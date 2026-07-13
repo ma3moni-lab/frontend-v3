@@ -1,0 +1,28 @@
+{
+  "name": "Ma3moni — Marriage Platform",
+  "short_name": "Ma3moni",
+  "description": "A compatibility-first platform for serious individuals seeking lifelong partnerships.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "background_color": "#F6F8FB",
+  "theme_color": "#0A6870",
+  "orientation": "portrait-primary",
+  "lang": "en",
+  "categories": ["social", "lifestyle"],
+  "icons": [
+    { "src": "/icons/icon-192.svg", "sizes": "any",     "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-512.svg", "sizes": "any",     "type": "image/svg+xml", "purpose": "maskable" },
+    { "src": "/icons/apple-touch-icon.svg", "sizes": "180x180", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    { "name": "My Matches",  "short_name": "Matches",  "url": "/?tab=matches",  "description": "View your compatibility matches" },
+    { "name": "Messages",    "short_name": "Messages", "url": "/?tab=messages", "description": "Open your conversations" },
+    { "name": "My Profile",  "short_name": "Profile",  "url": "/?tab=profile",  "description": "Edit your profile" }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "id": "com.ma3moni.app"
+}

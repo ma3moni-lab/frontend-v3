@@ -1,0 +1,289 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+
+  /* ── Brand surfaces ──────────────────────── */
+  --background: #F4F7FA;
+  --foreground: #0C1422;
+  --card: #FFFFFF;
+  --card-foreground: #0C1422;
+  --popover: #FFFFFF;
+  --popover-foreground: #0C1422;
+
+  /* ── Teal primary ────────────────────────── */
+  --primary: #0A6870;
+  --primary-foreground: #FFFFFF;
+
+  /* ── Supporting UI ───────────────────────── */
+  --secondary: #E6F2F3;
+  --secondary-foreground: #0A6870;
+  --muted: #ECF0F5;
+  --muted-foreground: #64737F;
+  --accent: #C5733F;
+  --accent-foreground: #FFFFFF;
+  --destructive: #D41F3A;
+  --destructive-foreground: #FFFFFF;
+
+  /* ── Form & input ────────────────────────── */
+  --border: rgba(12, 20, 34, 0.08);
+  --input: transparent;
+  --input-background: #EEF2F8;
+  --switch-background: #BFC8D4;
+  --ring: rgba(10, 104, 112, 0.30);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+
+  /* ── Shadows ─────────────────────────────── */
+  --shadow-sm: 0 1px 2px rgba(12,20,34,0.06), 0 1px 4px rgba(12,20,34,0.04);
+  --shadow-md: 0 4px 12px rgba(12,20,34,0.08), 0 2px 4px rgba(12,20,34,0.05);
+  --shadow-lg: 0 10px 32px rgba(12,20,34,0.10), 0 4px 8px rgba(12,20,34,0.06);
+  --shadow-xl: 0 20px 48px rgba(12,20,34,0.13), 0 8px 16px rgba(12,20,34,0.06);
+  --shadow-primary: 0 8px 24px rgba(10,104,112,0.22);
+
+  /* ── Charts ──────────────────────────────── */
+  --chart-1: #0A6870;
+  --chart-2: #C5733F;
+  --chart-3: #4A8DB8;
+  --chart-4: #6B9E78;
+  --chart-5: #9B6DAF;
+
+  /* ── Radius scale (8 px grid) ────────────── */
+  --radius: 0.75rem;
+
+  /* ── Sidebar ─────────────────────────────── */
+  --sidebar: #0B1627;
+  --sidebar-foreground: #CBD5E0;
+  --sidebar-primary: #14A8B4;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #162436;
+  --sidebar-accent-foreground: #E8EDF4;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: #0A6870;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  /* Card sits slightly above the background for separation. */
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  /* Keep the brand teal as primary in dark mode (not near-white). */
+  --primary: #12808A;
+  --primary-foreground: #FFFFFF;
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.5 0.18 25.7);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.4 0 0);
+  /* Elevated field surface so text is readable when typing (was missing → stayed light). */
+  --input-background: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-switch-background: var(--switch-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+
+  /* View transition animations */
+  @keyframes fadeIn    { from { opacity:0; transform:translateY(6px);  } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeUp    { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes slideInRight { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
+  @keyframes slideInLeft  { from { opacity:0; transform:translateX(-24px); } to { opacity:1; transform:translateX(0); } }
+  @keyframes countUp   { from { opacity:0; transform:translateY(12px) scale(0.9); } to { opacity:1; transform:translateY(0) scale(1); } }
+  @keyframes float     { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+
+  .view-enter       { animation: fadeIn       0.22s ease forwards; }
+  .view-enter-up    { animation: fadeUp       0.26s ease forwards; }
+  .view-slide-right { animation: slideInRight 0.22s ease forwards; }
+  .view-slide-left  { animation: slideInLeft  0.22s ease forwards; }
+  .count-up         { animation: countUp      0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+  .float-animation  { animation: float        3s ease-in-out infinite; }
+
+  .logo-font {
+    font-family: 'Gugi', 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Overlay nav button (e.g. back arrow on top of photos/heroes).
+     A dark scrim + blur + ring + drop-shadow keeps the icon visible on ANY
+     background — light or dark, busy or plain. */
+  .overlay-nav-btn {
+    background: rgba(12, 20, 34, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .overlay-nav-btn:hover { background: rgba(12, 20, 34, 0.62); }
+  .overlay-nav-btn:active { transform: scale(0.94); }
+  /* Extra insurance: the icon itself carries a drop-shadow so it never merges
+     into the button or an unusually light photo behind a thin scrim. */
+  .overlay-nav-btn svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55)); }
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h2 {
+    font-size: var(--text-xl);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h3 {
+    font-size: var(--text-lg);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  h4 {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  label {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  button {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-medium);
+    line-height: 1.5;
+  }
+
+  input {
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-normal);
+    line-height: 1.5;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(12,20,34,0.15); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(12,20,34,0.25); }
+
+  /* ── Dot-grid hero background pattern ────────────── */
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(10,104,112,0.07) 1.5px, transparent 1.5px);
+    background-size: 28px 28px;
+  }
+
+  /* ── Gradient text ───────────────────────────────── */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--primary) 0%, #14A8B4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-gradient-warm {
+    background: linear-gradient(135deg, #C5733F 0%, #E09050 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Glass card surface ──────────────────────────── */
+  .glass {
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.55);
+  }
+  .glass-dark {
+    background: rgba(11,22,39,0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* ── Gradient card border (top accent) ───────────── */
+  .card-accent-border {
+    border-top: 2px solid var(--primary);
+  }
+
+  /* ── Ink shadow — dark premium card ─────────────── */
+  .ink-card {
+    background: linear-gradient(135deg, #0B1E2D 0%, #0D2538 100%);
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+}

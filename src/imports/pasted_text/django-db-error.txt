@@ -1,0 +1,108 @@
+Traceback (most recent call last):
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 275, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/postgresql/base.py", line 277, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+psycopg.OperationalError: failed to resolve host 'dpg-d976a10js32c73br5o1g-a': [Errno -2] Name or service not known
+The above exception was the direct cause of the following exception:
+Traceback (most recent call last):
+  File "/opt/render/project/src/manage.py", line 14, in <module>
+    main()
+    ~~~~^^
+  File "/opt/render/project/src/manage.py", line 11, in main
+    execute_from_command_line(sys.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+    utility.execute()
+    ~~~~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/__init__.py", line 436, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/base.py", line 413, in run_from_argv
+    self.execute(*args, **cmd_options)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/base.py", line 459, in execute
+    output = self.handle(*args, **options)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/base.py", line 107, in wrapper
+    res = handle_func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/commands/migrate.py", line 100, in handle
+    self.check(databases=[database])
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/management/base.py", line 486, in check
+    all_issues = checks.run_checks(
+        app_configs=app_configs,
+    ...<2 lines>...
+        databases=databases,
+    )
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/checks/registry.py", line 88, in run_checks
+    new_errors = check(app_configs=app_configs, databases=databases)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/core/checks/model_checks.py", line 36, in check_all_models
+    errors.extend(model.check(**kwargs))
+                  ~~~~~~~~~~~^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/models/base.py", line 1617, in check
+    *cls._check_constraints(databases),
+     ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/models/base.py", line 2467, in _check_constraints
+    connection.features.supports_nulls_distinct_unique_constraints
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/functional.py", line 47, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+                                         ~~~~~~~~~^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/postgresql/features.py", line 141, in is_postgresql_15
+    return self.connection.pg_version >= 150000
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/functional.py", line 47, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+                                         ~~~~~~~~~^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/postgresql/base.py", line 438, in pg_version
+    with self.temporary_connection():
+         ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/render/project/python/Python-3.14.3/lib/python3.14/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 691, in temporary_connection
+    with self.cursor() as cursor:
+         ~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 316, in cursor
+    return self._cursor()
+           ~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 292, in _cursor
+    self.ensure_connection()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 274, in ensure_connection
+    with self.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/utils.py", line 91, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 275, in ensure_connection
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/base/base.py", line 256, in connect
+    self.connection = self.get_new_connection(conn_params)
+                      ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/utils/asyncio.py", line 26, in inner
+    return func(*args, **kwargs)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/django/db/backends/postgresql/base.py", line 277, in get_new_connection
+    connection = self.Database.connect(**conn_params)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/psycopg/connection.py", line 100, in connect
+    attempts = conninfo_attempts(params)
+  File "/opt/render/project/src/.venv/lib/python3.14/site-packages/psycopg/_conninfo_attempts.py", line 55, in conninfo_attempts
+    raise last_exc
+django.db.utils.OperationalError: failed to resolve host 'dpg-d976a10js32c73br5o1g-a': [Errno -2] Name or service not known
+==> Build failed 😞
