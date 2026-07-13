@@ -17,6 +17,11 @@ function figmaAssetResolver() {
 }
 
 export default defineConfig({
+  define: {
+    // Stamped at build time — makes sw.js byte-unique on every deploy
+    // so browsers detect the update and trigger an auto-refresh.
+    __BUILD_ID__: JSON.stringify(`${Date.now()}`),
+  },
   server: {
     headers: { 'Service-Worker-Allowed': '/' },
   },

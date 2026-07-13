@@ -3,9 +3,25 @@
 // Base URL is read from VITE_API_URL (default: http://localhost:8000).
 // All endpoints mirror the Phase 0-10 spec exactly.
 
-const BASE = (import.meta.env.VITE_API_URL ?? "https://ma3moni-backend.onrender.com").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_URL ?? "https://ma3moni-backend26.onrender.com").replace(/\/$/, "");
 /** Exposed so other modules can resolve relative media URLs from Django */
 export const DJANGO_BASE = BASE;
+
+/**
+ * Fire-and-forget ping to wake the Render free-tier server from sleep.
+ * Call once on app mount — any response (even 4xx) proves the server is up.
+ * Times out after 50 s (Render cold starts can take ~30-45 s).
+ */
+export async function wakeUpServer(): Promise<void> {
+  try {
+    await fetch(`${BASE}/api/`, {
+      method: "GET",
+      signal: AbortSignal.timeout(50_000),
+    });
+  } catch {
+    // Ignore — the point is to trigger the cold start, not to read the response
+  }
+}
 
 // ── Token storage keys ────────────────────────────────────────
 // Admin and user tokens are COMPLETELY ISOLATED — they never share a slot.
@@ -983,7 +999,7 @@ export const analytics = {
 // WebSocket URL helper — used by chat consumer
 // ═══════════════════════════════════════════════════════════════
 export function wsUrl(conversationId: string): string {
-  const base = (import.meta.env.VITE_API_URL ?? "https://ma3moni-backend.onrender.com")
+  const base = (import.meta.env.VITE_API_URL ?? "https://ma3moni-backend26.onrender.com")
     .replace(/^http/, "ws")
     .replace(/\/$/, "");
   const token = getAccessToken() ?? "";

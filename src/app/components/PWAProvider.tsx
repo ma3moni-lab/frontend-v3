@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Download, X, Wifi, Bell, Share } from "lucide-react";
 import { restorePreferences } from "../../lib/preferences";
+import { wakeUpServer } from "../../lib/api";
 
 interface PWAProviderProps { children: ReactNode; }
 interface BeforeInstallPromptEvent extends Event {
@@ -68,6 +69,8 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
   useEffect(() => {
     restorePreferences();
+    // Wake Render free-tier server before user tries to log in
+    wakeUpServer();
 
     // Preload critical fonts
     const preloadFont = (href: string) => {
@@ -83,6 +86,17 @@ export function PWAProvider({ children }: PWAProviderProps) {
     const manifest = document.createElement("link");
     manifest.rel = "manifest"; manifest.href = "/manifest.json";
     document.head.appendChild(manifest);
+
+    // Apple touch icon (home screen icon on iOS)
+    const appleIcon = document.createElement("link");
+    appleIcon.rel = "apple-touch-icon";
+    appleIcon.href = "/icons/apple-touch-icon.svg";
+    document.head.appendChild(appleIcon);
+
+    // Favicon
+    const favicon = document.createElement("link");
+    favicon.rel = "icon"; favicon.type = "image/svg+xml"; favicon.href = "/icons/icon-192.svg";
+    document.head.appendChild(favicon);
 
     // Theme & PWA meta tags
     const metas: HTMLMetaElement[] = [];
@@ -104,8 +118,17 @@ export function PWAProvider({ children }: PWAProviderProps) {
     addMeta("og:title", "Ma3moni — Where Intentional Connections Begin", false);
     addMeta("og:description", "A compatibility-first marriage platform.", false);
 
-    // Service Worker
+    // Service Worker — auto-reload when the new SW takes control.
+    // sw.ts calls skipWaiting() on install and clients.claim() on activate,
+    // so controllerchange fires as soon as the new version is active.
     if ("serviceWorker" in navigator) {
+      let reloading = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (reloading) return;
+        reloading = true;
+        window.location.reload();
+      });
+
       navigator.serviceWorker
         .register("/sw.js", { scope: "/" })
         .then(reg => {
@@ -133,7 +156,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
       const t = setTimeout(() => setShowIosBanner(true), 2000);
       return () => {
         clearTimeout(t);
-        document.head.removeChild(manifest);
+        try { document.head.removeChild(manifest); } catch {}
+        try { document.head.removeChild(appleIcon); } catch {}
+        try { document.head.removeChild(favicon); } catch {}
         metas.forEach(m => { try { document.head.removeChild(m); } catch {} });
         window.removeEventListener("online",  onOnline);
         window.removeEventListener("offline", onOffline);
@@ -149,7 +174,9 @@ export function PWAProvider({ children }: PWAProviderProps) {
     window.addEventListener("beforeinstallprompt", onInstall);
 
     return () => {
-      document.head.removeChild(manifest);
+      try { document.head.removeChild(manifest); } catch {}
+      try { document.head.removeChild(appleIcon); } catch {}
+      try { document.head.removeChild(favicon); } catch {}
       metas.forEach(m => { try { document.head.removeChild(m); } catch {} });
       window.removeEventListener("online",  onOnline);
       window.removeEventListener("offline", onOffline);

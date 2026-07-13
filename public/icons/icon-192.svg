@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A6870"/>
+      <stop offset="55%" stop-color="#0D8A95"/>
+      <stop offset="100%" stop-color="#0E9EA8"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect width="192" height="192" rx="40" fill="url(#bg)"/>
+  <!-- White heart, centered -->
+  <path
+    fill="white"
+    d="M96 140
+       C 96 140, 44 104, 44 70
+       C 44 52, 56 40, 70 40
+       C 80 40, 90 48, 96 56
+       C 102 48, 112 40, 122 40
+       C 136 40, 148 52, 148 70
+       C 148 104, 96 140, 96 140 Z"
+  />
+</svg>

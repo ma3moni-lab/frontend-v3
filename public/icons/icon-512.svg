@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0A6870"/>
+      <stop offset="55%" stop-color="#0D8A95"/>
+      <stop offset="100%" stop-color="#0E9EA8"/>
+    </linearGradient>
+  </defs>
+  <!-- Full bleed background for maskable icon (safe zone = inner 80%) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- White heart, within 60% safe zone (center 307x307 ~ 102..409) -->
+  <path
+    fill="white"
+    d="M256 375
+       C 256 375, 118 279, 118 185
+       C 118 138, 150 106, 188 106
+       C 212 106, 240 124, 256 148
+       C 272 124, 300 106, 324 106
+       C 362 106, 394 138, 394 185
+       C 394 279, 256 375, 256 375 Z"
+  />
+</svg>
