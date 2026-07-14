@@ -280,8 +280,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
           {/* CTA buttons */}
           <div className="flex items-center gap-2">
             <button onClick={onLogin}
-              className="hidden sm:flex items-center px-4 py-2 rounded-xl border border-border bg-white hover:bg-muted/40 transition-all text-foreground"
-              style={{ fontSize: "0.875rem", fontWeight: 600, boxShadow: "var(--shadow-sm)" }}>
+              className="hidden sm:flex items-center px-4 py-2 rounded-xl border border-border bg-white hover:bg-muted/40 transition-all"
+              style={{ fontSize: "0.875rem", fontWeight: 600, boxShadow: "var(--shadow-sm)", color: "#0C1422" }}>
               Sign In
             </button>
             <button onClick={onStart}
@@ -311,7 +311,7 @@ export function Landing({ onStart, onLogin }: LandingProps) {
               className="flex px-4 py-3 rounded-xl text-foreground hover:bg-muted/60 transition-colors"
               style={{ fontSize: "0.9375rem" }}>Blog</Link>
             <div className="pt-2 pb-1 flex gap-2">
-              <button onClick={onLogin} className="flex-1 py-3 rounded-xl border border-border bg-white text-center" style={{ fontSize: "0.9375rem", fontWeight: 600 }}>Sign In</button>
+              <button onClick={onLogin} className="flex-1 py-3 rounded-xl border border-border bg-white text-center" style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#0C1422" }}>Sign In</button>
               <button onClick={onStart} className="flex-1 py-3 rounded-xl text-white text-center" style={{ fontSize: "0.9375rem", fontWeight: 700, background: "linear-gradient(135deg, #0A6870, #0E8A95)" }}>Get Started</button>
             </div>
           </div>
@@ -357,8 +357,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                 <ArrowRight size={18} className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
               <button onClick={() => scrollTo("about")}
-                className="flex items-center justify-center gap-2 bg-white border border-border text-foreground px-8 py-4 rounded-2xl hover:bg-muted/40 transition-all"
-                style={{ fontSize: "1rem", fontWeight: 600, boxShadow: "var(--shadow-sm)" }}>
+                className="flex items-center justify-center gap-2 bg-white border border-border px-8 py-4 rounded-2xl hover:bg-muted/40 transition-all"
+                style={{ fontSize: "1rem", fontWeight: 600, boxShadow: "var(--shadow-sm)", color: "#0C1422" }}>
                 Learn More
               </button>
             </div>
