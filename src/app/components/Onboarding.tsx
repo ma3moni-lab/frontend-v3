@@ -1,5 +1,5 @@
-import { useState, useRef, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Check, Upload, Heart, X, RefreshCw, ChevronDown } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Check, Heart, X, RefreshCw, ChevronDown } from "lucide-react";
 
 // ── Country list (ISO 3166-1 alpha-2 sorted by name) ──────────────────────────
 const COUNTRIES = [
@@ -82,7 +82,7 @@ interface OnboardingProps {
   onBack: () => void;
 }
 
-const TOTAL_STEPS = 8;
+const TOTAL_STEPS = 7;
 
 type Gender = "male" | "female";
 type EducationLevel = "high-school" | "bachelors" | "masters" | "phd" | "other";
@@ -139,7 +139,6 @@ interface FormState {
   partnerAgeMax: number;
   partnerLocation: "same-city" | "same-country" | "worldwide" | "";
   educationImportance: "must-have" | "important" | "nice-to-have" | "not-important" | "";
-  photos: string[];
 }
 
 const initialForm: FormState = {
@@ -167,7 +166,6 @@ const initialForm: FormState = {
   partnerAgeMax: 35,
   partnerLocation: "",
   educationImportance: "",
-  photos: [],
 };
 
 const STEP_LABELS = [
@@ -178,7 +176,6 @@ const STEP_LABELS = [
   "Personality",
   "Goals & Timeline",
   "Preferences",
-  "Photos",
 ];
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
@@ -296,9 +293,6 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
   const [completed, setCompleted] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
-  // Real photo object URLs for onboarding step 8.
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
-  const photoInputRef = useRef<HTMLInputElement>(null);
   const [showResumeBanner, setShowResumeBanner] = useState(isResuming);
 
   const persist = (newStep: number, newForm: FormState) => {
@@ -342,7 +336,6 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
       }).catch(() => {});
 
       setCompleted(true);
-      setTimeout(onComplete, 1800);
     }
   };
 
@@ -355,14 +348,121 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
   };
 
   if (completed) {
+    const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ") || "Your Profile";
+    const religiosityLabel = ["", "Minimal", "Moderate", "Practicing", "Devout", "Very Devout"][form.religiosity] ?? "";
+    const timelineLabel = form.marriageTimeline ? {
+      "6months": "Within 6 months", "6-12months": "6–12 months",
+      "1-2years": "1–2 years", "2plus": "No rush (2+ years)",
+    }[form.marriageTimeline] ?? "" : "";
+
+    const chips = [
+      form.gender === "male" ? "Man" : form.gender === "female" ? "Woman" : "",
+      form.nationality,
+      form.city && form.country ? `${form.city}, ${form.country}` : form.country,
+      form.education ? { "high-school": "High School", bachelors: "Bachelor's", masters: "Master's", phd: "PhD", other: "Other" }[form.education] ?? form.education : "",
+      religiosityLabel ? `${religiosityLabel} practice` : "",
+      timelineLabel ? `Marriage: ${timelineLabel}` : "",
+    ].filter(Boolean);
+
     return (
-      <div className="size-full flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-            <Check size={36} className="text-primary" />
+      <div className="size-full bg-background overflow-y-auto">
+        <div className="max-w-lg mx-auto px-5 py-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-full bg-primary/10 border-4 border-primary/20 flex items-center justify-center mx-auto mb-4">
+              <span style={{ fontSize: "2rem", fontWeight: 900, color: "var(--primary)" }}>
+                {form.firstName.charAt(0).toUpperCase() || "✓"}
+              </span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 mb-3">
+              <Check size={13} className="text-green-600" />
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#065f46" }}>Profile Created</span>
+            </div>
+            <h2 style={{ fontSize: "1.75rem", fontWeight: 900, letterSpacing: "-0.025em" }}>Welcome, {form.firstName || "there"}!</h2>
+            <p className="text-muted-foreground mt-1.5" style={{ fontSize: "0.9375rem" }}>
+              Here's a summary of your profile before you start matching.
+            </p>
           </div>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: 800, letterSpacing: "-0.02em" }}>Profile Created!</h2>
-          <p className="text-muted-foreground mt-3" style={{ fontSize: "1rem" }}>Taking you to your dashboard…</p>
+
+          {/* Profile card */}
+          <div className="rounded-2xl border border-border bg-card overflow-hidden mb-5 shadow-sm">
+            {/* Name & chips */}
+            <div className="px-5 py-4 border-b border-border">
+              <h3 style={{ fontWeight: 800, fontSize: "1.25rem" }}>{fullName}</h3>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {chips.map(c => (
+                  <span key={c} className="px-2.5 py-1 rounded-full bg-secondary border border-primary/15 text-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>{c}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Sections */}
+            {[
+              {
+                title: "Background",
+                rows: [
+                  { label: "Nationality", val: form.nationality },
+                  { label: "Ethnicity", val: form.ethnicity },
+                  { label: "Lives in", val: [form.city, form.country].filter(Boolean).join(", ") },
+                  { label: "Profession", val: form.profession },
+                  ...(form.bloodGroup ? [{ label: "Blood Group", val: form.bloodGroup }] : []),
+                  ...(form.genotype   ? [{ label: "Genotype",    val: form.genotype }] : []),
+                ],
+              },
+              {
+                title: "Values & Lifestyle",
+                rows: [
+                  { label: "Religiosity", val: religiosityLabel },
+                  { label: "Family",      val: form.familyImportance === "high" ? "Very Important" : form.familyImportance === "medium" ? "Important" : "Values independence" },
+                  ...(form.lifestyle.length ? [{ label: "Lifestyle", val: form.lifestyle.join(", ") }] : []),
+                  ...(form.personality.length ? [{ label: "Personality", val: form.personality.join(", ") }] : []),
+                ],
+              },
+              {
+                title: "Goals & Timeline",
+                rows: [
+                  { label: "Marriage", val: timelineLabel },
+                  { label: "Career", val: form.careerAmbition === "high" ? "Highly Ambitious" : form.careerAmbition === "balanced" ? "Balanced" : form.careerAmbition === "low" ? "Family-First" : "" },
+                  ...(form.lifeGoals.length ? [{ label: "Life Goals", val: form.lifeGoals.join(", ") }] : []),
+                ],
+              },
+              {
+                title: "Partner Preferences",
+                rows: [
+                  { label: "Age Range", val: `${form.partnerAgeMin}–${form.partnerAgeMax} years` },
+                  { label: "Location", val: form.partnerLocation === "same-city" ? "Same City" : form.partnerLocation === "same-country" ? "Same Country" : form.partnerLocation === "worldwide" ? "Worldwide" : "" },
+                ],
+              },
+            ].map(section => (
+              <div key={section.title} className="px-5 py-4 border-b border-border last:border-0">
+                <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{section.title}</p>
+                <div className="space-y-2">
+                  {section.rows.filter(r => r.val).map(r => (
+                    <div key={r.label} className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                      <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tip */}
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-2.5 mb-6">
+            <span style={{ fontSize: "1rem" }}>💡</span>
+            <p style={{ fontSize: "0.8125rem", lineHeight: 1.6, color: "#92400e" }}>
+              <strong>Add photos after logging in</strong> — profiles with photos receive 3× more matches. You can upload from your Profile tab.
+            </p>
+          </div>
+
+          <button
+            onClick={onComplete}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 active:scale-[0.98] transition-all"
+            style={{ fontWeight: 700, fontSize: "1.0625rem" }}>
+            <Heart size={18} className="fill-current" />
+            Start Finding Matches
+          </button>
         </div>
       </div>
     );
@@ -711,80 +811,6 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             </div>
           )}
 
-          {step === 8 && (
-            <div>
-              <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Add your photos</h2>
-              <p className="text-muted-foreground mt-2 mb-6" style={{ fontSize: "0.9375rem" }}>Upload up to 5 photos. Your main photo will be reviewed before going live.</p>
-
-              {/* Hidden file input */}
-              <input
-                ref={photoInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                className="sr-only"
-                aria-label="Upload photos"
-                onChange={e => {
-                  const files = Array.from(e.target.files ?? []);
-                  const urls = files.map(f => URL.createObjectURL(f));
-                  const next = [...photoUrls, ...urls].slice(0, 5);
-                  setPhotoUrls(next);
-                  update("photos", next);
-                  e.target.value = "";
-                }}
-              />
-
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                {Array.from({ length: 5 }).map((_, i) => {
-                  const url = photoUrls[i];
-                  const isMain = i === 0;
-                  return (
-                    <div key={i} className={`relative ${isMain ? "col-span-2 row-span-2" : ""}`}>
-                      {url ? (
-                        <>
-                          <div className={`rounded-2xl overflow-hidden border-2 border-primary ${isMain ? "aspect-square" : "aspect-square"}`}>
-                            <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
-                          </div>
-                          {isMain && (
-                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-primary text-primary-foreground" style={{ fontSize: "0.625rem", fontWeight: 800 }}>MAIN</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => { const next = photoUrls.filter((_, j) => j !== i); setPhotoUrls(next); update("photos", next); }}
-                            className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center shadow-md"
-                            aria-label="Remove photo">
-                            <X size={13} />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => photoInputRef.current?.click()}
-                          className={`w-full aspect-square rounded-2xl border-2 border-dashed border-border hover:border-primary/40 hover:bg-primary/5 flex flex-col items-center justify-center gap-1.5 text-muted-foreground transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40`}>
-                          <Upload size={isMain ? 28 : 18} />
-                          {isMain && <span style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Add main photo</span>}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              {photoUrls.length === 0 && (
-                <div className="rounded-xl p-3.5 border border-amber-200 bg-amber-50 flex items-start gap-2.5 mb-3">
-                  <span style={{ fontSize: "1rem", lineHeight: 1 }}>💡</span>
-                  <p style={{ fontSize: "0.8125rem", lineHeight: 1.6, color: "#92400e" }}>
-                    <strong>Profiles with photos receive 3× more matches.</strong> You can skip for now and add photos from your Profile tab at any time.
-                  </p>
-                </div>
-              )}
-              <div className="bg-secondary rounded-xl p-4 border border-primary/10">
-                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem", lineHeight: 1.6 }}>
-                  <span style={{ fontWeight: 600, color: "var(--foreground)" }}>Photo review:</span> Your main photo will be reviewed by our moderation team within 24 hours before becoming visible to other members.
-                </p>
-              </div>
-            </div>
-          )}
         </div>{/* end step content */}
 
         {/* Validation error */}
@@ -812,7 +838,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3.5 rounded-xl hover:bg-primary/90 transition-all active:scale-[0.98]"
             style={{ fontSize: "0.9375rem", fontWeight: 600 }}
           >
-            {step === TOTAL_STEPS ? (photoUrls.length === 0 ? "Complete without photo" : "Complete Profile") : "Continue"}
+            {step === TOTAL_STEPS ? "Complete Profile" : "Continue"}
             {step < TOTAL_STEPS && <ChevronRight size={16} />}
           </button>
         </div>

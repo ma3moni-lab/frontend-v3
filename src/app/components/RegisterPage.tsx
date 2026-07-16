@@ -151,7 +151,6 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
   const [mode, setMode]           = useState<"email" | "phone">("email");
   const [email, setEmail]         = useState("");
   const [phone, setPhone]         = useState("");
-  const [fullName, setFullName]   = useState("");
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
   const [showPw, setShowPw]       = useState(false);
@@ -175,7 +174,7 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
       const res = await apiAuth.register(
         mode === "email" ? email.toLowerCase().trim() : `${phone.replace(/\s/g, "")}@phone.ma3moni`,
         password,
-        fullName.trim(),
+        "",
         mode === "phone" ? phone.trim() : undefined,
       );
       setUserTokens(res.access, res.refresh);
@@ -254,17 +253,6 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Full name */}
-          <div>
-            <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Full name</label>
-            <input
-              type="text" value={fullName} onChange={e => setFullName(e.target.value)}
-              placeholder="Your full name" required
-              className="w-full px-4 py-3.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-              style={{ fontSize: "0.9375rem" }}
-            />
-          </div>
-
           {/* Email or Phone */}
           {mode === "email" ? (
             <div>
