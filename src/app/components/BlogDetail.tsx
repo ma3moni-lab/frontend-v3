@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Clock, Calendar, User, Heart, ArrowRight, Quote, CheckCircle, ThumbsUp, ThumbsDown, Eye } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, Heart, ArrowRight, Quote, CheckCircle, ThumbsUp, ThumbsDown, Eye } from "lucide-react";
 
 const u = (id: string, w: number, h: number) =>
   `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&auto=format`;
@@ -663,7 +663,7 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
       </div>
 
       {/* ── Article content ── */}
-      <div className="max-w-3xl mx-auto px-6 pt-10 pb-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-16">
 
         {/* Title */}
         <h1 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, lineHeight: 1.15, letterSpacing: "-0.03em", marginBottom: "1.5rem" }}>
@@ -676,41 +676,30 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
         </p>
 
         {/* Author + meta */}
-        <div className="flex flex-wrap items-center gap-5 pb-8 border-b border-border mb-10">
+        <div className="flex flex-wrap items-center gap-4 pb-8 border-b border-border mb-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
               <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--primary)" }}>
                 {article.author.split(" ").map(n => n[0]).join("")}
               </span>
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <User size={12} className="text-muted-foreground" />
-                <span style={{ fontWeight: 700, fontSize: "0.9rem" }}>{article.author}</span>
-              </div>
+              <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{article.author}</span>
               <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{article.authorRole}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-muted-foreground">
+          <div className="flex items-center gap-3 text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1.5">
-              <Calendar size={13} />
-              <span style={{ fontSize: "0.875rem" }}>{article.date}</span>
+              <Calendar size={12} />
+              <span style={{ fontSize: "0.8125rem" }}>{article.date}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Clock size={13} />
-              <span style={{ fontSize: "0.875rem" }}>{article.readTime}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Eye size={13} />
-              <span style={{ fontSize: "0.875rem" }}>{views.toLocaleString()} views</span>
+              <Clock size={12} />
+              <span style={{ fontSize: "0.8125rem" }}>{article.readTime}</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <ThumbsUp size={13} className="text-green-500" />
-              <span style={{ fontSize: "0.875rem", color: "#16a34a" }}>{likes}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <ThumbsDown size={13} className="text-red-400" />
-              <span style={{ fontSize: "0.875rem", color: "#dc2626" }}>{dislikes}</span>
+              <Eye size={12} />
+              <span style={{ fontSize: "0.8125rem" }}>{views.toLocaleString()} views</span>
             </div>
           </div>
         </div>
@@ -719,30 +708,40 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
         <ArticleBody sections={article.body} />
 
         {/* ── Like / Dislike ── */}
-        <div className="mt-10 py-8 border-t border-b border-border text-center">
-          <p style={{ fontWeight: 700, fontSize: "1rem" }}>Was this article helpful?</p>
-          <p className="text-muted-foreground mt-1 mb-5" style={{ fontSize: "0.875rem" }}>Your feedback helps us improve our content.</p>
-          <div className="flex items-center justify-center gap-4">
+        <div className="mt-10 pt-8 border-t border-border">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => vote("like")}
-              className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl border transition-all ${voted === "like" ? "bg-green-500 border-green-500 text-white" : "border-border bg-card hover:border-green-500/50 hover:text-green-600 text-muted-foreground"}`}
-              style={{ fontWeight: 700, fontSize: "0.9375rem" }}
               aria-label="Like this article"
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 transition-all ${
+                voted === "like"
+                  ? "bg-green-500 border-green-500 text-white"
+                  : "border-border bg-card hover:border-green-400 hover:text-green-600 text-muted-foreground"
+              }`}
+              style={{ fontWeight: 700, fontSize: "0.9375rem" }}
             >
-              <ThumbsUp size={18} /> {likes.toLocaleString()}
+              <ThumbsUp size={17} />
+              <span>Helpful</span>
+              <span className="ml-1 opacity-70" style={{ fontSize: "0.8125rem" }}>({likes.toLocaleString()})</span>
             </button>
             <button
               onClick={() => vote("dislike")}
-              className={`flex items-center gap-2.5 px-6 py-3 rounded-2xl border transition-all ${voted === "dislike" ? "bg-red-500 border-red-500 text-white" : "border-border bg-card hover:border-red-400/50 hover:text-red-500 text-muted-foreground"}`}
-              style={{ fontWeight: 700, fontSize: "0.9375rem" }}
               aria-label="Dislike this article"
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 transition-all ${
+                voted === "dislike"
+                  ? "bg-red-500 border-red-500 text-white"
+                  : "border-border bg-card hover:border-red-300 hover:text-red-500 text-muted-foreground"
+              }`}
+              style={{ fontWeight: 700, fontSize: "0.9375rem" }}
             >
-              <ThumbsDown size={18} /> {dislikes.toLocaleString()}
+              <ThumbsDown size={17} />
+              <span>Not helpful</span>
+              <span className="ml-1 opacity-70" style={{ fontSize: "0.8125rem" }}>({dislikes.toLocaleString()})</span>
             </button>
           </div>
           {voted && (
             <p className="mt-3 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
-              {voted === "like" ? "Thank you! Glad this resonated." : "Thank you — we'll take your feedback on board."}
+              {voted === "like" ? "Thanks — glad it resonated." : "Thanks — we'll take your feedback on board."}
             </p>
           )}
         </div>

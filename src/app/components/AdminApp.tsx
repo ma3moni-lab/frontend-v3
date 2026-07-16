@@ -2936,6 +2936,17 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
   const defaultSection = role === "customer-care" ? "support" : role === "blog-admin" ? "blog" : "overview";
   const [section, setSection] = useState<AdminSection>(defaultSection);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Admin profile photo — fetched from /me/ so it shows in the sidebar
+  const [adminPhotoUrl, setAdminPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    import("../../lib/api").then(({ auth }) => {
+      auth.me().then(me => {
+        const photo = me.photos?.[0]?.image_url;
+        if (photo) setAdminPhotoUrl(photo);
+      }).catch(() => {});
+    });
+  }, []);
   const [isPending, startTransition] = useTransition();
 
   // Live counts for nav badges
@@ -3063,8 +3074,11 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
         <div className="p-3 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
           {sidebarOpen ? (
             <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2 rounded-xl" style={{ background: "var(--sidebar-accent)" }}>
-              <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-                <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-sidebar-primary flex items-center justify-center flex-shrink-0">
+                {adminPhotoUrl
+                  ? <img src={adminPhotoUrl} alt={adminName} className="w-full h-full object-cover object-top" />
+                  : <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
+                }
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--sidebar-foreground)", lineHeight: 1.3 }}>{adminName}</p>
@@ -3074,8 +3088,11 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
             </div>
           ) : (
             <div className="flex justify-center mb-2">
-              <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center">
-                <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
+              <div className="w-8 h-8 rounded-full overflow-hidden bg-sidebar-primary flex items-center justify-center">
+                {adminPhotoUrl
+                  ? <img src={adminPhotoUrl} alt={adminName} className="w-full h-full object-cover object-top" />
+                  : <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
+                }
               </div>
             </div>
           )}
@@ -3106,8 +3123,11 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
             <div className="h-5 w-px bg-border" />
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`}>
-              <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
+            <div className="w-8 h-8 rounded-full overflow-hidden bg-primary flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`}>
+              {adminPhotoUrl
+                ? <img src={adminPhotoUrl} alt={adminName} className="w-full h-full object-cover object-top" />
+                : <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
+              }
             </div>
           </div>
         </div>

@@ -377,8 +377,16 @@ export function LifeGoalsSection({ onBack, onSaved }: { onBack: () => void; onSa
   const [saved, setSaved] = useState(false);
   const s = () => {
     saveProfile({ marriageTimeline: f.timeline, wantsChildren: f.wantsChildren, numChildren: f.numChildren, careerAmbition: f.careerAmbition, goals: f.goals, goalsNote: f.note });
-    // marital_status is the closest backend field for marriage timeline
-    apiAuth.updateProfile({ marital_status: f.timeline }).catch(() => {});
+    // Save all relevant fields to backend so data persists across devices
+    const childrenPref = f.wantsChildren === "yes"
+      ? `yes-${f.numChildren}`
+      : f.wantsChildren;
+    apiAuth.updateProfile({
+      marriage_timeline:     f.timeline,
+      children_preference:   childrenPref,
+      career_ambition_level: f.careerAmbition,
+      interests:             f.goals.length ? f.goals : undefined,
+    } as never).catch(() => {});
     setSaved(true); toast.success("Changes saved");
     setTimeout(() => { setSaved(false); onSaved ? onSaved() : onBack(); }, 900);
   };

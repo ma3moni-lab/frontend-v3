@@ -98,13 +98,22 @@ sw.addEventListener("fetch", (e: FetchEvent) => {
 sw.addEventListener("push", (e: PushEvent) => {
   const data = e.data?.json() ?? { title: "Ma3moni", body: "You have a new notification." };
   e.waitUntil(
-    sw.registration.showNotification(data.title, {
-      body:    data.body,
-      icon:    "/icons/icon-192.svg",
-      badge:   "/icons/icon-192.svg",
-      data:    { url: data.url ?? "/" },
-      vibrate: [100, 50, 100],
-    })
+    // Notify all open clients so they can play an in-app sound
+    sw.clients.matchAll({ type: "window" }).then(clients => {
+      clients.forEach(c => c.postMessage({ type: "PUSH_RECEIVED", data }));
+    }).then(() =>
+      sw.registration.showNotification(data.title, {
+        body:             data.body,
+        icon:             "/icons/icon-192.svg",
+        badge:            "/icons/icon-192.svg",
+        data:             { url: data.url ?? "/" },
+        vibrate:          [120, 60, 120, 60, 200],
+        requireInteraction: false,
+        tag:              "ma3moni-push",
+        renotify:         true,
+        silent:           false,
+      })
+    )
   );
 });
 

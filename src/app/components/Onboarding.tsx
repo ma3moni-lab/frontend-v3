@@ -321,14 +321,25 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
       // Push to backend — best effort, non-blocking
       import("../../lib/api").then(({ auth: apiAuth }) => {
         const payload: Record<string, unknown> = {
-          full_name:        fullName,
-          gender:           form.gender,
-          nationality:      form.nationality,
-          ethnicity:        form.ethnicity,
-          location_country: form.country,
-          location_city:    form.city,
-          profession:       form.profession,
-          education:        form.education,
+          full_name:            fullName,
+          gender:               form.gender,
+          nationality:          form.nationality,
+          ethnicity:            form.ethnicity,
+          location_country:     form.country,
+          location_city:        form.city,
+          profession:           form.profession,
+          education:            form.education,
+          // Additional fields collected during onboarding
+          date_of_birth:        form.birthYear ? `${form.birthYear}-01-01` : undefined,
+          marriage_timeline:    form.marriageTimeline || undefined,
+          communication_style:  form.communicationStyle || undefined,
+          career_ambition_level: form.careerAmbition || undefined,
+          personality_traits:   form.personality.length ? form.personality : undefined,
+          interests:            form.lifestyle.length ? form.lifestyle : undefined,
+          pref_age_min:         form.partnerAgeMin || undefined,
+          pref_age_max:         form.partnerAgeMax || undefined,
+          pref_location:        form.partnerLocation || undefined,
+          pref_education:       form.educationImportance || undefined,
         };
         if (form.bloodGroup) payload.blood_group = form.bloodGroup;
         if (form.genotype)   payload.genotype    = form.genotype;

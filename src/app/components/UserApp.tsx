@@ -744,22 +744,40 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
 }
 
 // ─── GUIDANCE (in-app blog list) ─────────────────────────
+// Minimal article type for the list view — covers both API articles and static fallbacks
+interface ListArticle { id: string | number; title: string; category: string; photo: string; author: string; readTime?: string; slug?: string; }
+
 function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpenArticle: (id: number) => void }) {
   const [cat, setCat] = useState<string>("All");
-  const [apiCategories, setApiCategories] = useState<string[]>([]);
+  const [liveList, setLiveList] = useState<ListArticle[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  // Fetch categories from API; falls back to ARTICLES-derived list
   useEffect(() => {
-    import("../../lib/api").then(({ blog }) =>
-      blog.categories().then(res => {
-        if (res.length) setApiCategories(res.map(c => c.name));
-      }).catch(() => {})
-    );
+    import("../../lib/api").then(({ blog }) => {
+      blog.articles().then(res => {
+        if (res.results.length) {
+          setLiveList(res.results.map(a => ({
+            id:       a.id,
+            title:    a.title,
+            category: a.category?.name ?? "General",
+            photo:    a.cover_image ?? "",
+            author:   a.author?.full_name ?? "",
+            readTime: "",
+            slug:     a.slug,
+          })));
+        }
+      }).catch(() => {}).finally(() => setLoaded(true));
+    });
   }, []);
 
-  const cats = apiCategories.length ? apiCategories : Array.from(new Set(ARTICLES.map(a => a.category)));
+  // Merge: live API articles first, then static fallbacks not already covered by slug/id
+  const merged: ListArticle[] = liveList.length
+    ? liveList
+    : ARTICLES.map(a => ({ id: a.id, title: a.title, category: a.category, photo: a.photo, author: a.author, readTime: a.readTime }));
+
+  const cats = Array.from(new Set(merged.map(a => a.category)));
   const categories = ["All", ...cats];
-  const list = cat === "All" ? ARTICLES : ARTICLES.filter(a => a.category === cat);
+  const list = cat === "All" ? merged : merged.filter(a => a.category === cat);
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -768,6 +786,7 @@ function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpe
           <ChevronLeft size={22} />
         </button>
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Guidance &amp; Articles</h3>
+        {!loaded && <div className="ml-auto w-3.5 h-3.5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />}
       </div>
 
       {/* Category filter */}
@@ -783,17 +802,26 @@ function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpe
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {list.map(a => (
-          <button key={a.id} onClick={() => onOpenArticle(a.id)}
+          <button key={String(a.id)} onClick={() => {
+            // Live articles identified by numeric id mapped from static ARTICLES if possible;
+            // otherwise open by index 1 as a safe fallback.
+            const numId = typeof a.id === "number" ? a.id : parseInt(String(a.id), 10);
+            const fallback = ARTICLES.find(s => s.title === a.title)?.id ?? ARTICLES[0]?.id ?? 1;
+            onOpenArticle(isNaN(numId) ? fallback : numId);
+          }}
             className="w-full flex gap-3 bg-card rounded-2xl border border-border p-3 hover:border-primary/25 hover:shadow-sm transition-all text-left">
-            <div className="rounded-xl overflow-hidden flex-shrink-0" style={{ width: 92, height: 92 }}>
-              <img src={a.photo} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            <div className="rounded-xl overflow-hidden flex-shrink-0 bg-muted" style={{ width: 88, height: 88 }}>
+              {a.photo
+                ? <img src={a.photo} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center"><BookOpen size={22} className="text-muted-foreground" /></div>
+              }
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-primary" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{a.category}</span>
-              <p style={{ fontWeight: 700, fontSize: "0.875rem", lineHeight: 1.35, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</p>
+              <span className="text-primary" style={{ fontSize: "0.6875rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>{a.category}</span>
+              <p style={{ fontWeight: 600, fontSize: "0.875rem", lineHeight: 1.4, marginTop: 2, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</p>
               <div className="flex items-center gap-1.5 mt-1.5 text-muted-foreground">
-                <BookOpen size={11} /><span style={{ fontSize: "0.6875rem" }}>{a.readTime}</span>
-                <span style={{ fontSize: "0.6875rem" }}>·</span>
+                <BookOpen size={11} />
+                {a.readTime && <><span style={{ fontSize: "0.6875rem" }}>{a.readTime}</span><span style={{ fontSize: "0.6875rem" }}>·</span></>}
                 <span style={{ fontSize: "0.6875rem" }}>{a.author}</span>
               </div>
             </div>
@@ -2909,9 +2937,14 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
 function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: string }) {
   const [copied, setCopied] = useState(false);
   const [apiStats, setApiStats] = useState<ReferralStats | null>(null);
+  const [bonusPoints, setBonusPoints] = useState<number | null>(null);
 
   useEffect(() => {
     referralsApi.myCode().then(setApiStats).catch(() => {});
+    // Fetch admin-configured referral bonus
+    import("../../lib/api").then(({ adminApi: aApi }) =>
+      aApi.settings().then(s => { if (s.referral_bonus_points) setBonusPoints(s.referral_bonus_points); }).catch(() => {})
+    );
   }, []);
 
   const code = apiStats?.code ?? (() => {
@@ -2960,7 +2993,9 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
         {/* Hero */}
         <div className="bg-primary rounded-2xl p-6 text-white text-center mb-6">
           <Gift size={36} className="mx-auto mb-3 opacity-80" />
-          <h2 style={{ fontWeight: 800, fontSize: "1.5rem" }}>Earn $10 per referral</h2>
+          <h2 style={{ fontWeight: 800, fontSize: "1.5rem" }}>
+            Earn {bonusPoints ? `${bonusPoints} pts` : "$10"} per referral
+          </h2>
           <p style={{ fontSize: "0.9rem", opacity: 0.8, marginTop: 8 }}>
             Share your unique code with friends and earn when they subscribe.
           </p>
@@ -3010,7 +3045,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
           {[
             { step: "1", text: "Share your code with friends looking for a partner" },
             { step: "2", text: "They sign up and enter your referral code" },
-            { step: "3", text: "When they subscribe, you earn $10 instantly" },
+            { step: "3", text: `When they subscribe, you earn ${bonusPoints ? `${bonusPoints} points` : "$10"} instantly` },
           ].map(({ step, text }) => (
             <div key={step} className="flex items-start gap-3 mb-3 last:mb-0">
               <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -3683,7 +3718,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
 
   const u = <K extends keyof typeof form>(k: K, v: string) => setForm(p => ({ ...p, [k]: v }));
 
-  const save = () => {
+  const save = async () => {
     const fullNameVal = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ");
     try {
       const raw = localStorage.getItem("ma3moni_onboarding_progress");
@@ -3692,6 +3727,19 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
         step: 8,
         form: { ...existing, fullName: fullNameVal, gender: form.gender, dob: form.dob, city: form.city, country: form.country, bio: form.bio, phone: form.phone },
       }));
+    } catch {}
+    // Persist to backend so data survives logout/device changes
+    try {
+      const { auth: apiAuth } = await import("../../lib/api");
+      const patch: Record<string, unknown> = {
+        full_name:       fullNameVal,
+        gender:          form.gender || undefined,
+        location_city:   form.city.trim() || undefined,
+        location_country: form.country.trim() || undefined,
+        bio:             form.bio.trim() || undefined,
+      };
+      if (form.dob) patch.date_of_birth = form.dob;
+      apiAuth.updateProfile(patch as never).catch(() => {});
     } catch {}
     setSaved(true);
     toast.success("Personal info saved");
@@ -3930,6 +3978,52 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [blockModal, setBlockModal] = useState<{ matchId: string; name: string } | null>(null);
   const [reportModal, setReportModal] = useState<{ matchId: string; name: string } | null>(null);
 
+  // ── Hydrate localStorage profile from backend on mount ──────
+  // Runs once on mount. Fetches /me/ and merges backend profile fields into
+  // the localStorage key so data survives logout/device changes.
+  useEffect(() => {
+    import("../../lib/api").then(({ auth }) => {
+      auth.me().then(me => {
+        const p = me.profile;
+        if (!p) return;
+        const PROFILE_KEY = "ma3moni_onboarding_progress";
+        try {
+          const raw = localStorage.getItem(PROFILE_KEY);
+          const existing: Record<string, unknown> = raw
+            ? (JSON.parse(raw) as { form?: Record<string, unknown> }).form ?? {}
+            : {};
+          // Map backend fields → frontend localStorage keys (only overwrite if empty)
+          const hydrated: Record<string, unknown> = { ...existing };
+          const set = (k: string, v: unknown) => { if (!hydrated[k] && v) hydrated[k] = v; };
+          set("fullName",        p.full_name);
+          set("gender",          p.gender);
+          set("dob",             p.date_of_birth);
+          set("nationality",     p.nationality);
+          set("ethnicity",       p.ethnicity);
+          set("city",            p.location_city);
+          set("country",         p.location_country);
+          set("bio",             p.bio);
+          set("education",       p.education);
+          set("profession",      p.profession);
+          set("bloodGroup",      p.blood_group);
+          set("genotype",        p.genotype);
+          set("marriageTimeline",(p as Record<string,unknown>).marriage_timeline);
+          set("wantsChildren",   (p as Record<string,unknown>).children_preference);
+          set("careerAmbition",  (p as Record<string,unknown>).career_ambition_level);
+          set("communicationStyle", (p as Record<string,unknown>).communication_style);
+          if (Array.isArray(p.personality_traits) && p.personality_traits.length && !hydrated.personality)
+            hydrated.personality = p.personality_traits;
+          if (Array.isArray((p as Record<string,unknown>).interests) && ((p as Record<string,unknown>).interests as unknown[]).length && !hydrated.goals)
+            hydrated.goals = (p as Record<string,unknown>).interests;
+          if (p.pref_age_min && !hydrated.prefAgeMin) hydrated.prefAgeMin = p.pref_age_min;
+          if (p.pref_age_max && !hydrated.prefAgeMax) hydrated.prefAgeMax = p.pref_age_max;
+          localStorage.setItem(PROFILE_KEY, JSON.stringify({ step: 8, form: hydrated }));
+          setProfileVersion(v => v + 1);
+        } catch {}
+      }).catch(() => {});
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Immediate plan sync on mount — don't wait for 30s poll ──
   useEffect(() => {
     import("../../lib/api").then(({ auth }) => {
@@ -4000,6 +4094,36 @@ export function UserApp({ onSignOut }: UserAppProps) {
   // #7 — lifted so bell badge + NotificationsView share the same state
   const [notifItems, setNotifItems] = useState<NotifItem[]>([]);
   const unreadNotifs = useMemo(() => notifItems.filter(n => !n.read).length, [notifItems]);
+
+  // ── In-app notification sound via Web Audio API ───────────────
+  // Plays a short two-tone chime when a push message is forwarded from the SW
+  // or when new unread notifications arrive. Requires a user gesture first
+  // (browser policy), so we only attempt after the first user interaction.
+  const playNotifSound = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.18, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      gain.connect(ctx.destination);
+      [880, 1046].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+        osc.connect(gain);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + 0.6);
+      });
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "PUSH_RECEIVED") playNotifSound();
+    };
+    navigator.serviceWorker?.addEventListener("message", handler);
+    return () => navigator.serviceWorker?.removeEventListener("message", handler);
+  }, [playNotifSound]);
 
   // Sync from Django every 30s — picks up admin plan grants
   useEffect(() => {
