@@ -169,7 +169,7 @@ export function LoginPage({ onSuccess, onRegister, onBack }: LoginPageProps) {
                     <div className="relative">
                       <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                       <input type="text" value={identifier} onChange={e => { setIdentifier(e.target.value); setError(""); }}
-                        placeholder="you@example.com or +234 800 000 0000" required autoComplete="username email tel"
+                        placeholder="you@example.com" required autoComplete="username email tel"
                         className="w-full pl-10 pr-4 py-3.5 rounded-2xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
                         style={{ fontSize: "0.9375rem" }} />
                     </div>

@@ -2323,59 +2323,61 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
         </div>
       </div>
 
-      {/* ── Photo gallery strip ── */}
-      <div className="flex gap-1.5 px-4 py-3 bg-card border-b border-border">
-        {match.photos.map((ph, i) => (
-          <button key={i}
-            onClick={() => isLocked ? undefined : setActivePhoto(i)}
-            aria-disabled={isLocked}
-            className="rounded-xl overflow-hidden flex-shrink-0 transition-all relative"
-            style={{ width: 64, height: 72, opacity: activePhoto === i ? 1 : 0.55, outline: !isLocked && activePhoto === i ? `2px solid var(--primary)` : "none", outlineOffset: 2 }}>
-            <img src={ph} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-top"
-              style={{ filter: isLocked && i > 0 ? "blur(6px)" : "none" }} />
-            {/* Lock icon on blurred thumbnails */}
-            {isLocked && i > 0 && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl">
-                <Lock size={14} className="text-white/80" />
-              </div>
-            )}
-          </button>
-        ))}
-        <div className="flex-1" />
-        {/* Report — always available */}
-        {onReport && (
-          <button
-            onClick={() => onReport(match.id, match.fullName.split(" ")[0])}
-            aria-label="Report this profile"
-            className="flex items-center gap-1 px-3 py-2 rounded-xl text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors"
-            style={{ fontSize: "0.75rem", fontWeight: 600 }}>
-            <Flag size={13} /> Report
-          </button>
-        )}
-        {/* Already chatting — open existing conversation */}
-        {isAlreadyChatting ? (
-          <button onClick={() => onMessage(match.id)}
-            className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition-all"
-            style={{ fontSize: "0.8125rem", fontWeight: 700 }}>
-            <MessageCircle size={13} /> Open Chat
-          </button>
-        ) : plan !== "free" ? (
-          <button onClick={() => onMessage(match.id)}
-            className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-xl hover:bg-primary/90 transition-all"
-            style={{ fontSize: "0.8125rem", fontWeight: 700 }}>
-            <Send size={13} /> Message
-          </button>
-        ) : (
-          // Free user — interest only
-          <button
-            onClick={() => { if (!localInterest) { setLocalInterest(true); onInterest?.(match.id, match.fullName.split(" ")[0]); } }}
-            disabled={localInterest}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-all ${localInterest ? "bg-green-100 text-green-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
-            style={{ fontSize: "0.8125rem", fontWeight: 700 }}>
-            <Heart size={13} fill={localInterest ? "currentColor" : "none"} />
-            {localInterest ? "Interested ✓" : "Show Interest"}
-          </button>
-        )}
+      {/* ── Photo gallery strip + actions ── */}
+      <div className="flex flex-col bg-card border-b border-border">
+        {/* Photo thumbnails row */}
+        <div className="flex gap-1.5 px-4 pt-3 pb-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          {match.photos.map((ph, i) => (
+            <button key={i}
+              onClick={() => isLocked ? undefined : setActivePhoto(i)}
+              aria-disabled={isLocked}
+              className="rounded-xl overflow-hidden flex-shrink-0 transition-all relative"
+              style={{ width: 64, height: 72, opacity: activePhoto === i ? 1 : 0.55, outline: !isLocked && activePhoto === i ? `2px solid var(--primary)` : "none", outlineOffset: 2 }}>
+              <img src={ph} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-top"
+                style={{ filter: isLocked && i > 0 ? "blur(6px)" : "none" }} />
+              {isLocked && i > 0 && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl">
+                  <Lock size={14} className="text-white/80" />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+        {/* Action buttons row */}
+        <div className="flex items-center gap-2 px-4 pb-3">
+          {onReport && (
+            <button
+              onClick={() => onReport(match.id, match.fullName.split(" ")[0])}
+              aria-label="Report this profile"
+              className="flex items-center gap-1 px-3 py-2 rounded-xl text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors border border-border"
+              style={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              <Flag size={13} /> Report
+            </button>
+          )}
+          <div className="flex-1" />
+          {isAlreadyChatting ? (
+            <button onClick={() => onMessage(match.id)}
+              className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-all"
+              style={{ fontSize: "0.875rem", fontWeight: 700 }}>
+              <MessageCircle size={14} /> Open Chat
+            </button>
+          ) : plan !== "free" ? (
+            <button onClick={() => onMessage(match.id)}
+              className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-all"
+              style={{ fontSize: "0.875rem", fontWeight: 700 }}>
+              <Send size={14} /> Message
+            </button>
+          ) : (
+            <button
+              onClick={() => { if (!localInterest) { setLocalInterest(true); onInterest?.(match.id, match.fullName.split(" ")[0]); } }}
+              disabled={localInterest}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl transition-all ${localInterest ? "bg-green-100 text-green-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+              style={{ fontSize: "0.875rem", fontWeight: 700 }}>
+              <Heart size={14} fill={localInterest ? "currentColor" : "none"} />
+              {localInterest ? "Interested ✓" : "Show Interest"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Profile content ── */}

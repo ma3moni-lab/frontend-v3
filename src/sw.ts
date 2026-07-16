@@ -83,7 +83,10 @@ sw.addEventListener("fetch", (e: FetchEvent) => {
   e.respondWith(
     caches.match(request).then(cached => {
       const fresh = fetch(request).then(res => {
-        if (res.ok) caches.open(CACHE_VERSION).then(c => c.put(request, res.clone()));
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+        }
         return res;
       });
       return cached ?? fresh;

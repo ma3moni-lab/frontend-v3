@@ -472,9 +472,16 @@ function ActivityTimeline({ userId }: {
     setActivities([]);
     setLoading(true);
     adminApi.userActivity(userId).then(res => {
-      setActivities(res.results.map(a => ({
+      const mapped = res.results.map(a => ({
         icon: a.type, text: a.action + (a.detail ? `: ${a.detail}` : ""), time: a.timestamp, type: a.type,
-      })));
+      }));
+      // Login/logout events bubble to the top
+      mapped.sort((a, b) => {
+        const aLogin = a.type === "login" || a.type === "auth" ? 0 : 1;
+        const bLogin = b.type === "login" || b.type === "auth" ? 0 : 1;
+        return aLogin - bLogin;
+      });
+      setActivities(mapped);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [userId]);
 

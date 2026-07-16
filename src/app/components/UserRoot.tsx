@@ -112,9 +112,11 @@ export function UserRoot() {
   // profile_complete = backend says score ≥ 70; else show onboarding
   const afterLogin = (plan: UserPlan, profileComplete: boolean) => {
     try { localStorage.setItem(PLAN_KEY, plan); } catch {}
-    // Detect location silently (non-blocking)
     detectAndStoreLocation();
-    const target: UserView = profileComplete ? "app" : "onboarding";
+    // If the user already completed onboarding before (stored locally), always send
+    // them to the app — the backend score threshold shouldn't re-trigger onboarding.
+    const alreadyOnboarded = (() => { try { return localStorage.getItem(ONBOARDING_KEY) === "true"; } catch { return false; } })();
+    const target: UserView = (profileComplete || alreadyOnboarded) ? "app" : "onboarding";
     setView(target);
   };
 
