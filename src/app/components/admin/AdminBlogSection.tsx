@@ -238,8 +238,9 @@ export function BlogEditorModal({ article, categories, onClose, onSaved }: {
       if (publish && !isEdit) await blogApi.publishArticle(saved.id).catch(() => {});
       toast.success(publish ? `"${form.title}" published!` : `"${form.title}" saved as draft.`);
       onSaved();
-    } catch {
-      toast.error("Failed to save article. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Failed to save article: ${msg}`);
     } finally {
       setSaving(false);
     }

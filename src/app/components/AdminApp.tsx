@@ -28,7 +28,7 @@ import {
   BookOpen, ThumbsUp, UserPlus, Pencil,
   Tag, Trash
 } from "lucide-react";
-import { BlogSection, TopArticlesPanel } from "./admin/AdminBlogSection.tsx";
+import { BlogSection, TopArticlesPanel } from "./admin/AdminBlogSection";
 import {
   LineChart, Line, BarChart, Bar,
   PieChart, Pie, Cell, XAxis, YAxis,
@@ -1939,33 +1939,42 @@ function ReportDetailView({ report, allReports, onBack, onAction }: {
 }
 
 // ─── SETTINGS SECTION ─────────────────────────────────────
-function SettingsSection({ role, liveSettings, onSettingsSaved }: { role: AdminRole; liveSettings?: PlatformSettings; onSettingsSaved?: (s: PlatformSettings) => void }) {
+function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSettingsSaved?: (s: PlatformSettings) => void }) {
   const isSuperAdmin = role === "super-admin";
   const [settings, setSettings] = useState({
     genderBalance: true,
-    maxDailyMatchesFree:  liveSettings ? String(liveSettings.max_daily_matches_free)  : "2",
-    maxDailyMatchesBasic: liveSettings ? String(liveSettings.max_daily_matches_basic) : "5",
+    maxDailyMatchesFree:  "2",
+    maxDailyMatchesBasic: "5",
     minFemaleRatio: "48",
-    referralBonus: liveSettings ? String(liveSettings.referral_bonus_points) : "10",
-    maintenanceMode: liveSettings?.maintenance_mode ?? false,
+    referralBonus: "10",
+    maintenanceMode: false,
     emailVerification: true,
     photoModerationRequired: true,
-    maxPhotos: liveSettings ? String(liveSettings.max_photos) : "4",
+    maxPhotos: "4",
   });
   const [adminRevenueAccess, setAdminRevenueAccess] = useState(getRevenuePermission);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
+  // Self-fetch live settings from DB on mount
   useEffect(() => {
-    if (!liveSettings) return;
-    setSettings(prev => ({
-      ...prev,
-      maxDailyMatchesFree:  String(liveSettings.max_daily_matches_free),
-      maxDailyMatchesBasic: String(liveSettings.max_daily_matches_basic),
-      referralBonus:        String(liveSettings.referral_bonus_points),
-      maintenanceMode:      liveSettings.maintenance_mode,
-      maxPhotos:            String(liveSettings.max_photos),
-    }));
-  }, [liveSettings]);
+    adminApi.settings()
+      .then(s => {
+        setSettings(prev => ({
+          ...prev,
+          maxDailyMatchesFree:  String(s.max_daily_matches_free),
+          maxDailyMatchesBasic: String(s.max_daily_matches_basic),
+          referralBonus:        String(s.referral_bonus_points),
+          maintenanceMode:      s.maintenance_mode,
+          maxPhotos:            String(s.max_photos),
+        }));
+        if (s.revenue_permission_for_admin !== undefined) {
+          setAdminRevenueAccess(s.revenue_permission_for_admin);
+          setRevenuePermission(s.revenue_permission_for_admin);
+        }
+      })
+      .catch(() => setLoadError(true));
+  }, []);
 
   const toggle = (key: keyof typeof settings) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -1988,9 +1997,20 @@ function SettingsSection({ role, liveSettings, onSettingsSaved }: { role: AdminR
       });
       onSettingsSaved?.(updated);
       setRevenuePermission(adminRevenueAccess);
+      // Reflect what the server actually saved
+      setSettings(prev => ({
+        ...prev,
+        maxDailyMatchesFree:  String(updated.max_daily_matches_free),
+        maxDailyMatchesBasic: String(updated.max_daily_matches_basic),
+        referralBonus:        String(updated.referral_bonus_points),
+        maintenanceMode:      updated.maintenance_mode,
+        maxPhotos:            String(updated.max_photos),
+      }));
+      setLoadError(false);
       toast.success("Settings saved successfully.");
-    } catch {
-      toast.error("Could not save to server. Changes applied locally.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      toast.error(`Could not save settings: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -1999,6 +2019,13 @@ function SettingsSection({ role, liveSettings, onSettingsSaved }: { role: AdminR
   return (
     <div>
       <SectionHeader title="System Settings" sub="Configure platform behavior and operational controls" />
+
+      {loadError && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-2" style={{ fontSize: "0.875rem" }}>
+          <AlertTriangle size={15} className="flex-shrink-0" />
+          <span>Could not load live settings from server — showing defaults. Check that migrations are applied on the backend, then refresh.</span>
+        </div>
+      )}
 
       <div className="space-y-6">
         {/* Matching Controls */}
