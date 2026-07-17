@@ -623,6 +623,39 @@ export interface BlogArticle {
   user_vote:     1 | -1 | null;
 }
 
+/**
+ * Fix Cloudinary double-prefix bug that occurs when Django's MEDIA_URL
+ * (already the Cloudinary root) gets prepended to a URL that Cloudinary
+ * storage already made absolute, producing:
+ *   https://res.cloudinary.com/<cloud>/image/upload/https:/res.cloudinary.com/...
+ *
+ * The fix: find `/upload/http` in the URL and extract everything after `/upload/`.
+ * Works for both `https:/` (single slash) and `https://` variants.
+ * Falls through unchanged for normal, correctly-formed URLs.
+ */
+export function sanitizeCoverUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  const marker = "/upload/http";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return url;                        // no double-prefix — return as-is
+  let inner = url.slice(idx + "/upload/".length);
+  // Normalize single-slash scheme (https:/ → https://)
+  if (inner.startsWith("https:/") && !inner.startsWith("https://")) {
+    inner = "https://" + inner.slice(7);
+  } else if (inner.startsWith("http:/") && !inner.startsWith("http://")) {
+    inner = "http://" + inner.slice(6);
+  }
+  return inner;
+}
+
+/** Apply sanitizeCoverUrl to every article in the response. */
+function fixArticle(a: BlogArticle): BlogArticle {
+  return { ...a, cover_image: sanitizeCoverUrl(a.cover_image) };
+}
+function fixList(r: { results: BlogArticle[]; count: number; next: string | null }) {
+  return { ...r, results: r.results.map(fixArticle) };
+}
+
 export const blog = {
   categories: () =>
     get<BlogCategory[]>("/api/blog/categories/"),
@@ -633,11 +666,12 @@ export const blog = {
     if (params.search)   qs.set("search",   params.search);
     if (params.page)     qs.set("page",      String(params.page));
     const suffix = qs.toString() ? `?${qs}` : "";
-    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/blog/articles/${suffix}`);
+    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/blog/articles/${suffix}`)
+      .then(fixList);
   },
 
   article: (slug: string) =>
-    get<BlogArticle>(`/api/blog/articles/${slug}/`),
+    get<BlogArticle>(`/api/blog/articles/${slug}/`).then(fixArticle),
 
   vote: (id: string, vote: 1 | -1) =>
     post<{ likes_count: number; dislikes_count: number; user_vote: 1 | -1 }>(
@@ -657,26 +691,28 @@ export const adminBlog = {
     if (params.search)   qs.set("search",   params.search);
     if (params.page)     qs.set("page",      String(params.page));
     const suffix = qs.toString() ? `?${qs}` : "";
-    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/admin/blog/articles/${suffix}`);
+    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/admin/blog/articles/${suffix}`)
+      .then(fixList);
   },
   listCategories: () => get<BlogCategory[]>("/api/admin/blog/categories/"),
 
   createArticle: (data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
-    post<BlogArticle>("/api/admin/blog/articles/", data),
+    post<BlogArticle>("/api/admin/blog/articles/", data).then(fixArticle),
 
   updateArticle: (id: string, data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
-    patch<BlogArticle>(`/api/admin/blog/articles/${id}/`, data),
+    patch<BlogArticle>(`/api/admin/blog/articles/${id}/`, data).then(fixArticle),
 
   deleteArticle: (id: string) =>
     del<void>(`/api/admin/blog/articles/${id}/`),
 
   publishArticle: (id: string) =>
-    post<BlogArticle>(`/api/admin/blog/articles/${id}/publish/`),
+    post<BlogArticle>(`/api/admin/blog/articles/${id}/publish/`).then(fixArticle),
 
   uploadCover: (id: string, file: File) => {
     const form = new FormData();
     form.append("cover", file);
-    return upload<{ cover_image: string }>(`/api/admin/blog/articles/${id}/cover/`, form);
+    return upload<{ cover_image: string }>(`/api/admin/blog/articles/${id}/cover/`, form)
+      .then(r => ({ cover_image: sanitizeCoverUrl(r.cover_image) }));
   },
 
   createCategory: (name: string) =>
