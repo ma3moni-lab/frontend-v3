@@ -256,6 +256,27 @@
     line-height: 1.5;
   }
 
+  /* ── Full justification (Word Ctrl+J style) ──────────── */
+  /* Applied to <p> tags — not headings, buttons, or nav items. */
+  p {
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    -ms-hyphens: auto;
+    /* Require at least 6-char words to hyphenate; keep ≥3 chars before/after break */
+    hyphenate-limit-chars: 6 3 3;
+    /* Allow long words to wrap before overflowing their container */
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  /* Last line of a justified block should be left-aligned, not stretched. */
+  p:last-child,
+  p:only-child {
+    text-align-last: left;
+  }
+
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(12,20,34,0.15); border-radius: 4px; }
