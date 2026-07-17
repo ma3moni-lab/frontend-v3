@@ -6,7 +6,8 @@ import {
   Quote, Clock, ChevronDown, ChevronUp, Send, Tag, Mail,
   MessageCircle, Check, Sparkles, TrendingUp, Award,
 } from "lucide-react";
-import { BlogDetail, ARTICLES } from "./BlogDetail";
+import { BlogDetail } from "./BlogDetail";
+import { blog, type BlogArticle } from "../../lib/api";
 
 const u = (id: string, w: number, h: number) =>
   `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&auto=format`;
@@ -205,11 +206,16 @@ export function Landing({ onStart, onLogin }: LandingProps) {
   const [showTerms, setShowTerms]           = useState(false);
   const [contactForm, setContactForm]       = useState({ name: "", email: "", subject: "", message: "" });
   const [contactSent, setContactSent]       = useState(false);
-  const [selectedArticle, setSelectedArticle] = useState<number | null>(null);
+  const [selectedArticle, setSelectedArticle] = useState<string | null>(null);
+  const [landingArticles, setLandingArticles] = useState<BlogArticle[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handler = (e: Event) => { setSelectedArticle((e as CustomEvent).detail as number); };
+    blog.articles().then(r => setLandingArticles(r.results.slice(0, 3))).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => { setSelectedArticle((e as CustomEvent).detail as string); };
     window.addEventListener("openArticle", handler);
     return () => window.removeEventListener("openArticle", handler);
   }, []);
@@ -231,6 +237,7 @@ export function Landing({ onStart, onLogin }: LandingProps) {
     return (
       <BlogDetail
         articleId={selectedArticle}
+
         onBack={() => { setSelectedArticle(null); setTimeout(() => scrollTo("blog"), 80); }}
         onStart={onStart}
       />
@@ -678,17 +685,25 @@ export function Landing({ onStart, onLogin }: LandingProps) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {ARTICLES.map((post, idx) => (
-              <button key={post.id} onClick={() => { setSelectedArticle(post.id); scrollRef.current?.scrollTo({ top: 0 }); }}
+            {landingArticles.length === 0 ? (
+              <p className="text-muted-foreground col-span-3 text-center py-8" style={{ fontSize: "0.9375rem" }}>Articles coming soon.</p>
+            ) : landingArticles.map((post, idx) => (
+              <button key={post.id} onClick={() => { setSelectedArticle(post.slug); scrollRef.current?.scrollTo({ top: 0 }); }}
                 className={`text-left bg-card rounded-3xl border border-border overflow-hidden hover:border-primary/25 hover:shadow-lg transition-all duration-300 group ${idx === 0 ? "md:col-span-1" : ""}`}
                 style={{ boxShadow: "var(--shadow-sm)" }}>
                 <div className="relative overflow-hidden" style={{ height: "200px" }}>
-                  <img src={post.photo} alt={post.title} loading="lazy" decoding="async"
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  {post.cover_image ? (
+                    <img src={post.cover_image} alt={post.title} loading="lazy" decoding="async"
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ) : (
+                    <div className="w-full h-full bg-secondary" />
+                  )}
                   <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(12,20,34,0.25) 0%, transparent 50%)" }} />
-                  <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-white" style={{ fontSize: "0.6875rem", fontWeight: 800, background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
-                    {post.category}
-                  </span>
+                  {post.category && (
+                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-white" style={{ fontSize: "0.6875rem", fontWeight: 800, background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
+                      {post.category.name}
+                    </span>
+                  )}
                 </div>
                 <div className="p-5">
                   <h3 style={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.45, marginBottom: "0.625rem", letterSpacing: "-0.01em" }}>{post.title}</h3>
@@ -697,11 +712,13 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                   </p>
                   <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
                     <div>
-                      <p style={{ fontWeight: 700, fontSize: "0.8125rem" }}>{post.author}</p>
-                      <div className="flex items-center gap-1.5 text-muted-foreground mt-0.5">
-                        <Clock size={11} />
-                        <span style={{ fontSize: "0.75rem" }}>{post.readTime} · {post.date}</span>
-                      </div>
+                      <p style={{ fontWeight: 700, fontSize: "0.8125rem" }}>{post.author?.full_name ?? "Ma3moni Team"}</p>
+                      {post.published_at && (
+                        <div className="flex items-center gap-1.5 text-muted-foreground mt-0.5">
+                          <Clock size={11} />
+                          <span style={{ fontSize: "0.75rem" }}>{new Date(post.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center transition-all duration-200 group-hover:bg-primary group-hover:shadow-md">
                       <ArrowRight size={14} className="text-primary group-hover:text-white transition-colors" />

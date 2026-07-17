@@ -104,20 +104,26 @@ export function UserRoot() {
     clearTokens();
     try { localStorage.removeItem(SESSION_KEY); } catch {}
     try { localStorage.removeItem(PLAN_KEY); } catch {}
-    try { localStorage.removeItem(ONBOARDING_KEY); } catch {}
+    // Intentionally keep ONBOARDING_KEY — user already completed onboarding; signing out doesn't undo it.
     setView("landing");
   };
 
   // ── After login: decide where to send the user ───────────────
-  // profile_complete = backend says score ≥ 70; else show onboarding
-  const afterLogin = (plan: UserPlan, profileComplete: boolean) => {
+  const afterLogin = async (plan: UserPlan, profileComplete: boolean) => {
     try { localStorage.setItem(PLAN_KEY, plan); } catch {}
     detectAndStoreLocation();
-    // If the user already completed onboarding before (stored locally), always send
-    // them to the app — the backend score threshold shouldn't re-trigger onboarding.
     const alreadyOnboarded = (() => { try { return localStorage.getItem(ONBOARDING_KEY) === "true"; } catch { return false; } })();
-    const target: UserView = (profileComplete || alreadyOnboarded) ? "app" : "onboarding";
-    setView(target);
+    if (profileComplete || alreadyOnboarded) { setView("app"); return; }
+    // Neither flag set — cross-device or cleared storage: check backend profile for any data.
+    try {
+      const me = await apiAuth.me();
+      const p = me.profile as Record<string, unknown>;
+      if (p?.full_name || p?.gender || p?.location_city || p?.date_of_birth) {
+        try { localStorage.setItem(ONBOARDING_KEY, "true"); } catch {}
+        setView("app"); return;
+      }
+    } catch {}
+    setView("onboarding");
   };
 
   // ── After registration + OTP: go to onboarding ───────────────

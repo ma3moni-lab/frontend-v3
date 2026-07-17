@@ -641,10 +641,10 @@ export const blog = {
     ),
 
   // Blog admin only
-  createArticle: (data: Partial<BlogArticle>) =>
+  createArticle: (data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
     post<BlogArticle>("/api/blog/articles/", data),
 
-  updateArticle: (id: string, data: Partial<BlogArticle>) =>
+  updateArticle: (id: string, data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
     patch<BlogArticle>(`/api/blog/articles/${id}/`, data),
 
   deleteArticle: (id: string) =>

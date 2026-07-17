@@ -1,10 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
 import { Heart, ArrowRight, Clock, User, Tag, Search, ChevronRight } from "lucide-react";
-import { ARTICLES } from "./BlogDetail";
 import { BlogDetail } from "./BlogDetail";
-
-const CATEGORIES = ["All", "Compatibility", "Communication", "Values", "Relationships"];
+import { blog, type BlogArticle } from "../../lib/api";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Compatibility:  "#0A6870",
@@ -29,16 +27,25 @@ export function BlogListPage() {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
-  const [openArticleId, setOpenArticleId] = useState<number | null>(null);
+  const [openArticleSlug, setOpenArticleSlug] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [allArticles, setAllArticles] = useState<BlogArticle[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = ARTICLES.filter(a => {
-    const matchCat = activeCategory === "All" || a.category === activeCategory;
+  useEffect(() => {
+    blog.articles().then(r => setAllArticles(r.results)).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  // Build category list from live data
+  const liveCategories = ["All", ...Array.from(new Set(allArticles.map(a => a.category?.name).filter(Boolean) as string[]))];
+
+  const filtered = allArticles.filter(a => {
+    const matchCat = activeCategory === "All" || a.category?.name === activeCategory;
     const matchSearch = !search.trim() ||
       a.title.toLowerCase().includes(search.toLowerCase()) ||
-      a.excerpt.toLowerCase().includes(search.toLowerCase()) ||
-      a.author.toLowerCase().includes(search.toLowerCase());
+      (a.excerpt ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (a.author?.full_name ?? "").toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
 
@@ -46,14 +53,14 @@ export function BlogListPage() {
   const rest = filtered.slice(1);
 
   // ── Article detail view ──────────────────────────────────
-  if (openArticleId !== null) {
+  if (openArticleSlug !== null) {
     return (
       <BlogDetail
-        articleId={openArticleId}
-        onBack={() => { setOpenArticleId(null); window.scrollTo({ top: 0 }); }}
+        articleId={openArticleSlug}
+        onBack={() => { setOpenArticleSlug(null); window.scrollTo({ top: 0 }); }}
         onStart={() => navigate("/")}
         backLabel="← Back to Blog"
-        onOpenArticle={id => { setOpenArticleId(id); window.scrollTo({ top: 0 }); }}
+        onOpenArticle={slug => { setOpenArticleSlug(slug); window.scrollTo({ top: 0 }); }}
       />
     );
   }
@@ -129,9 +136,8 @@ export function BlogListPage() {
           {/* Stats row */}
           <div className="flex flex-wrap gap-6 mt-8 pt-8 border-t border-border">
             {[
-              { label: "Articles published", value: `${ARTICLES.length}` },
-              { label: "Categories", value: `${CATEGORIES.length - 1}` },
-              { label: "Authors", value: "3" },
+              { label: "Articles published", value: loading ? "…" : `${allArticles.length}` },
+              { label: "Categories", value: loading ? "…" : `${liveCategories.length - 1}` },
               { label: "New article", value: "Every week" },
             ].map(({ label, value }) => (
               <div key={label}>
@@ -147,7 +153,7 @@ export function BlogListPage() {
       <div className="sticky top-16 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex items-center gap-2 py-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-            {CATEGORIES.map(cat => (
+            {liveCategories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
@@ -160,7 +166,7 @@ export function BlogListPage() {
                 {cat}
                 {cat !== "All" && (
                   <span className={`ml-1.5 ${activeCategory === cat ? "opacity-70" : "opacity-50"}`}>
-                    ({ARTICLES.filter(a => a.category === cat).length})
+                    ({allArticles.filter(a => a.category?.name === cat).length})
                   </span>
                 )}
               </button>
@@ -183,7 +189,9 @@ export function BlogListPage() {
 
       <div className="max-w-6xl mx-auto px-6 py-12">
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="py-24 text-center text-muted-foreground" style={{ fontSize: "1rem" }}>Loading articles…</div>
+        ) : filtered.length === 0 ? (
           /* ── Empty state ── */
           <div className="py-24 text-center">
             <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mx-auto mb-5">
@@ -191,11 +199,13 @@ export function BlogListPage() {
             </div>
             <h3 style={{ fontWeight: 700, fontSize: "1.25rem" }}>No articles found</h3>
             <p className="text-muted-foreground mt-2" style={{ fontSize: "1rem" }}>
-              Try a different search or{" "}
-              <button onClick={() => { setActiveCategory("All"); setSearch(""); }} className="text-primary hover:underline">
-                clear filters
-              </button>
-              .
+              {allArticles.length === 0 ? "No articles have been published yet." : (
+                <>Try a different search or{" "}
+                  <button onClick={() => { setActiveCategory("All"); setSearch(""); }} className="text-primary hover:underline">
+                    clear filters
+                  </button>.
+                </>
+              )}
             </p>
           </div>
         ) : (
@@ -203,29 +213,37 @@ export function BlogListPage() {
             {/* ── Featured article ── */}
             {featured && (
               <button
-                onClick={() => { setOpenArticleId(featured.id); window.scrollTo({ top: 0 }); }}
+                onClick={() => { setOpenArticleSlug(featured.slug); window.scrollTo({ top: 0 }); }}
                 className="w-full text-left mb-12 group"
               >
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 rounded-3xl overflow-hidden border border-border hover:border-primary/25 hover:shadow-xl transition-all">
                   {/* Image */}
                   <div className="lg:col-span-3 relative overflow-hidden" style={{ minHeight: "320px" }}>
-                    <img
-                      src={featured.photo}
-                      alt={featured.title}
-                      className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700"
-                      style={{ minHeight: "320px" }}
-                    />
+                    {featured.cover_image ? (
+                      <img
+                        src={featured.cover_image}
+                        alt={featured.title}
+                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700"
+                        style={{ minHeight: "320px" }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-secondary flex items-center justify-center" style={{ minHeight: "320px" }}>
+                        <Tag size={32} className="text-muted-foreground" />
+                      </div>
+                    )}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to right, transparent 60%, rgba(255,255,255,0.05) 100%)" }} />
                     <div className="absolute top-5 left-5 flex items-center gap-2 bg-primary text-white px-3 py-1.5 rounded-full">
                       <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>Featured</span>
                     </div>
-                    <div className="absolute top-5 right-5">
-                      <CategoryBadge category={featured.category} />
-                    </div>
+                    {featured.category && (
+                      <div className="absolute top-5 right-5">
+                        <CategoryBadge category={featured.category.name} />
+                      </div>
+                    )}
                   </div>
                   {/* Content */}
                   <div className="lg:col-span-2 bg-card p-8 lg:p-10 flex flex-col justify-center">
-                    <CategoryBadge category={featured.category} />
+                    {featured.category && <CategoryBadge category={featured.category.name} />}
                     <h2
                       style={{ fontWeight: 900, fontSize: "clamp(1.25rem, 2.5vw, 1.625rem)", letterSpacing: "-0.025em", lineHeight: 1.25, margin: "0.875rem 0 1rem" }}
                       className="group-hover:text-primary transition-colors"
@@ -238,12 +256,14 @@ export function BlogListPage() {
                     <div className="flex items-center gap-4 text-muted-foreground">
                       <div className="flex items-center gap-1.5">
                         <User size={13} />
-                        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)" }}>{featured.author}</span>
+                        <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--foreground)" }}>{featured.author?.full_name ?? "Ma3moni Team"}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock size={12} />
-                        <span style={{ fontSize: "0.8125rem" }}>{featured.readTime}</span>
-                      </div>
+                      {featured.published_at && (
+                        <div className="flex items-center gap-1">
+                          <Clock size={12} />
+                          <span style={{ fontSize: "0.8125rem" }}>{new Date(featured.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-5 text-primary group-hover:gap-3 transition-all" style={{ fontSize: "0.9rem", fontWeight: 700 }}>
                       Read article <ChevronRight size={16} />
@@ -269,19 +289,27 @@ export function BlogListPage() {
                   {rest.map(article => (
                     <button
                       key={article.id}
-                      onClick={() => { setOpenArticleId(article.id); window.scrollTo({ top: 0 }); }}
+                      onClick={() => { setOpenArticleSlug(article.slug); window.scrollTo({ top: 0 }); }}
                       className="text-left bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/20 hover:shadow-md transition-all group"
                     >
                       {/* Thumbnail */}
                       <div className="relative overflow-hidden" style={{ height: "220px" }}>
-                        <img
-                          src={article.photo}
-                          alt={article.title}
-                          className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                        />
-                        <div className="absolute top-3 left-3">
-                          <CategoryBadge category={article.category} />
-                        </div>
+                        {article.cover_image ? (
+                          <img
+                            src={article.cover_image}
+                            alt={article.title}
+                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-secondary flex items-center justify-center">
+                            <Tag size={24} className="text-muted-foreground" />
+                          </div>
+                        )}
+                        {article.category && (
+                          <div className="absolute top-3 left-3">
+                            <CategoryBadge category={article.category.name} />
+                          </div>
+                        )}
                       </div>
 
                       {/* Body */}
@@ -304,16 +332,17 @@ export function BlogListPage() {
                             <div className="flex items-center gap-1.5">
                               <div className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center">
                                 <span style={{ fontSize: "0.5rem", fontWeight: 900, color: "var(--primary)" }}>
-                                  {article.author.split(" ").map(n => n[0]).join("")}
+                                  {(article.author?.full_name ?? "M").split(" ").map(n => n[0]).join("")}
                                 </span>
                               </div>
-                              <span style={{ fontWeight: 600, fontSize: "0.8125rem" }}>{article.author}</span>
+                              <span style={{ fontWeight: 600, fontSize: "0.8125rem" }}>{article.author?.full_name ?? "Ma3moni Team"}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-muted-foreground mt-0.5">
-                              <Clock size={11} />
-                              <span style={{ fontSize: "0.75rem" }}>{article.readTime}</span>
-                              <span style={{ fontSize: "0.75rem" }}>· {article.date}</span>
-                            </div>
+                            {article.published_at && (
+                              <div className="flex items-center gap-2 text-muted-foreground mt-0.5">
+                                <Clock size={11} />
+                                <span style={{ fontSize: "0.75rem" }}>{new Date(article.published_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+                              </div>
+                            )}
                           </div>
                           <ArrowRight size={15} className="text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                         </div>
@@ -333,9 +362,9 @@ export function BlogListPage() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {[
-              { initials: "MR", name: "Mariam Rashid",   role: "Psychologist & Relationship Researcher", color: "#0A6870", articles: ARTICLES.filter(a => a.author === "Mariam Rashid").length },
-              { initials: "LH", name: "Layla Hassan",    role: "Co-Founder & CTO, Ma3moni",              color: "#4A8DB8", articles: ARTICLES.filter(a => a.author === "Layla Hassan").length },
-              { initials: "FA", name: "Faisal Al-Amin",  role: "Co-Founder & CEO, Ma3moni",              color: "#C5733F", articles: ARTICLES.filter(a => a.author === "Faisal Al-Amin").length },
+              { initials: "MR", name: "Mariam Rashid",   role: "Psychologist & Relationship Researcher", color: "#0A6870", articles: allArticles.filter(a => a.author?.full_name === "Mariam Rashid").length },
+              { initials: "LH", name: "Layla Hassan",    role: "Co-Founder & CTO, Ma3moni",              color: "#4A8DB8", articles: allArticles.filter(a => a.author?.full_name === "Layla Hassan").length },
+              { initials: "FA", name: "Faisal Al-Amin",  role: "Co-Founder & CEO, Ma3moni",              color: "#C5733F", articles: allArticles.filter(a => a.author?.full_name === "Faisal Al-Amin").length },
             ].map(({ initials, name, role, color, articles }) => (
               <div key={name} className="flex items-start gap-4 bg-card rounded-2xl border border-border p-5 hover:border-primary/20 transition-all">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: color + "20" }}>

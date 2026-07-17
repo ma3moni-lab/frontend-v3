@@ -31,7 +31,7 @@ import {
   FoundPartnerSection,
   DeactivateSection,
 } from "./user/ProfileSections";
-import { ARTICLES, BlogDetail } from "./BlogDetail";
+import { BlogDetail } from "./BlogDetail";
 
 interface UserAppProps {
   onSignOut: () => void;
@@ -535,7 +535,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
   onOpenNotif: () => void;
   setSubView: (v: SubView) => void;
   setTab: (t: Tab) => void;
-  onOpenArticle: (id: number) => void;
+  onOpenArticle: (slug: string) => void;
   onOpenGuidance: () => void;
   displayName: string;
   firstName: string;
@@ -550,6 +550,10 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
   const [showJourney, setShowJourney] = useState(false);
   const activeConvs = useMemo(() => (conversations ?? CONVERSATIONS).filter(c => c.status === "active").slice(0, 2), [conversations]);
   const milestones = useMemo(() => buildMilestones(plan, profileStrength, foundPartner ?? false), [plan, profileStrength, foundPartner]);
+  const [homeArticles, setHomeArticles] = useState<import("../../lib/api").BlogArticle[]>([]);
+  useEffect(() => {
+    import("../../lib/api").then(({ blog }) => blog.articles().then(r => setHomeArticles(r.results.slice(0, 5))).catch(() => {}));
+  }, []);
 
   return (
     <div className="pb-6">
@@ -717,22 +721,29 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
           </button>
         </div>
         <div className="flex gap-3 overflow-x-auto px-4 pb-2" style={{ scrollbarWidth: "none" }}>
-          {ARTICLES.slice(0, 5).map(a => (
-            <button key={a.id} onClick={() => onOpenArticle(a.id)}
+          {homeArticles.length === 0 ? (
+            <p className="text-muted-foreground py-4 px-1" style={{ fontSize: "0.8125rem" }}>No articles yet.</p>
+          ) : homeArticles.map(a => (
+            <button key={a.id} onClick={() => onOpenArticle(a.slug)}
               className="flex-shrink-0 rounded-2xl overflow-hidden bg-card border border-border text-left hover:border-primary/25 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all"
               style={{ width: 220 }}>
-              <div className="relative h-28 overflow-hidden">
-                <img src={a.photo} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white"
-                  style={{ fontSize: "0.625rem", fontWeight: 700, background: "rgba(10,104,112,0.9)", backdropFilter: "blur(4px)" }}>
-                  {a.category}
-                </span>
+              <div className="relative h-28 overflow-hidden bg-muted">
+                {a.cover_image
+                  ? <img src={a.cover_image} alt={a.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center"><BookOpen size={22} className="text-muted-foreground" /></div>
+                }
+                {a.category && (
+                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-white"
+                    style={{ fontSize: "0.625rem", fontWeight: 700, background: "rgba(10,104,112,0.9)", backdropFilter: "blur(4px)" }}>
+                    {a.category.name}
+                  </span>
+                )}
               </div>
               <div className="p-3">
                 <p style={{ fontWeight: 700, fontSize: "0.8125rem", lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.title}</p>
                 <div className="flex items-center justify-between mt-2 text-muted-foreground">
-                  <div className="flex items-center gap-1.5"><BookOpen size={11} /><span style={{ fontSize: "0.6875rem" }}>{a.readTime}</span></div>
-                  {a.views && <span style={{ fontSize: "0.6875rem" }}>{(a.views / 1000).toFixed(1)}k views</span>}
+                  <div className="flex items-center gap-1.5"><BookOpen size={11} /><span style={{ fontSize: "0.6875rem" }}>{Math.max(1, Math.ceil((a.content?.length ?? 0) / 1200))} min read</span></div>
+                  {a.view_count > 0 && <span style={{ fontSize: "0.6875rem" }}>{a.view_count > 999 ? `${(a.view_count/1000).toFixed(1)}k` : a.view_count} views</span>}
                 </div>
               </div>
             </button>
@@ -747,7 +758,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
 // Minimal article type for the list view — covers both API articles and static fallbacks
 interface ListArticle { id: string | number; title: string; category: string; photo: string; author: string; readTime?: string; slug?: string; }
 
-function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpenArticle: (id: number) => void }) {
+function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpenArticle: (slug: string) => void }) {
   const [cat, setCat] = useState<string>("All");
   const [liveList, setLiveList] = useState<ListArticle[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -770,10 +781,7 @@ function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpe
     });
   }, []);
 
-  // Merge: live API articles first, then static fallbacks not already covered by slug/id
-  const merged: ListArticle[] = liveList.length
-    ? liveList
-    : ARTICLES.map(a => ({ id: a.id, title: a.title, category: a.category, photo: a.photo, author: a.author, readTime: a.readTime }));
+  const merged: ListArticle[] = liveList;
 
   const cats = Array.from(new Set(merged.map(a => a.category)));
   const categories = ["All", ...cats];
@@ -801,14 +809,11 @@ function GuidanceListView({ onBack, onOpenArticle }: { onBack: () => void; onOpe
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {list.length === 0 && loaded && (
+          <p className="text-muted-foreground text-center py-12" style={{ fontSize: "0.9rem" }}>No articles published yet.</p>
+        )}
         {list.map(a => (
-          <button key={String(a.id)} onClick={() => {
-            // Live articles identified by numeric id mapped from static ARTICLES if possible;
-            // otherwise open by index 1 as a safe fallback.
-            const numId = typeof a.id === "number" ? a.id : parseInt(String(a.id), 10);
-            const fallback = ARTICLES.find(s => s.title === a.title)?.id ?? ARTICLES[0]?.id ?? 1;
-            onOpenArticle(isNaN(numId) ? fallback : numId);
-          }}
+          <button key={String(a.id)} onClick={() => { if (a.slug) onOpenArticle(a.slug); }}
             className="w-full flex gap-3 bg-card rounded-2xl border border-border p-3 hover:border-primary/25 hover:shadow-sm transition-all text-left">
             <div className="rounded-xl overflow-hidden flex-shrink-0 bg-muted" style={{ width: 88, height: 88 }}>
               {a.photo
@@ -3949,7 +3954,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [subView, setSubView] = useState<SubView>("none");
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
-  const [activeArticleId, setActiveArticleId] = useState<number | null>(null);
+  const [activeArticleId, setActiveArticleId] = useState<string | null>(null);
   const [blogFrom, setBlogFrom] = useState<"none" | "blog-list">("none");
   const [userPlan, setUserPlan] = useState<UserPlan>(() =>
     (localStorage.getItem(PLAN_KEY) as UserPlan | null) ?? "free"
@@ -4290,7 +4295,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
   };
 
   // Open an article; remember where it was opened from so "back" returns there.
-  const openArticle = (id: number, from: "none" | "blog-list") => {
+  const openArticle = (id: string, from: "none" | "blog-list") => {
     setActiveArticleId(id);
     setBlogFrom(from);
     setSubView("blog-detail");
