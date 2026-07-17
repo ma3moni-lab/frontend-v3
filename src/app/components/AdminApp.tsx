@@ -457,6 +457,29 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
   const isCustomerCare  = role === "customer-care";
   const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
+  // Live blog stats — fetched for blog-admin and all admin/super-admin roles
+  const [blogStats, setBlogStats] = useState<{
+    total: number; published: number; drafts: number; categories: number;
+    totalViews: number; totalLikes: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (isCustomerCare) return;
+    import("../../lib/api").then(({ adminBlog }) => {
+      Promise.all([adminBlog.listArticles(), adminBlog.listCategories()]).then(([articles, cats]) => {
+        const all = articles.results;
+        setBlogStats({
+          total:      all.length,
+          published:  all.filter(a => a.status === "published").length,
+          drafts:     all.filter(a => a.status === "draft").length,
+          categories: cats.length,
+          totalViews: all.reduce((s, a) => s + (a.view_count ?? 0), 0),
+          totalLikes: all.reduce((s, a) => s + (a.likes_count ?? 0), 0),
+        });
+      }).catch(() => {});
+    });
+  }, [isCustomerCare]);
+
   const subtitle = isBlogAdmin
     ? "Your content performance at a glance"
     : isCustomerCare
@@ -472,22 +495,23 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
         {/* Users: super-admin, admin */}
         {(role === "super-admin" || role === "admin") && (
           <>
-            <KpiCard icon={<Users size={18} />} label="Total Users" value={liveOverview ? fmt(liveOverview.total_users) : "12,847"} change="+8.3%" color="#0A6870" />
-            <KpiCard icon={<UserCheck size={18} />} label="Active Today" value={liveOverview ? fmt(liveOverview.active_today) : "1,234"} change="+12.1%" color="#4A8DB8" />
-            <KpiCard icon={<Heart size={18} />} label="Matches This Month" value={liveOverview ? fmt(liveOverview.total_matches) : "619"} change="+4.6%" color="#C5733F" />
+            <KpiCard icon={<Users size={18} />} label="Total Users" value={liveOverview ? fmt(liveOverview.total_users) : "—"} change="+8.3%" color="#0A6870" />
+            <KpiCard icon={<UserCheck size={18} />} label="Active Today" value={liveOverview ? fmt(liveOverview.active_today) : "—"} change="+12.1%" color="#4A8DB8" />
+            <KpiCard icon={<Heart size={18} />} label="Matches This Month" value={liveOverview ? fmt(liveOverview.total_matches) : "—"} change="+4.6%" color="#C5733F" />
+            <KpiCard icon={<BookOpen size={18} />} label="Published Articles" value={blogStats ? String(blogStats.published) : "—"} change="" color="#6B9E78" />
           </>
         )}
         {/* Revenue: only when permitted */}
         {canSeeFinancials && (
-          <KpiCard icon={<DollarSign size={18} />} label="Monthly Revenue" value={liveOverview?.revenue_mtd ? `$${(liveOverview.revenue_mtd / 1000).toFixed(1)}k` : "$48,200"} change="+7.2%" color="#6B9E78" />
+          <KpiCard icon={<DollarSign size={18} />} label="Monthly Revenue" value={liveOverview?.revenue_mtd ? `$${(liveOverview.revenue_mtd / 1000).toFixed(1)}k` : "—"} change="+7.2%" color="#6B9E78" />
         )}
         {/* Blog Admin KPIs */}
         {isBlogAdmin && (
           <>
-            <KpiCard icon={<BookOpen size={18} />} label="Published Articles" value="6" change="+2" color="#6B9E78" />
-            <KpiCard icon={<Eye size={18} />} label="Total Article Views" value="16,726" change="+14.2%" color="#4A8DB8" />
-            <KpiCard icon={<ThumbsUp size={18} />} label="Total Likes" value="1,127" change="+8.3%" color="#0A6870" />
-            <KpiCard icon={<Tag size={18} />} label="Categories" value="7" change="" color="#C5733F" />
+            <KpiCard icon={<BookOpen size={18} />} label="Published Articles" value={blogStats ? String(blogStats.published) : "—"} change="" color="#6B9E78" />
+            <KpiCard icon={<Eye size={18} />} label="Total Article Views" value={blogStats ? fmt(blogStats.totalViews) : "—"} change="" color="#4A8DB8" />
+            <KpiCard icon={<ThumbsUp size={18} />} label="Total Likes" value={blogStats ? fmt(blogStats.totalLikes) : "—"} change="" color="#0A6870" />
+            <KpiCard icon={<Tag size={18} />} label="Categories" value={blogStats ? String(blogStats.categories) : "—"} change="" color="#C5733F" />
           </>
         )}
         {/* Customer Care KPIs */}

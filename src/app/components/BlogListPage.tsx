@@ -223,7 +223,8 @@ export function BlogListPage() {
                       <img
                         src={featured.cover_image}
                         alt={featured.title}
-                        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700"
+                        loading="eager"
+                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
                         style={{ minHeight: "320px" }}
                       />
                     ) : (
@@ -231,7 +232,9 @@ export function BlogListPage() {
                         <Tag size={32} className="text-muted-foreground" />
                       </div>
                     )}
-                    <div className="absolute inset-0" style={{ background: "linear-gradient(to right, transparent 60%, rgba(255,255,255,0.05) 100%)" }} />
+                    {/* Cinematic gradient: dark at bottom on mobile, fades right on desktop */}
+                    <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.35) 100%)" }} />
+                    <div className="absolute inset-0 hidden lg:block" style={{ background: "linear-gradient(to right, transparent 55%, rgba(0,0,0,0.1) 100%)" }} />
                     <div className="absolute top-5 left-5 flex items-center gap-2 bg-primary text-white px-3 py-1.5 rounded-full">
                       <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>Featured</span>
                     </div>
@@ -293,16 +296,24 @@ export function BlogListPage() {
                       className="text-left bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/20 hover:shadow-md transition-all group"
                     >
                       {/* Thumbnail */}
-                      <div className="relative overflow-hidden" style={{ height: "220px" }}>
+                      <div className="relative overflow-hidden" style={{ height: "220px", background: "var(--secondary)" }}>
                         {article.cover_image ? (
-                          <img
-                            src={article.cover_image}
-                            alt={article.title}
-                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                          />
+                          <>
+                            <img
+                              src={article.cover_image}
+                              alt={article.title}
+                              loading="lazy"
+                              className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-600"
+                            />
+                            {/* Subtle bottom fade so category/metadata reads over image */}
+                            <div
+                              className="absolute inset-0"
+                              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.28) 0%, transparent 55%)" }}
+                            />
+                          </>
                         ) : (
                           <div className="w-full h-full bg-secondary flex items-center justify-center">
-                            <Tag size={24} className="text-muted-foreground" />
+                            <Tag size={24} className="text-muted-foreground opacity-40" />
                           </div>
                         )}
                         {article.category && (

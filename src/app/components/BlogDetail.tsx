@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { ArrowLeft, Clock, Calendar, Heart, ArrowRight, ThumbsUp, ThumbsDown, Eye, BookOpen } from "lucide-react";
 import type { BlogArticle } from "../../lib/api";
 
-// ─── Content renderer ─────────────────────────────────────────
-// Admin saves blocks as JSON. Fallback: plain text → paragraphs.
+// ─── Content renderer ──────────────────────────────────────
 
 type Block =
   | { type: "paragraph"; text: string }
@@ -50,8 +49,18 @@ function ContentRenderer({ content }: { content: string }) {
         );
         if (b.type === "image") return (
           <figure key={i} className="my-8">
-            <img src={b.src} alt={b.caption} className="w-full rounded-2xl object-cover" style={{ maxHeight: 400 }} />
-            {b.caption && <figcaption className="text-center text-muted-foreground mt-2" style={{ fontSize: "0.8125rem" }}>{b.caption}</figcaption>}
+            <img
+              src={b.src}
+              alt={b.caption}
+              loading="lazy"
+              className="w-full rounded-2xl object-cover shadow-md"
+              style={{ maxHeight: 460 }}
+            />
+            {b.caption && (
+              <figcaption className="text-center text-muted-foreground mt-2.5" style={{ fontSize: "0.8125rem" }}>
+                {b.caption}
+              </figcaption>
+            )}
           </figure>
         );
         return (
@@ -64,7 +73,55 @@ function ContentRenderer({ content }: { content: string }) {
   );
 }
 
-// ─── Main component ───────────────────────────────────────────
+// ─── Hero image ────────────────────────────────────────────
+
+function HeroImage({ src, alt, category }: { src: string; alt: string; category?: string }) {
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <div className="relative w-full overflow-hidden" style={{ height: "clamp(260px, 42vh, 520px)" }}>
+      {/* Blurred placeholder while loading */}
+      <div
+        className="absolute inset-0 bg-cover bg-center transition-opacity duration-700"
+        style={{
+          backgroundImage: `url(${src})`,
+          filter: "blur(20px)",
+          transform: "scale(1.1)",
+          opacity: loaded ? 0 : 1,
+        }}
+      />
+      <img
+        src={src}
+        alt={alt}
+        loading="eager"
+        onLoad={() => setLoaded(true)}
+        className="w-full h-full object-cover transition-opacity duration-700"
+        style={{ opacity: loaded ? 1 : 0 }}
+      />
+      {/* Cinematic gradient overlay */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, transparent 35%, rgba(0,0,0,0.55) 100%)",
+        }}
+      />
+      {/* Category pill bottom-left */}
+      {category && (
+        <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-7">
+          <span
+            className="px-3 py-1.5 rounded-full text-white backdrop-blur-sm"
+            style={{ fontSize: "0.75rem", fontWeight: 700, background: "var(--primary)", boxShadow: "0 2px 12px rgba(0,0,0,0.25)" }}
+          >
+            {category}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────
+
 interface BlogDetailProps {
   articleId: string;
   onBack: () => void;
@@ -118,8 +175,12 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
     <div className="size-full overflow-y-auto bg-background">
       {/* Top bar */}
       <div className="sticky top-0 z-50 bg-background/90 backdrop-blur-sm border-b border-border">
-        <div className="max-w-4xl mx-auto px-6 h-14 flex items-center justify-between">
-          <button onClick={onBack} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.9rem" }}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+            style={{ fontSize: "0.9rem" }}
+          >
             <ArrowLeft size={17} /> {backLabel}
           </button>
           <div className="flex items-center gap-2">
@@ -133,7 +194,9 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
 
       {loading ? (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-16 space-y-5">
-          {[260, 40, 20, 16, 16, 16].map((h, i) => (
+          {/* Skeleton hero */}
+          <div className="bg-muted animate-pulse rounded-3xl w-full" style={{ height: "clamp(260px, 40vh, 460px)" }} />
+          {[40, 20, 16, 16, 16].map((h, i) => (
             <div key={i} className="bg-muted animate-pulse rounded-2xl" style={{ height: h }} />
           ))}
         </div>
@@ -147,17 +210,7 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
         <>
           {/* Hero */}
           {article.cover_image ? (
-            <div className="relative w-full" style={{ height: "clamp(240px, 38vh, 460px)" }}>
-              <img src={article.cover_image} alt={article.title} className="w-full h-full object-cover" />
-              <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(10,20,34,0.65) 100%)" }} />
-              {article.category && (
-                <div className="absolute bottom-6 left-6">
-                  <span className="px-3 py-1.5 rounded-full text-white" style={{ fontSize: "0.75rem", fontWeight: 700, background: "var(--primary)" }}>
-                    {article.category.name}
-                  </span>
-                </div>
-              )}
-            </div>
+            <HeroImage src={article.cover_image} alt={article.title} category={article.category?.name} />
           ) : article.category && (
             <div className="px-4 sm:px-6 pt-8 max-w-3xl mx-auto">
               <span className="px-3 py-1.5 rounded-full text-primary bg-secondary border border-primary/15" style={{ fontSize: "0.75rem", fontWeight: 700 }}>
@@ -167,18 +220,13 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
           )}
 
           {/* Content */}
-          <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 pb-16">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-8 pb-16">
             <h1 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, lineHeight: 1.15, letterSpacing: "-0.03em", marginBottom: "1.5rem" }}>
               {article.title}
             </h1>
-            {article.excerpt && (
-              <p className="text-muted-foreground mb-8" style={{ fontSize: "1.125rem", lineHeight: 1.7 }}>
-                {article.excerpt}
-              </p>
-            )}
 
             {/* Meta */}
-            <div className="flex flex-wrap items-center gap-4 pb-8 border-b border-border mb-10">
+            <div className="flex flex-wrap items-center gap-4 pb-7 border-b border-border mb-9">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
                   <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "var(--primary)" }}>{initials}</span>
@@ -186,38 +234,70 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
                 <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>{authorName}</span>
               </div>
               <div className="flex items-center gap-3 text-muted-foreground flex-wrap">
-                {publishedDate && <div className="flex items-center gap-1.5"><Calendar size={12} /><span style={{ fontSize: "0.8125rem" }}>{publishedDate}</span></div>}
-                <div className="flex items-center gap-1.5"><Clock size={12} /><span style={{ fontSize: "0.8125rem" }}>{readMins} min read</span></div>
-                <div className="flex items-center gap-1.5"><Eye size={12} /><span style={{ fontSize: "0.8125rem" }}>{article.view_count.toLocaleString()} views</span></div>
+                {publishedDate && (
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={12} />
+                    <span style={{ fontSize: "0.8125rem" }}>{publishedDate}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <Clock size={12} />
+                  <span style={{ fontSize: "0.8125rem" }}>{readMins} min read</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Eye size={12} />
+                  <span style={{ fontSize: "0.8125rem" }}>{article.view_count.toLocaleString()} views</span>
+                </div>
               </div>
             </div>
 
             {/* Body */}
             <ContentRenderer content={article.content} />
 
-            {/* Votes */}
+            {/* Votes — sticky on mobile at the bottom */}
             <div className="mt-10 pt-8 border-t border-border">
-              <div className="flex items-center gap-3">
-                <button onClick={() => vote("like")} aria-label="Helpful"
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 transition-all ${voted === "like" ? "bg-green-500 border-green-500 text-white" : "border-border bg-card hover:border-green-400 hover:text-green-600 text-muted-foreground"}`}
-                  style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
-                  <ThumbsUp size={17} /> <span>Helpful</span>
+              <p className="text-muted-foreground mb-4" style={{ fontSize: "0.875rem" }}>Was this article helpful?</p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => vote("like")}
+                  aria-label="Helpful"
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all active:scale-95 ${
+                    voted === "like"
+                      ? "bg-green-500 border-green-500 text-white shadow-md"
+                      : "border-border bg-card hover:border-green-400 hover:text-green-600 text-muted-foreground"
+                  }`}
+                  style={{ fontWeight: 700, fontSize: "0.9375rem", minWidth: "120px" }}
+                >
+                  <ThumbsUp size={17} />
+                  <span>Helpful</span>
                   <span className="opacity-70" style={{ fontSize: "0.8125rem" }}>({likes.toLocaleString()})</span>
                 </button>
-                <button onClick={() => vote("dislike")} aria-label="Not helpful"
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border-2 transition-all ${voted === "dislike" ? "bg-red-500 border-red-500 text-white" : "border-border bg-card hover:border-red-300 hover:text-red-500 text-muted-foreground"}`}
-                  style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
-                  <ThumbsDown size={17} /> <span>Not helpful</span>
+                <button
+                  onClick={() => vote("dislike")}
+                  aria-label="Not helpful"
+                  className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all active:scale-95 ${
+                    voted === "dislike"
+                      ? "bg-red-500 border-red-500 text-white shadow-md"
+                      : "border-border bg-card hover:border-red-300 hover:text-red-500 text-muted-foreground"
+                  }`}
+                  style={{ fontWeight: 700, fontSize: "0.9375rem", minWidth: "140px" }}
+                >
+                  <ThumbsDown size={17} />
+                  <span>Not helpful</span>
                   <span className="opacity-70" style={{ fontSize: "0.8125rem" }}>({dislikes.toLocaleString()})</span>
                 </button>
               </div>
-              {voted && <p className="mt-3 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{voted === "like" ? "Thanks — glad it resonated." : "Thanks — we'll keep improving."}</p>}
+              {voted && (
+                <p className="mt-3 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                  {voted === "like" ? "Thanks — glad it resonated." : "Thanks — we'll keep improving."}
+                </p>
+              )}
             </div>
 
             {/* Author card */}
             {authorName && (
-              <div className="mt-14 pt-8 border-t border-border">
-                <div className="flex items-start gap-4 bg-secondary rounded-2xl border border-primary/15 p-6">
+              <div className="mt-12 pt-8 border-t border-border">
+                <div className="flex items-start gap-4 bg-secondary rounded-2xl border border-primary/15 p-5 sm:p-6">
                   <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center flex-shrink-0">
                     <span style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--primary)" }}>{initials}</span>
                   </div>
@@ -232,29 +312,58 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
             )}
 
             {/* CTA */}
-            <div className="mt-10 bg-primary rounded-2xl p-8 text-white text-center">
+            <div className="mt-10 bg-primary rounded-2xl p-7 sm:p-8 text-white text-center">
               <h3 style={{ fontWeight: 900, fontSize: "1.5rem", letterSpacing: "-0.02em" }}>Ready to apply what you've read?</h3>
               <p className="opacity-80 mt-2 mb-6" style={{ fontSize: "1rem" }}>
                 Ma3moni matches you based on the values, communication style, and goals you've just read about.
               </p>
-              <button onClick={onStart} className="inline-flex items-center gap-2 bg-white text-primary px-8 py-3.5 rounded-xl hover:bg-white/90 transition-all" style={{ fontWeight: 700, fontSize: "1rem" }}>
+              <button
+                onClick={onStart}
+                className="inline-flex items-center gap-2 bg-white text-primary px-7 py-3.5 rounded-xl hover:bg-white/90 active:scale-95 transition-all"
+                style={{ fontWeight: 700, fontSize: "1rem" }}
+              >
                 Create Your Profile <ArrowRight size={17} />
               </button>
             </div>
 
-            {/* Related */}
+            {/* Related articles */}
             {related.length > 0 && (
               <div className="mt-14">
-                <h2 style={{ fontWeight: 800, fontSize: "1.375rem", letterSpacing: "-0.02em", marginBottom: "1.25rem" }}>More from the Journal</h2>
+                <h2 style={{ fontWeight: 800, fontSize: "1.375rem", letterSpacing: "-0.02em", marginBottom: "1.25rem" }}>
+                  More from the Journal
+                </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {related.map(rel => (
-                    <button key={rel.id} onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); onOpenArticle?.(rel.slug); }}
-                      className="text-left rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/25 hover:shadow-sm transition-all">
-                      {rel.cover_image && <img src={rel.cover_image} alt={rel.title} className="w-full object-cover" style={{ height: 140 }} />}
+                    <button
+                      key={rel.id}
+                      onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); onOpenArticle?.(rel.slug); }}
+                      className="text-left rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/25 hover:shadow-sm transition-all group"
+                    >
+                      {rel.cover_image ? (
+                        <div className="relative overflow-hidden" style={{ height: 160 }}>
+                          <img
+                            src={rel.cover_image}
+                            alt={rel.title}
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)" }} />
+                        </div>
+                      ) : (
+                        <div className="w-full bg-secondary" style={{ height: 160 }} />
+                      )}
                       <div className="p-4">
-                        {rel.category && <span className="text-primary" style={{ fontSize: "0.75rem", fontWeight: 700 }}>{rel.category.name}</span>}
-                        <p style={{ fontWeight: 700, fontSize: "0.9375rem", lineHeight: 1.4, marginTop: "0.25rem" }} className="line-clamp-2">{rel.title}</p>
-                        {rel.excerpt && <p className="text-muted-foreground mt-1 line-clamp-2" style={{ fontSize: "0.8125rem" }}>{rel.excerpt}</p>}
+                        {rel.category && (
+                          <span className="text-primary" style={{ fontSize: "0.75rem", fontWeight: 700 }}>
+                            {rel.category.name}
+                          </span>
+                        )}
+                        <p
+                          style={{ fontWeight: 700, fontSize: "0.9375rem", lineHeight: 1.4, marginTop: "0.25rem" }}
+                          className="line-clamp-2"
+                        >
+                          {rel.title}
+                        </p>
                       </div>
                     </button>
                   ))}
