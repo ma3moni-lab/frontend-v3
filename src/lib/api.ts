@@ -39,19 +39,21 @@ function ls(key: string): string | null { try { return localStorage.getItem(key)
 function lset(key: string, val: string) { try { localStorage.setItem(key, val); } catch {} }
 
 /** Returns the correct access token for a given API path.
- *  Admin endpoints use ONLY the admin slot; user endpoints use the user slot
- *  (falling back to the legacy key for sessions created before USER_ACCESS_KEY). */
+ *  Admin endpoints use ONLY the admin slot; all other endpoints prefer the user
+ *  slot but fall back to the admin token so that admins can call blog/user APIs
+ *  without needing a separate user session. */
 function tokenForPath(path: string): string | null {
   if (path.startsWith("/api/admin/")) {
-    return ls(ADMIN_ACCESS_KEY);           // no fallback — admin only
+    return ls(ADMIN_ACCESS_KEY);           // admin endpoints: admin token only
   }
-  return ls(USER_ACCESS_KEY) ?? ls(ACCESS_KEY);  // legacy fallback for users only
+  // Non-admin paths: user token first, legacy fallback, then admin token as last resort
+  return ls(USER_ACCESS_KEY) ?? ls(ACCESS_KEY) ?? ls(ADMIN_ACCESS_KEY);
 }
 function refreshForPath(path: string): string | null {
   if (path.startsWith("/api/admin/")) {
-    return ls(ADMIN_REFRESH_KEY);          // no fallback — admin only
+    return ls(ADMIN_REFRESH_KEY);
   }
-  return ls(USER_REFRESH_KEY) ?? ls(REFRESH_KEY);  // legacy fallback for users only
+  return ls(USER_REFRESH_KEY) ?? ls(REFRESH_KEY) ?? ls(ADMIN_REFRESH_KEY);
 }
 
 export function getAccessToken()  { return ls(ACCESS_KEY); }
@@ -625,11 +627,12 @@ export const blog = {
     get<BlogCategory[]>("/api/blog/categories/"),
 
   articles: (params: { category?: string; search?: string; page?: number } = {}) => {
-    const qs = new URLSearchParams({ status: "published" });
+    const qs = new URLSearchParams();
     if (params.category) qs.set("category", params.category);
     if (params.search)   qs.set("search",   params.search);
     if (params.page)     qs.set("page",      String(params.page));
-    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/blog/articles/?${qs}`);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/blog/articles/${suffix}`);
   },
 
   article: (slug: string) =>
