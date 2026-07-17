@@ -646,10 +646,21 @@ export const blog = {
 
 };
 
-// ── Admin-only blog writes — routed through /api/admin/blog/ ──
-// These always use the admin JWT token (tokenForPath sees /api/admin/ prefix).
-// Public reads (articles list, single article, categories) stay on /api/blog/.
+// ── Admin-only blog API — routed through /api/admin/blog/ ────
+// All calls here use the admin JWT token automatically (tokenForPath
+// routes /api/admin/ paths to ADMIN_ACCESS_KEY with no fallback logic).
 export const adminBlog = {
+  // Reads — admin sees all statuses (draft + published + archived)
+  listArticles: (params: { category?: string; search?: string; page?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.category) qs.set("category", params.category);
+    if (params.search)   qs.set("search",   params.search);
+    if (params.page)     qs.set("page",      String(params.page));
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return get<{ results: BlogArticle[]; count: number; next: string | null }>(`/api/admin/blog/articles/${suffix}`);
+  },
+  listCategories: () => get<BlogCategory[]>("/api/admin/blog/categories/"),
+
   createArticle: (data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
     post<BlogArticle>("/api/admin/blog/articles/", data),
 

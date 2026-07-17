@@ -24,7 +24,7 @@ const makeId = () => Math.random().toString(36).slice(2, 9);
 export function TopArticlesPanel() {
   const [articles, setArticles] = useState<BlogArticle[]>([]);
   useEffect(() => {
-    blogApi.articles().then(r => setArticles(r.results.slice(0, 4))).catch(() => {});
+    adminBlogApi.listArticles().then(r => setArticles(r.results.slice(0, 4))).catch(() => {});
   }, []);
   if (!articles.length) return (
     <div className="bg-card rounded-2xl border border-border p-6">
@@ -207,7 +207,9 @@ export function BlogEditorModal({ article, categories, onClose, onSaved }: {
     setBlocks(prev => [...prev.slice(0, idx + 1), nb, ...prev.slice(idx + 1)]);
   };
 
-  const handleSave = async (publish: boolean) => {
+  // forceDraft=true → always save as draft (Save Draft button)
+  // forceDraft=false → use whatever form.status says (Publish / Save Changes button)
+  const handleSave = async (forceDraft = false) => {
     if (!form.title.trim()) { toast.error("Please enter an article title."); return; }
     setSaving(true);
     try {
@@ -221,23 +223,27 @@ export function BlogEditorModal({ article, categories, onClose, onSaved }: {
           return withoutId;
         })
       );
+      const effectiveStatus = forceDraft ? "draft" : form.status;
       let saved: BlogArticle;
       if (isEdit && article) {
         saved = await adminBlogApi.updateArticle(article.id, {
           title: form.title, excerpt: form.excerpt, content: contentJson,
           category_id: form.categoryId || undefined,
-          status: publish ? "published" : form.status,
+          status: effectiveStatus,
         });
       } else {
         saved = await adminBlogApi.createArticle({
           title: form.title, excerpt: form.excerpt, content: contentJson,
           category_id: form.categoryId || undefined,
-          status: publish ? "published" : "draft",
+          status: effectiveStatus,
         });
       }
       if (coverFile) await adminBlogApi.uploadCover(saved.id, coverFile).catch(() => {});
-      if (publish && !isEdit) await adminBlogApi.publishArticle(saved.id).catch(() => {});
-      toast.success(publish ? `"${form.title}" published!` : `"${form.title}" saved as draft.`);
+      toast.success(
+        effectiveStatus === "published"
+          ? `"${form.title}" published!`
+          : `"${form.title}" saved as draft.`
+      );
       onSaved();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -381,16 +387,16 @@ export function BlogEditorModal({ article, categories, onClose, onSaved }: {
               className="px-5 py-3 rounded-xl border border-border hover:bg-muted transition-colors disabled:opacity-50"
               style={{ fontSize: "0.9rem" }}>Cancel</button>
             {!isEdit && (
-              <button onClick={() => handleSave(false)} disabled={saving}
+              <button onClick={() => handleSave(true)} disabled={saving}
                 className="flex-1 py-3 rounded-xl border border-border hover:bg-muted transition-colors disabled:opacity-50"
                 style={{ fontSize: "0.9rem" }}>
                 {saving ? "Saving…" : "Save Draft"}
               </button>
             )}
-            <button onClick={() => handleSave(form.status === "published" || isEdit ? false : true)} disabled={saving}
+            <button onClick={() => handleSave(false)} disabled={saving}
               className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               style={{ fontSize: "0.9rem", fontWeight: 600 }}>
-              {saving ? "Saving…" : isEdit ? "Save Changes" : "Publish"}
+              {saving ? "Saving…" : isEdit ? "Save Changes" : form.status === "published" ? "Publish" : "Save as Draft"}
             </button>
           </div>
         </div>
@@ -420,8 +426,8 @@ export function BlogSection({ role }: { role: AdminRole }) {
   const reload = () => {
     setArtLoading(true);
     Promise.all([
-      blogApi.articles().then(r => setArticles(r.results)),
-      blogApi.categories().then(setCategories),
+      adminBlogApi.listArticles().then(r => setArticles(r.results)),
+      adminBlogApi.listCategories().then(setCategories),
     ]).finally(() => setArtLoading(false));
   };
 
