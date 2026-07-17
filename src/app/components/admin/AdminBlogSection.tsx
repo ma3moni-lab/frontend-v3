@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import {
   blog as blogApi,
+  adminBlog as adminBlogApi,
   type BlogArticle,
   type BlogCategory,
 } from "../../../lib/api";
@@ -222,20 +223,20 @@ export function BlogEditorModal({ article, categories, onClose, onSaved }: {
       );
       let saved: BlogArticle;
       if (isEdit && article) {
-        saved = await blogApi.updateArticle(article.id, {
+        saved = await adminBlogApi.updateArticle(article.id, {
           title: form.title, excerpt: form.excerpt, content: contentJson,
           category_id: form.categoryId || undefined,
           status: publish ? "published" : form.status,
         });
       } else {
-        saved = await blogApi.createArticle({
+        saved = await adminBlogApi.createArticle({
           title: form.title, excerpt: form.excerpt, content: contentJson,
           category_id: form.categoryId || undefined,
           status: publish ? "published" : "draft",
         });
       }
-      if (coverFile) await blogApi.uploadCover(saved.id, coverFile).catch(() => {});
-      if (publish && !isEdit) await blogApi.publishArticle(saved.id).catch(() => {});
+      if (coverFile) await adminBlogApi.uploadCover(saved.id, coverFile).catch(() => {});
+      if (publish && !isEdit) await adminBlogApi.publishArticle(saved.id).catch(() => {});
       toast.success(publish ? `"${form.title}" published!` : `"${form.title}" saved as draft.`);
       onSaved();
     } catch (err) {
@@ -431,22 +432,25 @@ export function BlogSection({ role }: { role: AdminRole }) {
     if (!name) return;
     setCatSaving(true);
     try {
-      const cat = await blogApi.createCategory(name);
+      const cat = await adminBlogApi.createCategory(name);
       setCategories(prev => [...prev, cat]);
       setNewCat("");
       toast.success(`Category "${cat.name}" created.`);
-    } catch { toast.error("Failed to create category."); }
-    finally { setCatSaving(false); }
+    } catch (err) {
+      toast.error(`Failed to create category: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally { setCatSaving(false); }
   };
 
   const saveEditCat = async (id: string) => {
     const name = editCatVal.trim();
     if (!name) { setEditCatId(null); return; }
     try {
-      const updated = await blogApi.updateCategory(id, name);
+      const updated = await adminBlogApi.updateCategory(id, name);
       setCategories(prev => prev.map(c => c.id === id ? updated : c));
       toast.success(`Category renamed to "${updated.name}".`);
-    } catch { toast.error("Failed to rename category."); }
+    } catch (err) {
+      toast.error(`Failed to rename category: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
     setEditCatId(null);
   };
 
@@ -454,21 +458,24 @@ export function BlogSection({ role }: { role: AdminRole }) {
     const count = articles.filter(a => a.category?.id === id).length;
     if (count > 0) { toast.error(`"${name}" is used by ${count} article(s). Reassign them first.`); return; }
     try {
-      await blogApi.deleteCategory(id);
+      await adminBlogApi.deleteCategory(id);
       setCategories(prev => prev.filter(c => c.id !== id));
       toast.success(`Category "${name}" deleted.`);
-    } catch { toast.error("Failed to delete category."); }
+    } catch (err) {
+      toast.error(`Failed to delete category: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }
   };
 
   const deleteArticle = async (id: string, title: string) => {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     setDeletingArt(id);
     try {
-      await blogApi.deleteArticle(id);
+      await adminBlogApi.deleteArticle(id);
       setArticles(prev => prev.filter(a => a.id !== id));
       toast.success("Article deleted.");
-    } catch { toast.error("Failed to delete article."); }
-    finally { setDeletingArt(null); }
+    } catch (err) {
+      toast.error(`Failed to delete article: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally { setDeletingArt(null); }
   };
 
   const statusBadge = (status: string) => {

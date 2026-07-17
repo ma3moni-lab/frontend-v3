@@ -14,7 +14,8 @@ export const DJANGO_BASE = BASE;
  */
 export async function wakeUpServer(): Promise<void> {
   try {
-    await fetch(`${BASE}/api/`, {
+    // Ping the root health endpoint (returns {"status":"ok"}) to wake Render from sleep.
+    await fetch(`${BASE}/`, {
       method: "GET",
       signal: AbortSignal.timeout(50_000),
     });
@@ -643,36 +644,52 @@ export const blog = {
       `/api/blog/articles/${id}/vote/`, { vote }
     ),
 
-  // Blog admin only
+};
+
+// ── Admin-only blog writes — routed through /api/admin/blog/ ──
+// These always use the admin JWT token (tokenForPath sees /api/admin/ prefix).
+// Public reads (articles list, single article, categories) stay on /api/blog/.
+export const adminBlog = {
   createArticle: (data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
-    post<BlogArticle>("/api/blog/articles/", data),
+    post<BlogArticle>("/api/admin/blog/articles/", data),
 
   updateArticle: (id: string, data: { title?: string; excerpt?: string; content?: string; category_id?: string; status?: string }) =>
-    patch<BlogArticle>(`/api/blog/articles/${id}/`, data),
+    patch<BlogArticle>(`/api/admin/blog/articles/${id}/`, data),
 
   deleteArticle: (id: string) =>
-    del<void>(`/api/blog/articles/${id}/`),
+    del<void>(`/api/admin/blog/articles/${id}/`),
 
   publishArticle: (id: string) =>
-    post<BlogArticle>(`/api/blog/articles/${id}/publish/`),
-
-  archiveArticle: (id: string) =>
-    post<BlogArticle>(`/api/blog/articles/${id}/archive/`),
+    post<BlogArticle>(`/api/admin/blog/articles/${id}/publish/`),
 
   uploadCover: (id: string, file: File) => {
     const form = new FormData();
     form.append("cover", file);
-    return upload<{ cover_image: string }>(`/api/blog/articles/${id}/cover/`, form);
+    return upload<{ cover_image: string }>(`/api/admin/blog/articles/${id}/cover/`, form);
   },
 
   createCategory: (name: string) =>
-    post<BlogCategory>("/api/blog/categories/", { name }),
+    post<BlogCategory>("/api/admin/blog/categories/create/", { name }),
 
   updateCategory: (id: string, name: string) =>
-    patch<BlogCategory>(`/api/blog/categories/${id}/`, { name }),
+    patch<BlogCategory>(`/api/admin/blog/categories/${id}/`, { name }),
 
   deleteCategory: (id: string) =>
-    del<void>(`/api/blog/categories/${id}/`),
+    del<void>(`/api/admin/blog/categories/${id}/`),
+};
+
+// ═══════════════════════════════════════════════════════════════
+// PUBLIC SETTINGS — /api/settings/  (no auth required)
+// ═══════════════════════════════════════════════════════════════
+export interface PublicSettings {
+  referral_bonus_points:   number;
+  maintenance_mode:        boolean;
+  max_daily_matches_free:  number;
+  max_daily_matches_basic: number;
+}
+
+export const publicApi = {
+  settings: () => get<PublicSettings>("/api/settings/"),
 };
 
 // ═══════════════════════════════════════════════════════════════

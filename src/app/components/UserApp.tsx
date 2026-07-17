@@ -2942,14 +2942,17 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
 function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: string }) {
   const [copied, setCopied] = useState(false);
   const [apiStats, setApiStats] = useState<ReferralStats | null>(null);
-  const [bonusPoints, setBonusPoints] = useState<number | null>(null);
+  const [bonusPoints, setBonusPoints] = useState<number>(10);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    referralsApi.myCode().then(setApiStats).catch(() => {});
-    // Fetch admin-configured referral bonus
-    import("../../lib/api").then(({ adminApi: aApi }) =>
-      aApi.settings().then(s => { if (s.referral_bonus_points) setBonusPoints(s.referral_bonus_points); }).catch(() => {})
-    );
+    Promise.all([
+      referralsApi.myCode().catch(() => null),
+      import("../../lib/api").then(({ publicApi }) => publicApi.settings().catch(() => null)),
+    ]).then(([stats, settings]) => {
+      if (stats) setApiStats(stats);
+      if (settings?.referral_bonus_points) setBonusPoints(settings.referral_bonus_points);
+    }).finally(() => setLoading(false));
   }, []);
 
   const code = apiStats?.code ?? (() => {
@@ -2966,7 +2969,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
       try {
         await navigator.share({
           title: "Join Ma3moni — Marriage Platform",
-          text: `Use my referral code ${code} when you sign up and we both earn $10!`,
+          text: `Use my referral code ${code} when you sign up and we both earn ${bonusPoints} points!`,
           url: shareUrl,
         });
         return;
@@ -3032,10 +3035,17 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          {[
-            { value: "4", label: "Referrals" },
-            { value: "$40", label: "Earned" },
-            { value: "2", label: "Active" },
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="bg-card rounded-2xl border border-border p-4 text-center animate-pulse">
+                <div className="h-8 bg-muted rounded-lg mx-auto mb-1 w-12" />
+                <div className="h-3 bg-muted rounded w-16 mx-auto" />
+              </div>
+            ))
+          ) : [
+            { value: String(apiStats?.total_signups ?? 0),   label: "Signups" },
+            { value: String(apiStats?.total_converted ?? 0), label: "Converted" },
+            { value: String(apiStats?.total_points ?? 0),    label: "Points" },
           ].map(({ value, label }) => (
             <div key={label} className="bg-card rounded-2xl border border-border p-4 text-center">
               <p style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--primary)" }}>{value}</p>
@@ -3043,6 +3053,24 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
             </div>
           ))}
         </div>
+
+        {/* Monthly activity */}
+        {apiStats?.monthly_stats && apiStats.monthly_stats.length > 0 && (
+          <div className="bg-card rounded-2xl border border-border p-5 mb-6">
+            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem" }} className="mb-4">Monthly Referrals</h3>
+            <div className="space-y-2">
+              {apiStats.monthly_stats.slice(-6).map(m => (
+                <div key={m.month} className="flex items-center gap-3">
+                  <span className="text-muted-foreground w-20 flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{m.month}</span>
+                  <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                    <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (m.signups / Math.max(...apiStats.monthly_stats.map(x => x.signups), 1)) * 100)}%` }} />
+                  </div>
+                  <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--primary)", minWidth: 20, textAlign: "right" }}>{m.signups}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* How it works */}
         <div className="bg-card rounded-2xl border border-border p-5">
