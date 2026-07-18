@@ -11,7 +11,8 @@ const BlogListPage= lazy(() => import("./components/BlogListPage").then(m => ({ 
 
 export const router = createBrowserRouter([
   { path: "/",      Component: UserRoot },
-  { path: "/app/admin", Component: AdminRoot },
+  { path: "/app/admin",           Component: AdminRoot },
+  { path: "/app/admin/:section", Component: AdminRoot },
   { path: "/blog",  Component: BlogListPage },
   { path: "*",      Component: NotFound },
 ]);

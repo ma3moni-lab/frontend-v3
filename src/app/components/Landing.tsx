@@ -61,6 +61,16 @@ const TERMS_SUMMARY = `By using Ma3moni, you confirm you are 18+, single, and ge
 
 function firstParagraphText(content: string, maxLen = 200): string {
   if (!content) return "";
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      const first = parsed.find((b: { type: string; text?: string }) => b.type === "paragraph" && b.text);
+      if (first?.text) {
+        const plain = (first.text as string).replace(/[*_`#>~]/g, "").trim();
+        return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
+      }
+    }
+  } catch {}
   const chunk = content.split(/\n{2,}|\n/)[0].trim();
   const plain = chunk.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#>~]/g, "").trim();
   return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
@@ -698,14 +708,14 @@ export function Landing({ onStart, onLogin }: LandingProps) {
               <button key={post.id} onClick={() => { setSelectedArticle(post.slug); scrollRef.current?.scrollTo({ top: 0 }); }}
                 className={`text-left bg-card rounded-3xl border border-border overflow-hidden hover:border-primary/25 hover:shadow-lg transition-all duration-300 group ${idx === 0 ? "md:col-span-1" : ""}`}
                 style={{ boxShadow: "var(--shadow-sm)" }}>
-                <div className="relative overflow-hidden" style={{ height: "200px" }}>
+                <div className="relative overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
                   {post.cover_image ? (
                     <img src={post.cover_image} alt={post.title} loading="lazy" decoding="async"
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      className="absolute inset-0 w-full h-full object-contain" />
                   ) : (
-                    <div className="w-full h-full bg-secondary" />
+                    <div className="absolute inset-0 bg-secondary" />
                   )}
-                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(12,20,34,0.25) 0%, transparent 50%)" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(12,20,34,0.2) 0%, transparent 50%)" }} />
                   {post.category && (
                     <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-white" style={{ fontSize: "0.6875rem", fontWeight: 800, background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
                       {post.category.name}

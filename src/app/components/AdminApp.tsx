@@ -42,6 +42,8 @@ interface AdminAppProps {
   role: AdminRole;
   adminName: string;
   adminEmail: string;
+  initialSection?: string;
+  onSectionChange?: (section: string) => void;
 }
 
 // Sections each role can access
@@ -2614,7 +2616,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
 }
 
 // ─── ADMIN SHELL ──────────────────────────────────────────
-export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps) {
+export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, onSectionChange }: AdminAppProps) {
   // v2 — sections rendered on-demand via renderSection() to avoid recharts key collisions.
   // For admin role, dynamically add "payments" to nav when super-admin has granted access.
   const baseAccess = ROLE_ACCESS[role];
@@ -2623,12 +2625,24 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
     : baseAccess;
 
   const defaultSection = role === "customer-care" ? "support" : role === "blog-admin" ? "blog" : "overview";
-  const [section, setSection] = useState<AdminSection>(defaultSection);
+  const resolvedInitial: AdminSection = (
+    initialSection && allowedSections.includes(initialSection as AdminSection)
+      ? initialSection as AdminSection
+      : defaultSection
+  );
+  const [section, setSection] = useState<AdminSection>(resolvedInitial);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Admins are identified by role badge/initials — no dating-profile photo in admin UI
   const adminPhotoUrl: string | null = null;
   const [isPending, startTransition] = useTransition();
+
+  const changeSection = (next: AdminSection) => {
+    startTransition(() => {
+      setSection(next);
+      onSectionChange?.(next);
+    });
+  };
 
   // Live counts for nav badges
   const [navCounts, setNavCounts] = useState({
@@ -2694,7 +2708,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
   // recharts SVG defs (linearGradient IDs) to collide, producing duplicate-key warnings.
   const renderSection = () => {
     switch (section) {
-      case "overview":   return <OverviewSection role={role} onNavigate={s => startTransition(() => setSection(s))} liveOverview={liveOverview} liveUsersChart={liveUsersChart} liveRevenueChart={liveRevenueChart} liveGender={liveGender} />;
+      case "overview":   return <OverviewSection role={role} onNavigate={s => changeSection(s)} liveOverview={liveOverview} liveUsersChart={liveUsersChart} liveRevenueChart={liveRevenueChart} liveGender={liveGender} />;
       case "users":      return <UsersSection />;
       case "moderation": return null; // removed
       case "blacklist":  return <BlacklistSection />;
@@ -2734,7 +2748,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
           {navItems.map(({ key, icon, label, badge }) => (
             <button
               key={key}
-              onClick={() => startTransition(() => setSection(key))}
+              onClick={() => changeSection(key)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${section === key ? "text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${isPending ? "opacity-80" : ""}`}
               style={{ background: section === key ? "var(--sidebar-primary)" : "transparent", justifyContent: sidebarOpen ? "flex-start" : "center" }}
             >
@@ -2753,65 +2767,21 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
           ))}
         </nav>
 
-        {/* Bottom */}
+        {/* Bottom — logout only */}
         <div className="p-3 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
-          {(() => {
-            const roleGrad = role === "super-admin"
-              ? "linear-gradient(135deg,#0A6870,#14A8B4)"
-              : role === "admin"
-              ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)"
-              : role === "blog-admin"
-              ? "linear-gradient(135deg,#5B8F68,#7DB48A)"
-              : "linear-gradient(135deg,#B5632F,#D08050)";
-            const roleStrip = role === "super-admin"
-              ? "linear-gradient(90deg,#0A6870,#14A8B4)"
-              : role === "admin"
-              ? "linear-gradient(90deg,#4A8DB8,#6BAFD6)"
-              : role === "blog-admin"
-              ? "linear-gradient(90deg,#6B9E78,#8DC49A)"
-              : "linear-gradient(90deg,#C5733F,#E09060)";
-            const initials = adminName && adminName !== adminEmail
-              ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase()
-              : ROLE_BADGE[role];
-            return sidebarOpen ? (
-              <div className="mb-2 rounded-xl overflow-hidden" style={{ background: "var(--sidebar-accent)", border: "1px solid rgba(255,255,255,0.06)" }}>
-                <div className="h-1 w-full" style={{ background: roleStrip }} />
-                <div className="flex items-center gap-3 px-3 py-3">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: roleGrad, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-                      <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "white", letterSpacing: "0.02em" }}>{initials}</span>
-                    </div>
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2" style={{ background: "#22c55e", borderColor: "var(--sidebar-accent)" }} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate" style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--sidebar-foreground)", lineHeight: 1.3 }}>
-                      {adminName && adminName !== adminEmail ? adminName : ROLE_LABEL[role]}
-                    </p>
-                    <p className="truncate" style={{ fontSize: "0.6875rem", color: "rgba(203,213,224,0.45)", lineHeight: 1.4 }}>{adminEmail}</p>
-                    <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full" style={{ fontSize: "0.5625rem", fontWeight: 700, letterSpacing: "0.06em", background: "rgba(255,255,255,0.07)", color: "rgba(203,213,224,0.75)", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.08)" }}>
-                      {ROLE_LABEL[role]}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-center mb-2">
-                <div className="relative">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`} style={{ background: roleGrad, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-                    <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>{initials}</span>
-                  </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2" style={{ background: "#22c55e", borderColor: "#0B1627" }} />
-                </div>
-              </div>
-            );
-          })()}
           <button
             onClick={onBack}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-            style={{ justifyContent: sidebarOpen ? "flex-start" : "center", opacity: 0.6 }}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors"
+            style={{
+              justifyContent: sidebarOpen ? "flex-start" : "center",
+              color: "rgba(203,213,224,0.55)",
+              background: "transparent",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
-            <LogOut size={16} />
-            {sidebarOpen && <span style={{ fontSize: "0.8125rem" }}>Sign Out</span>}
+            <LogOut size={15} />
+            {sidebarOpen && <span style={{ fontSize: "0.8125rem", fontWeight: 500 }}>Sign Out</span>}
           </button>
         </div>
       </aside>
@@ -2827,17 +2797,31 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
             <Menu size={18} />
           </button>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors">
+            <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted">
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
             <div className="h-5 w-px bg-border" />
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`} style={{
-              background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)"
-            }}>
-              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>
-                {adminName && adminName !== adminEmail ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
-              </span>
+            {/* Admin identity chip */}
+            <div className="flex items-center gap-2.5">
+              <div className="hidden sm:block text-right">
+                <p style={{ fontSize: "0.8125rem", fontWeight: 700, lineHeight: 1.25 }}>
+                  {adminName && adminName !== adminEmail ? adminName : ROLE_LABEL[role]}
+                </p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", lineHeight: 1.2 }}>{ROLE_LABEL[role]}</p>
+              </div>
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                title={`${adminName} — ${ROLE_LABEL[role]}`}
+                style={{
+                  background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                }}
+              >
+                <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>
+                  {adminName && adminName !== adminEmail ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
+                </span>
+              </div>
             </div>
           </div>
         </div>

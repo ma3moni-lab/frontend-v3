@@ -29,6 +29,16 @@ function CoverImg({ src, alt, className, style }: {
 
 function firstParagraphText(content: string, maxLen = 220): string {
   if (!content) return "";
+  try {
+    const parsed = JSON.parse(content);
+    if (Array.isArray(parsed)) {
+      const first = parsed.find((b: { type: string; text?: string }) => b.type === "paragraph" && b.text);
+      if (first?.text) {
+        const plain = (first.text as string).replace(/[*_`#>~]/g, "").trim();
+        return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
+      }
+    }
+  } catch {}
   const chunk = content.split(/\n{2,}|\n/)[0].trim();
   const plain = chunk.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#>~]/g, "").trim();
   return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
@@ -248,12 +258,11 @@ export function BlogListPage() {
               >
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 rounded-3xl overflow-hidden border border-border hover:border-primary/25 hover:shadow-xl transition-all">
                   {/* Image */}
-                  <div className="lg:col-span-3 relative overflow-hidden bg-muted" style={{ minHeight: "320px" }}>
+                  <div className="lg:col-span-3 relative overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
                     <CoverImg
                       src={featured.cover_image}
                       alt={featured.title}
-                      className="w-full h-full object-contain"
-                      style={{ minHeight: "320px", maxHeight: "480px" }}
+                      className="absolute inset-0 w-full h-full object-contain"
                     />
                     {/* Cinematic gradient: dark at bottom on mobile, fades right on desktop */}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.35) 100%)" }} />
@@ -319,12 +328,11 @@ export function BlogListPage() {
                       className="text-left bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/20 hover:shadow-md transition-all group"
                     >
                       {/* Thumbnail */}
-                      <div className="relative overflow-hidden bg-muted flex items-center justify-center" style={{ minHeight: "200px" }}>
+                      <div className="relative overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
                         <CoverImg
                           src={article.cover_image}
                           alt={article.title}
-                          className="w-full object-contain"
-                          style={{ display: "block", maxHeight: "320px" }}
+                          className="absolute inset-0 w-full h-full object-contain"
                         />
                         <div
                           className="absolute inset-0 pointer-events-none"

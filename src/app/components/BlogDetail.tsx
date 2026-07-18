@@ -141,9 +141,9 @@ function HeroImage({ src, alt, category }: { src: string; alt: string; category?
   if (errored) {
     return (
       <div
-        className="relative w-full flex items-end"
+        className="relative w-full overflow-hidden flex items-end"
         style={{
-          height: "clamp(260px, 42vh, 520px)",
+          aspectRatio: "16/9",
           background: "linear-gradient(135deg, var(--primary) 0%, #14A8B4 60%, #0A6870 100%)",
         }}
       >
@@ -162,10 +162,9 @@ function HeroImage({ src, alt, category }: { src: string; alt: string; category?
   }
 
   return (
-    <div className="relative w-full bg-muted" style={{ minHeight: "200px" }}>
-      {/* Placeholder shimmer while loading */}
+    <div className="relative w-full overflow-hidden" style={{ aspectRatio: "16/9", background: "var(--muted)" }}>
       {!loaded && (
-        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%)", minHeight: "200px" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%)" }} />
       )}
       <img
         src={src}
@@ -173,8 +172,8 @@ function HeroImage({ src, alt, category }: { src: string; alt: string; category?
         loading="eager"
         onLoad={() => setLoaded(true)}
         onError={() => setErrored(true)}
-        className="w-full transition-opacity duration-700"
-        style={{ opacity: loaded ? 1 : 0, display: "block", objectFit: "contain", maxWidth: "100%" }}
+        className="absolute inset-0 w-full h-full transition-opacity duration-700"
+        style={{ opacity: loaded ? 1 : 0, objectFit: "contain" }}
       />
       {category && (
         <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-7">
