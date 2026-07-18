@@ -36,19 +36,55 @@ function renderInline(text: string) {
   });
 }
 
+const PARA_STYLE: React.CSSProperties = {
+  fontSize: "1.0625rem",
+  lineHeight: 1.85,
+  marginBottom: "1.5rem",
+  marginTop: 0,
+};
+
+function ParagraphBlock({ text, index }: { text: string; index: number }) {
+  // Split on blank lines first; if there are none, split on single newlines so
+  // each line the user typed becomes its own visible paragraph with spacing.
+  const rawChunks = text.split(/\n{2,}/);
+  const chunks =
+    rawChunks.length > 1
+      ? rawChunks.map(c => c.trim()).filter(Boolean)
+      : text.split(/\n/).map(c => c.trim()).filter(Boolean);
+
+  if (chunks.length === 0) return null;
+  if (chunks.length === 1) {
+    return <p style={PARA_STYLE}>{renderInline(chunks[0])}</p>;
+  }
+  return (
+    <>
+      {chunks.map((chunk, j) => (
+        <p key={`${index}-${j}`} style={PARA_STYLE}>{renderInline(chunk)}</p>
+      ))}
+    </>
+  );
+}
+
 function ContentRenderer({ content }: { content: string }) {
   const blocks = parseContent(content);
   if (!blocks.length) return null;
   return (
-    <div>
+    <div style={{ marginTop: "0.5rem" }}>
       {blocks.map((b, i) => {
         if (b.type === "heading") return (
-          <h2 key={i} style={{ fontWeight: 800, fontSize: "1.4375rem", letterSpacing: "-0.02em", marginTop: "2.5rem", marginBottom: "0.75rem", lineHeight: 1.25 }}>
+          <h2 key={i} style={{
+            fontWeight: 800,
+            fontSize: "1.4375rem",
+            letterSpacing: "-0.02em",
+            marginTop: i === 0 ? 0 : "2.75rem",
+            marginBottom: "1rem",
+            lineHeight: 1.25,
+          }}>
             {b.text}
           </h2>
         );
         if (b.type === "image") return (
-          <figure key={i} className="my-8">
+          <figure key={i} style={{ margin: "2.5rem 0" }}>
             <img
               src={b.src}
               alt={b.caption}
@@ -57,17 +93,13 @@ function ContentRenderer({ content }: { content: string }) {
               style={{ maxHeight: 460 }}
             />
             {b.caption && (
-              <figcaption className="text-center text-muted-foreground mt-2.5" style={{ fontSize: "0.8125rem" }}>
+              <figcaption className="text-center text-muted-foreground" style={{ fontSize: "0.8125rem", marginTop: "0.75rem" }}>
                 {b.caption}
               </figcaption>
             )}
           </figure>
         );
-        return (
-          <p key={i} style={{ fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.25rem" }}>
-            {renderInline(b.text)}
-          </p>
-        );
+        return <ParagraphBlock key={i} text={b.text} index={i} />;
       })}
     </div>
   );

@@ -269,6 +269,8 @@
     /* Allow long words to wrap before overflowing their container */
     overflow-wrap: break-word;
     word-break: normal;
+    margin-bottom: 1.5rem;
+    margin-top: 0;
   }
 
   /* Last line of a justified block should be left-aligned, not stretched. */
