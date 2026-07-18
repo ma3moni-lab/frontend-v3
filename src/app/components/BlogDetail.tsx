@@ -73,45 +73,86 @@ function ContentRenderer({ content }: { content: string }) {
   );
 }
 
+// ─── Fallback cover for related articles ──────────────────
+
+function RelatedCoverImg({ src, alt }: { src: string; alt: string }) {
+  const [errored, setErrored] = useState(false);
+  if (errored || !src) {
+    return (
+      <div className="relative overflow-hidden" style={{ height: 160 }}>
+        <div className="w-full h-full" style={{ background: "linear-gradient(135deg, var(--primary) 0%, #14A8B4 100%)" }} />
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+      </div>
+    );
+  }
+  return (
+    <div className="relative overflow-hidden" style={{ height: 160 }}>
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        onError={() => setErrored(true)}
+        className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+      />
+      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)" }} />
+    </div>
+  );
+}
+
 // ─── Hero image ────────────────────────────────────────────
 
 function HeroImage({ src, alt, category }: { src: string; alt: string; category?: string }) {
-  const [loaded, setLoaded] = useState(false);
+  const [loaded,  setLoaded]  = useState(false);
+  const [errored, setErrored] = useState(false);
+
+  if (errored) {
+    return (
+      <div
+        className="relative w-full flex items-end"
+        style={{
+          height: "clamp(260px, 42vh, 520px)",
+          background: "linear-gradient(135deg, var(--primary) 0%, #14A8B4 60%, #0A6870 100%)",
+        }}
+      >
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+        {category && (
+          <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-7">
+            <span className="px-3 py-1.5 rounded-full text-white backdrop-blur-sm"
+              style={{ fontSize: "0.75rem", fontWeight: 700, background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.4)" }}>
+              {category}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full overflow-hidden" style={{ height: "clamp(260px, 42vh, 520px)" }}>
       {/* Blurred placeholder while loading */}
-      <div
-        className="absolute inset-0 bg-cover bg-center transition-opacity duration-700"
-        style={{
-          backgroundImage: `url(${src})`,
-          filter: "blur(20px)",
-          transform: "scale(1.1)",
-          opacity: loaded ? 0 : 1,
-        }}
-      />
+      {!loaded && (
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%)" }} />
+      )}
       <img
         src={src}
         alt={alt}
         loading="eager"
         onLoad={() => setLoaded(true)}
+        onError={() => setErrored(true)}
         className="w-full h-full object-cover transition-opacity duration-700"
         style={{ opacity: loaded ? 1 : 0 }}
       />
       {/* Cinematic gradient overlay */}
       <div
         className="absolute inset-0"
-        style={{
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, transparent 35%, rgba(0,0,0,0.55) 100%)",
-        }}
+        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, transparent 35%, rgba(0,0,0,0.55) 100%)" }}
       />
-      {/* Category pill bottom-left */}
       {category && (
         <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-7">
-          <span
-            className="px-3 py-1.5 rounded-full text-white backdrop-blur-sm"
-            style={{ fontSize: "0.75rem", fontWeight: 700, background: "var(--primary)", boxShadow: "0 2px 12px rgba(0,0,0,0.25)" }}
-          >
+          <span className="px-3 py-1.5 rounded-full text-white backdrop-blur-sm"
+            style={{ fontSize: "0.75rem", fontWeight: 700, background: "var(--primary)", boxShadow: "0 2px 12px rgba(0,0,0,0.25)" }}>
             {category}
           </span>
         </div>
@@ -339,19 +380,7 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
                       onClick={() => { window.scrollTo({ top: 0, behavior: "smooth" }); onOpenArticle?.(rel.slug); }}
                       className="text-left rounded-2xl border border-border bg-card overflow-hidden hover:border-primary/25 hover:shadow-sm transition-all group"
                     >
-                      {rel.cover_image ? (
-                        <div className="relative overflow-hidden" style={{ height: 160 }}>
-                          <img
-                            src={rel.cover_image}
-                            alt={rel.title}
-                            loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                          />
-                          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.3) 0%, transparent 60%)" }} />
-                        </div>
-                      ) : (
-                        <div className="w-full bg-secondary" style={{ height: 160 }} />
-                      )}
+                      <RelatedCoverImg src={rel.cover_image} alt={rel.title} />
                       <div className="p-4">
                         {rel.category && (
                           <span className="text-primary" style={{ fontSize: "0.75rem", fontWeight: 700 }}>

@@ -4,6 +4,29 @@ import { Heart, ArrowRight, Clock, User, Tag, Search, ChevronRight } from "lucid
 import { BlogDetail } from "./BlogDetail";
 import { blog, type BlogArticle } from "../../lib/api";
 
+/** Image that falls back to a branded gradient when the src 404s or fails to load. */
+function CoverImg({ src, alt, className, style }: {
+  src: string; alt: string; className?: string; style?: React.CSSProperties;
+}) {
+  const [errored, setErrored] = useState(false);
+  if (errored || !src) {
+    return (
+      <div
+        className={className}
+        style={{
+          ...style,
+          background: "linear-gradient(135deg, var(--primary) 0%, #14A8B4 60%, #0A6870 100%)",
+          position: "relative",
+        }}
+      >
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} className={className} style={style} onError={() => setErrored(true)} />;
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   Compatibility:  "#0A6870",
   Communication:  "#4A8DB8",
@@ -219,19 +242,12 @@ export function BlogListPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 rounded-3xl overflow-hidden border border-border hover:border-primary/25 hover:shadow-xl transition-all">
                   {/* Image */}
                   <div className="lg:col-span-3 relative overflow-hidden" style={{ minHeight: "320px" }}>
-                    {featured.cover_image ? (
-                      <img
-                        src={featured.cover_image}
-                        alt={featured.title}
-                        loading="eager"
-                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
-                        style={{ minHeight: "320px" }}
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-secondary flex items-center justify-center" style={{ minHeight: "320px" }}>
-                        <Tag size={32} className="text-muted-foreground" />
-                      </div>
-                    )}
+                    <CoverImg
+                      src={featured.cover_image}
+                      alt={featured.title}
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+                      style={{ minHeight: "320px" }}
+                    />
                     {/* Cinematic gradient: dark at bottom on mobile, fades right on desktop */}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.35) 100%)" }} />
                     <div className="absolute inset-0 hidden lg:block" style={{ background: "linear-gradient(to right, transparent 55%, rgba(0,0,0,0.1) 100%)" }} />
@@ -297,25 +313,15 @@ export function BlogListPage() {
                     >
                       {/* Thumbnail */}
                       <div className="relative overflow-hidden" style={{ height: "220px", background: "var(--secondary)" }}>
-                        {article.cover_image ? (
-                          <>
-                            <img
-                              src={article.cover_image}
-                              alt={article.title}
-                              loading="lazy"
-                              className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-600"
-                            />
-                            {/* Subtle bottom fade so category/metadata reads over image */}
-                            <div
-                              className="absolute inset-0"
-                              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.28) 0%, transparent 55%)" }}
-                            />
-                          </>
-                        ) : (
-                          <div className="w-full h-full bg-secondary flex items-center justify-center">
-                            <Tag size={24} className="text-muted-foreground opacity-40" />
-                          </div>
-                        )}
+                        <CoverImg
+                          src={article.cover_image}
+                          alt={article.title}
+                          className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-500"
+                        />
+                        <div
+                          className="absolute inset-0 pointer-events-none"
+                          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.28) 0%, transparent 55%)" }}
+                        />
                         {article.category && (
                           <div className="absolute top-3 left-3">
                             <CategoryBadge category={article.category.name} />
