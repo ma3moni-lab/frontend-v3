@@ -1976,6 +1976,16 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     photoModerationRequired: true,
     maxPhotos: "4",
   });
+
+  // Credo gateway keys — kept in separate state so they're only sent on explicit save
+  const [credoKeys, setCredoKeys] = useState({
+    publicKey:     "",
+    secretKey:     "",
+    merchantId:    "",
+    webhookSecret: "",
+  });
+  const [credoSaved, setCredoSaved] = useState({ secretKeySet: false, webhookSecretSet: false });
+  const [credoSaving, setCredoSaving] = useState(false);
   const [adminRevenueAccess, setAdminRevenueAccess] = useState(getRevenuePermission);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -1996,6 +2006,16 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           setAdminRevenueAccess(s.revenue_permission_for_admin);
           setRevenuePermission(s.revenue_permission_for_admin);
         }
+        // Pre-fill non-secret Credo fields; show masked indicator for secrets
+        setCredoKeys(prev => ({
+          ...prev,
+          publicKey:  s.credo_public_key  ?? "",
+          merchantId: s.credo_merchant_id ?? "",
+        }));
+        setCredoSaved({
+          secretKeySet:     s.credo_secret_key_set     ?? false,
+          webhookSecretSet: s.credo_webhook_secret_set ?? false,
+        });
       })
       .catch(() => setLoadError(true));
   }, []);
@@ -2037,6 +2057,28 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
       toast.error(`Could not save settings: ${msg}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveCredoKeys = async () => {
+    setCredoSaving(true);
+    try {
+      const payload: Record<string, string> = {};
+      if (credoKeys.publicKey.trim())     payload.credo_public_key     = credoKeys.publicKey.trim();
+      if (credoKeys.merchantId.trim())    payload.credo_merchant_id    = credoKeys.merchantId.trim();
+      if (credoKeys.secretKey.trim())     payload.credo_secret_key     = credoKeys.secretKey.trim();
+      if (credoKeys.webhookSecret.trim()) payload.credo_webhook_secret = credoKeys.webhookSecret.trim();
+      const updated = await adminApi.updateSettings(payload);
+      setCredoKeys(prev => ({ ...prev, secretKey: "", webhookSecret: "" }));
+      setCredoSaved({
+        secretKeySet:     updated.credo_secret_key_set     ?? (!!credoKeys.secretKey || credoSaved.secretKeySet),
+        webhookSecretSet: updated.credo_webhook_secret_set ?? (!!credoKeys.webhookSecret || credoSaved.webhookSecretSet),
+      });
+      toast.success("Credo payment keys saved.");
+    } catch {
+      toast.error("Could not save Credo keys. Please try again.");
+    } finally {
+      setCredoSaving(false);
     }
   };
 
@@ -2251,6 +2293,98 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           )}
         </div>
       </div>
+
+        {/* Payment Gateway — Credo by eTranzact */}
+        {isSuperAdmin && (
+          <div className="bg-card rounded-2xl border border-border p-6">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <CreditCard size={18} className="text-primary" />
+              </div>
+              <div>
+                <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Payment Gateway — Credo by eTranzact</h3>
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Keys are stored securely in the database. Secret keys are write-only and never returned after saving.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Public Key</label>
+                  <input
+                    value={credoKeys.publicKey}
+                    onChange={e => setCredoKeys(p => ({ ...p, publicKey: e.target.value }))}
+                    placeholder="pk_live_xxxxxxxxxxxx"
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                    style={{ fontSize: "0.8125rem" }}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Merchant ID</label>
+                  <input
+                    value={credoKeys.merchantId}
+                    onChange={e => setCredoKeys(p => ({ ...p, merchantId: e.target.value }))}
+                    placeholder="MER_xxxxxxxxxxxx"
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                    style={{ fontSize: "0.8125rem" }}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                    Secret Key
+                    {credoSaved.secretKeySet && !credoKeys.secretKey && (
+                      <span className="ml-2 px-2 py-0.5 rounded-full text-green-700 bg-green-100" style={{ fontSize: "0.6875rem", fontWeight: 600 }}>● Saved</span>
+                    )}
+                  </label>
+                  <input
+                    type="password"
+                    value={credoKeys.secretKey}
+                    onChange={e => setCredoKeys(p => ({ ...p, secretKey: e.target.value }))}
+                    placeholder={credoSaved.secretKeySet ? "Leave blank to keep existing key" : "sk_live_xxxxxxxxxxxx"}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                    style={{ fontSize: "0.8125rem" }}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                    Webhook Secret
+                    {credoSaved.webhookSecretSet && !credoKeys.webhookSecret && (
+                      <span className="ml-2 px-2 py-0.5 rounded-full text-green-700 bg-green-100" style={{ fontSize: "0.6875rem", fontWeight: 600 }}>● Saved</span>
+                    )}
+                  </label>
+                  <input
+                    type="password"
+                    value={credoKeys.webhookSecret}
+                    onChange={e => setCredoKeys(p => ({ ...p, webhookSecret: e.target.value }))}
+                    placeholder={credoSaved.webhookSecretSet ? "Leave blank to keep existing secret" : "whsec_xxxxxxxxxxxx"}
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                    style={{ fontSize: "0.8125rem" }}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                  Callback URL: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground" style={{ fontSize: "0.75rem" }}>/payment/verify</code>
+                  &nbsp;·&nbsp;
+                  Webhook URL: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground" style={{ fontSize: "0.75rem" }}>/api/payments/webhook/credo/</code>
+                </p>
+                <button
+                  onClick={saveCredoKeys}
+                  disabled={credoSaving}
+                  className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors flex-shrink-0 ml-4"
+                  style={{ fontSize: "0.875rem", fontWeight: 600 }}
+                >
+                  {credoSaving ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Save Keys"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* Save button */}
       <div className="flex justify-end mt-6">

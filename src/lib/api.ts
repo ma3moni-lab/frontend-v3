@@ -833,13 +833,17 @@ export interface AdminTicket extends SupportTicket {
 }
 
 export interface PlatformSettings {
-  max_daily_matches_free:      number;
-  max_daily_matches_basic:     number;
-  max_photos:                  number;
-  match_expiry_days:           number;
-  referral_bonus_points:       number;
-  maintenance_mode:            boolean;
+  max_daily_matches_free:       number;
+  max_daily_matches_basic:      number;
+  max_photos:                   number;
+  match_expiry_days:            number;
+  referral_bonus_points:        number;
+  maintenance_mode:             boolean;
   revenue_permission_for_admin: boolean;
+  credo_public_key:             string;
+  credo_merchant_id:            string;
+  credo_secret_key_set:         boolean;
+  credo_webhook_secret_set:     boolean;
 }
 
 // All possible granular permissions assignable per staff member
@@ -973,7 +977,7 @@ export const adminApi = {
   settings: () =>
     get<PlatformSettings>("/api/admin/settings/"),
 
-  updateSettings: (data: Partial<PlatformSettings>) =>
+  updateSettings: (data: Partial<PlatformSettings> & { credo_secret_key?: string; credo_webhook_secret?: string }) =>
     patch<PlatformSettings>("/api/admin/settings/", data),
 
   // Staff / admin accounts (super_admin only)
