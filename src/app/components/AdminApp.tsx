@@ -2280,16 +2280,8 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
   const [section, setSection] = useState<AdminSection>(defaultSection);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // Admin profile photo — fetched from /me/ so it shows in the sidebar
-  const [adminPhotoUrl, setAdminPhotoUrl] = useState<string | null>(null);
-  useEffect(() => {
-    import("../../lib/api").then(({ auth }) => {
-      auth.me().then(me => {
-        const photo = me.photos?.[0]?.image_url;
-        if (photo) setAdminPhotoUrl(photo);
-      }).catch(() => {});
-    });
-  }, []);
+  // Admins are identified by role badge/initials — no dating-profile photo in admin UI
+  const adminPhotoUrl: string | null = null;
   const [isPending, startTransition] = useTransition();
 
   // Live counts for nav badges
@@ -2415,30 +2407,56 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
 
         {/* Bottom */}
         <div className="p-3 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
-          {sidebarOpen ? (
-            <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2 rounded-xl" style={{ background: "var(--sidebar-accent)" }}>
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-                {adminPhotoUrl
-                  ? <img src={adminPhotoUrl} alt={adminName} className="w-full h-full object-cover object-top" />
-                  : <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
-                }
+          {(() => {
+            const roleGrad = role === "super-admin"
+              ? "linear-gradient(135deg,#0A6870,#14A8B4)"
+              : role === "admin"
+              ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)"
+              : role === "blog-admin"
+              ? "linear-gradient(135deg,#5B8F68,#7DB48A)"
+              : "linear-gradient(135deg,#B5632F,#D08050)";
+            const roleStrip = role === "super-admin"
+              ? "linear-gradient(90deg,#0A6870,#14A8B4)"
+              : role === "admin"
+              ? "linear-gradient(90deg,#4A8DB8,#6BAFD6)"
+              : role === "blog-admin"
+              ? "linear-gradient(90deg,#6B9E78,#8DC49A)"
+              : "linear-gradient(90deg,#C5733F,#E09060)";
+            const initials = adminName && adminName !== adminEmail
+              ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase()
+              : ROLE_BADGE[role];
+            return sidebarOpen ? (
+              <div className="mb-2 rounded-xl overflow-hidden" style={{ background: "var(--sidebar-accent)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div className="h-1 w-full" style={{ background: roleStrip }} />
+                <div className="flex items-center gap-3 px-3 py-3">
+                  <div className="relative flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: roleGrad, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                      <span style={{ fontSize: "0.875rem", fontWeight: 800, color: "white", letterSpacing: "0.02em" }}>{initials}</span>
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2" style={{ background: "#22c55e", borderColor: "var(--sidebar-accent)" }} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate" style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--sidebar-foreground)", lineHeight: 1.3 }}>
+                      {adminName && adminName !== adminEmail ? adminName : ROLE_LABEL[role]}
+                    </p>
+                    <p className="truncate" style={{ fontSize: "0.6875rem", color: "rgba(203,213,224,0.45)", lineHeight: 1.4 }}>{adminEmail}</p>
+                    <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full" style={{ fontSize: "0.5625rem", fontWeight: 700, letterSpacing: "0.06em", background: "rgba(255,255,255,0.07)", color: "rgba(203,213,224,0.75)", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.08)" }}>
+                      {ROLE_LABEL[role]}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate" style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--sidebar-foreground)", lineHeight: 1.3 }}>{adminName}</p>
-                <p className="truncate" style={{ fontSize: "0.6875rem", color: "rgba(203,213,224,0.55)", lineHeight: 1.3, fontWeight: 400 }}>{adminEmail}</p>
-                <span className="inline-block mt-0.5 px-1.5 py-px rounded" style={{ fontSize: "0.5625rem", fontWeight: 700, letterSpacing: "0.04em", background: "rgba(255,255,255,0.08)", color: "rgba(203,213,224,0.6)", textTransform: "uppercase" }}>{ROLE_LABEL[role]}</span>
+            ) : (
+              <div className="flex justify-center mb-2">
+                <div className="relative">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`} style={{ background: roleGrad, boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>{initials}</span>
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2" style={{ background: "#22c55e", borderColor: "#0B1627" }} />
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="flex justify-center mb-2">
-              <div className="w-8 h-8 rounded-full overflow-hidden bg-sidebar-primary flex items-center justify-center">
-                {adminPhotoUrl
-                  ? <img src={adminPhotoUrl} alt={adminName} className="w-full h-full object-cover object-top" />
-                  : <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
-                }
-              </div>
-            </div>
-          )}
+            );
+          })()}
           <button
             onClick={onBack}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
@@ -2466,11 +2484,12 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
             <div className="h-5 w-px bg-border" />
-            <div className="w-8 h-8 rounded-full overflow-hidden bg-primary flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`}>
-              {adminPhotoUrl
-                ? <img src={adminPhotoUrl} alt={adminName} className="w-full h-full object-cover object-top" />
-                : <span style={{ fontSize: "0.75rem", fontWeight: 800, color: "white" }}>{ROLE_BADGE[role]}</span>
-              }
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" title={`${adminName} — ${ROLE_LABEL[role]}`} style={{
+              background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)"
+            }}>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>
+                {adminName && adminName !== adminEmail ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
+              </span>
             </div>
           </div>
         </div>

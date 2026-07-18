@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type CSSProperties } from "react";
 import { ArrowLeft, Clock, Calendar, Heart, ArrowRight, ThumbsUp, ThumbsDown, Eye, BookOpen } from "lucide-react";
 import type { BlogArticle } from "../../lib/api";
 
@@ -36,7 +36,7 @@ function renderInline(text: string) {
   });
 }
 
-const PARA_STYLE: React.CSSProperties = {
+const PARA_STYLE: CSSProperties = {
   fontSize: "1.0625rem",
   lineHeight: 1.85,
   marginBottom: "1.5rem",

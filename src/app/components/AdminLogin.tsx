@@ -59,10 +59,18 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
       }
 
       setAdminTokens(res.access, res.refresh);
+
+      // Fetch real full name from profile — fall back to email if profile not set
+      let displayName = res.user.email;
+      try {
+        const me = await apiAuth.me();
+        displayName = me.profile?.full_name?.trim() || res.user.email;
+      } catch {}
+
       setLoading(false);
       onLogin({
         role:  frontendRole,
-        name:  res.user.email,
+        name:  displayName,
         email: res.user.email,
       });
     } catch (err) {
