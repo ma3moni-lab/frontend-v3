@@ -162,10 +162,10 @@ function HeroImage({ src, alt, category }: { src: string; alt: string; category?
   }
 
   return (
-    <div className="relative w-full overflow-hidden" style={{ height: "clamp(260px, 42vh, 520px)" }}>
-      {/* Blurred placeholder while loading */}
+    <div className="relative w-full bg-muted" style={{ minHeight: "200px" }}>
+      {/* Placeholder shimmer while loading */}
       {!loaded && (
-        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%)" }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, var(--muted) 0%, var(--secondary) 100%)", minHeight: "200px" }} />
       )}
       <img
         src={src}
@@ -173,13 +173,8 @@ function HeroImage({ src, alt, category }: { src: string; alt: string; category?
         loading="eager"
         onLoad={() => setLoaded(true)}
         onError={() => setErrored(true)}
-        className="w-full h-full object-cover transition-opacity duration-700"
-        style={{ opacity: loaded ? 1 : 0 }}
-      />
-      {/* Cinematic gradient overlay */}
-      <div
-        className="absolute inset-0"
-        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, transparent 35%, rgba(0,0,0,0.55) 100%)" }}
+        className="w-full transition-opacity duration-700"
+        style={{ opacity: loaded ? 1 : 0, display: "block", objectFit: "contain", maxWidth: "100%" }}
       />
       {category && (
         <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-7">

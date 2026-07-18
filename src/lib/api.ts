@@ -1003,7 +1003,32 @@ export const adminApi = {
 
   platformActivity: (type?: "user" | "admin") =>
     get<{ results: ActivityEntry[] }>(`/api/admin/activity/${type ? "?type=" + type : ""}`),
+
+  auditLog: (params: { action?: string; actor_id?: string; search?: string; page?: number; page_size?: number } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') qs.set(k, String(v)); });
+    const q = qs.toString();
+    return get<{ results: AuditEntry[]; count: number; page: number; pages: number }>(`/api/admin/audit-log/${q ? '?' + q : ''}`);
+  },
 };
+
+export interface AuditEntry {
+  id:           number;
+  action:       string;
+  action_label: string;
+  actor: {
+    id:    string | null;
+    name:  string;
+    email: string;
+    role:  string;
+  };
+  target_type:  string;
+  target_id:    string;
+  target_label: string;
+  detail:       string;
+  ip_address:   string | null;
+  created_at:   string;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // ANALYTICS — /api/admin/analytics/

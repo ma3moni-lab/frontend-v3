@@ -27,6 +27,13 @@ function CoverImg({ src, alt, className, style }: {
   return <img src={src} alt={alt} className={className} style={style} onError={() => setErrored(true)} />;
 }
 
+function firstParagraphText(content: string, maxLen = 220): string {
+  if (!content) return "";
+  const chunk = content.split(/\n{2,}|\n/)[0].trim();
+  const plain = chunk.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#>~]/g, "").trim();
+  return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   Compatibility:  "#0A6870",
   Communication:  "#4A8DB8",
@@ -241,12 +248,12 @@ export function BlogListPage() {
               >
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 rounded-3xl overflow-hidden border border-border hover:border-primary/25 hover:shadow-xl transition-all">
                   {/* Image */}
-                  <div className="lg:col-span-3 relative overflow-hidden" style={{ minHeight: "320px" }}>
+                  <div className="lg:col-span-3 relative overflow-hidden bg-muted" style={{ minHeight: "320px" }}>
                     <CoverImg
                       src={featured.cover_image}
                       alt={featured.title}
-                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
-                      style={{ minHeight: "320px" }}
+                      className="w-full h-full object-contain"
+                      style={{ minHeight: "320px", maxHeight: "480px" }}
                     />
                     {/* Cinematic gradient: dark at bottom on mobile, fades right on desktop */}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.35) 100%)" }} />
@@ -269,8 +276,8 @@ export function BlogListPage() {
                     >
                       {featured.title}
                     </h2>
-                    <p className="text-muted-foreground mb-6" style={{ fontSize: "0.9375rem", lineHeight: 1.7 }}>
-                      {featured.excerpt}
+                    <p className="text-muted-foreground mb-6" style={{ fontSize: "0.9375rem", lineHeight: 1.7, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {firstParagraphText(featured.content || "")}
                     </p>
                     <div className="flex items-center gap-4 text-muted-foreground">
                       <div className="flex items-center gap-1.5">
@@ -312,11 +319,12 @@ export function BlogListPage() {
                       className="text-left bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/20 hover:shadow-md transition-all group"
                     >
                       {/* Thumbnail */}
-                      <div className="relative overflow-hidden" style={{ height: "220px", background: "var(--secondary)" }}>
+                      <div className="relative overflow-hidden bg-muted flex items-center justify-center" style={{ minHeight: "200px" }}>
                         <CoverImg
                           src={article.cover_image}
                           alt={article.title}
-                          className="w-full h-full object-cover group-hover:scale-[1.05] transition-transform duration-500"
+                          className="w-full object-contain"
+                          style={{ display: "block", maxHeight: "320px" }}
                         />
                         <div
                           className="absolute inset-0 pointer-events-none"
@@ -339,9 +347,9 @@ export function BlogListPage() {
                         </h3>
                         <p
                           className="text-muted-foreground"
-                          style={{ fontSize: "0.875rem", lineHeight: 1.65, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: "1rem" }}
+                          style={{ fontSize: "0.875rem", lineHeight: 1.65, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", marginBottom: "1rem" }}
                         >
-                          {article.excerpt}
+                          {firstParagraphText(article.content || "")}
                         </p>
 
                         <div className="flex items-center justify-between pt-4 border-t border-border">

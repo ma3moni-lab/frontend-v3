@@ -59,6 +59,13 @@ const FAQS = [
 const PRIVACY_SUMMARY = `Ma3moni collects only the information needed to match you with compatible partners. We never sell your data to third parties. Messages are encrypted end-to-end. You have the right to access, correct, or delete your data at any time. For the full Privacy Policy, email privacy@ma3moni.com.`;
 const TERMS_SUMMARY = `By using Ma3moni, you confirm you are 18+, single, and genuinely seeking a long-term relationship. You agree not to impersonate others, send spam, or misuse the platform. Subscriptions are billed monthly and can be cancelled anytime. For the full Terms of Service, email legal@ma3moni.com.`;
 
+function firstParagraphText(content: string, maxLen = 200): string {
+  if (!content) return "";
+  const chunk = content.split(/\n{2,}|\n/)[0].trim();
+  const plain = chunk.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/[*_`#>~]/g, "").trim();
+  return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
+}
+
 // ─────────────────────────── TRUST INDICATORS ────────────────────
 const TRUST_ITEMS = [
   "256-bit encryption",
@@ -707,8 +714,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                 </div>
                 <div className="p-5">
                   <h3 style={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.45, marginBottom: "0.625rem", letterSpacing: "-0.01em" }}>{post.title}</h3>
-                  <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.65, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                    {post.excerpt}
+                  <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.65, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {firstParagraphText(post.content || "")}
                   </p>
                   <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
                     <div>

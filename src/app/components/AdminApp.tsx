@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, lazy, Suspense, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { USERS as USERS_DATA } from "../../data/users";
-import { adminApi, analytics as analyticsApi, restoreAdminToken, type AnalyticsOverview, type PlatformSettings } from "../../lib/api";
+import { adminApi, analytics as analyticsApi, restoreAdminToken, type AnalyticsOverview, type PlatformSettings, type AuditEntry } from "../../lib/api";
 
 // Heavy admin sections are code-split — they only load when their tab is opened,
 // keeping the initial admin bundle small.
@@ -48,7 +48,7 @@ interface AdminAppProps {
 // Base access per role. Payments are super-admin only unless the super-admin
 // explicitly grants revenue visibility to admins via Settings.
 const ROLE_ACCESS: Record<AdminRole, AdminSection[]> = {
-  "super-admin":   ["overview","users","blacklist","support","roles","blog","payments","analytics","reports","settings"],
+  "super-admin":   ["overview","users","blacklist","support","roles","blog","payments","analytics","reports","settings","audit"],
   "admin":         ["overview","users","blacklist","support","blog","analytics","reports"],
   "blog-admin":    ["blog","overview"],
   "customer-care": ["support","overview"],
@@ -81,7 +81,7 @@ const ROLE_LABEL: Record<AdminRole, string> = {
 type AdminSection =
   | "overview" | "users" | "blacklist"
   | "support" | "roles" | "blog" | "payments" | "analytics"
-  | "reports" | "settings";
+  | "reports" | "settings" | "audit";
 
 // ─── MOCK DATA ────────────────────────────────────────────
 // USERS_DATA imported from src/data/users (shared with UsersSectionV2).
@@ -1962,6 +1962,218 @@ function ReportDetailView({ report, allReports, onBack, onAction }: {
   );
 }
 
+// ─── ADMIN AUDIT LOG SECTION ──────────────────────────────
+const ACTION_COLORS: Record<string, { bg: string; text: string }> = {
+  user_suspend:    { bg: "#FEF3C7", text: "#92400E" },
+  user_activate:   { bg: "#D1FAE5", text: "#065F46" },
+  user_deactivate: { bg: "#FEE2E2", text: "#991B1B" },
+  user_delete:     { bg: "#FEE2E2", text: "#7F1D1D" },
+  user_grant_sub:  { bg: "#DBEAFE", text: "#1E40AF" },
+  user_reset_pw:   { bg: "#EDE9FE", text: "#5B21B6" },
+  role_assign:     { bg: "#E0F2FE", text: "#0C4A6E" },
+  blacklist_add:   { bg: "#FEE2E2", text: "#991B1B" },
+  blacklist_remove:{ bg: "#D1FAE5", text: "#065F46" },
+  settings_update: { bg: "#F0FDF4", text: "#166534" },
+  blog_publish:    { bg: "#ECFDF5", text: "#047857" },
+  blog_unpublish:  { bg: "#FEF9C3", text: "#713F12" },
+  blog_delete:     { bg: "#FEE2E2", text: "#991B1B" },
+  photo_approve:   { bg: "#D1FAE5", text: "#065F46" },
+  photo_reject:    { bg: "#FEE2E2", text: "#991B1B" },
+  report_action:   { bg: "#FEF3C7", text: "#92400E" },
+  login:           { bg: "#E0F2FE", text: "#075985" },
+};
+
+const ROLE_BADGE_COLORS: Record<string, string> = {
+  super_admin: "#0A6870", admin: "#4A8DB8", blog_admin: "#6B9E78", cc_agent: "#C5733F",
+};
+
+function AdminAuditSection() {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [search, setSearch] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+
+  const fetchAudit = (p = 1, q = search, act = actionFilter) => {
+    setLoading(true);
+    adminApi.auditLog({ page: p, page_size: 25, search: q, action: act })
+      .then(r => { setEntries(r.results); setTotal(r.count); setPage(r.page); setPages(r.pages); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchAudit(); }, []);
+
+  const applySearch = () => { setSearch(searchInput); fetchAudit(1, searchInput, actionFilter); };
+  const applyAction = (act: string) => { setActionFilter(act); fetchAudit(1, search, act); };
+
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  const ALL_ACTIONS = [
+    { value: "", label: "All Actions" },
+    { value: "user_suspend",    label: "User Suspended" },
+    { value: "user_activate",   label: "User Activated" },
+    { value: "user_deactivate", label: "User Deactivated" },
+    { value: "user_delete",     label: "User Deleted" },
+    { value: "user_grant_sub",  label: "Subscription Granted" },
+    { value: "user_reset_pw",   label: "Password Reset" },
+    { value: "role_assign",     label: "Role Assigned" },
+    { value: "blacklist_add",   label: "Blacklist Added" },
+    { value: "blacklist_remove",label: "Blacklist Removed" },
+    { value: "settings_update", label: "Settings Updated" },
+    { value: "blog_publish",    label: "Blog Published" },
+    { value: "blog_delete",     label: "Blog Deleted" },
+    { value: "photo_approve",   label: "Photo Approved" },
+    { value: "photo_reject",    label: "Photo Rejected" },
+    { value: "report_action",   label: "Report Actioned" },
+    { value: "login",           label: "Admin Login" },
+  ];
+
+  return (
+    <div>
+      <SectionHeader
+        title="Admin Audit Log"
+        sub="Complete tamper-evident log of all admin actions — visible to super admins only"
+      />
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2.5 flex-1" style={{ minWidth: 200, maxWidth: 340 }}>
+          <Search size={14} className="text-muted-foreground flex-shrink-0" />
+          <input
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && applySearch()}
+            placeholder="Search admin, target, detail…"
+            className="flex-1 bg-transparent focus:outline-none text-foreground placeholder:text-muted-foreground"
+            style={{ fontSize: "0.875rem" }}
+          />
+          {searchInput && (
+            <button onClick={() => { setSearchInput(""); setSearch(""); fetchAudit(1, "", actionFilter); }} className="text-muted-foreground hover:text-foreground">
+              <X size={13} />
+            </button>
+          )}
+        </div>
+        <select
+          value={actionFilter}
+          onChange={e => applyAction(e.target.value)}
+          className="px-3 py-2.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+          style={{ fontSize: "0.875rem" }}
+        >
+          {ALL_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+        </select>
+        <button
+          onClick={() => fetchAudit(page)}
+          className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors"
+          style={{ fontSize: "0.875rem" }}
+        >
+          <RefreshCw size={14} /> Refresh
+        </button>
+        <span className="text-muted-foreground ml-auto" style={{ fontSize: "0.875rem" }}>
+          {total.toLocaleString()} event{total !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* Table */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden">
+        {loading ? (
+          <div className="py-20 text-center text-muted-foreground"><div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin mx-auto mb-3" />Loading audit log…</div>
+        ) : entries.length === 0 ? (
+          <div className="py-20 text-center">
+            <Shield size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+            <p style={{ fontWeight: 700, fontSize: "1rem" }}>No audit events yet</p>
+            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Actions taken by admins will appear here.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full" style={{ fontSize: "0.875rem" }}>
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  {["Timestamp", "Admin", "Action", "Target", "Detail", "IP"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-muted-foreground" style={{ fontWeight: 600, fontSize: "0.8125rem", whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e, idx) => {
+                  const colors = ACTION_COLORS[e.action] ?? { bg: "#F3F4F6", text: "#374151" };
+                  const roleColor = ROLE_BADGE_COLORS[e.actor.role] ?? "#68747F";
+                  return (
+                    <tr key={e.id} className={`border-b border-border last:border-0 transition-colors hover:bg-muted/20 ${idx % 2 === 0 ? "" : "bg-muted/5"}`}>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontSize: "0.8125rem" }}>
+                        {fmtTime(e.created_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: roleColor + "20" }}>
+                            <span style={{ fontSize: "0.5625rem", fontWeight: 800, color: roleColor }}>
+                              {e.actor.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p style={{ fontWeight: 600, lineHeight: 1.3 }}>{e.actor.name}</p>
+                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>{e.actor.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: colors.bg, color: colors.text }}>
+                          {e.action_label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {e.target_label ? (
+                          <div>
+                            <p style={{ fontWeight: 600 }}>{e.target_label}</p>
+                            {e.target_type && <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", textTransform: "capitalize" }}>{e.target_type}</p>}
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-4 py-3" style={{ color: "var(--muted-foreground)", maxWidth: 260 }}>
+                        <span className="line-clamp-2">{e.detail || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                        {e.ip_address ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>Page {page} of {pages}</span>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => { const p = page - 1; setPage(p); fetchAudit(p); }}
+              className="px-4 py-2 rounded-xl border border-border bg-card disabled:opacity-40 hover:bg-muted transition-colors"
+              style={{ fontSize: "0.875rem" }}
+            >← Prev</button>
+            <button
+              disabled={page >= pages}
+              onClick={() => { const p = page + 1; setPage(p); fetchAudit(p); }}
+              className="px-4 py-2 rounded-xl border border-border bg-card disabled:opacity-40 hover:bg-muted transition-colors"
+              style={{ fontSize: "0.875rem" }}
+            >Next →</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SETTINGS SECTION ─────────────────────────────────────
 function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSettingsSaved?: (s: PlatformSettings) => void }) {
   const isSuperAdmin = role === "super-admin";
@@ -2473,6 +2685,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
     { key: "analytics",  icon: <BarChart2 size={17} />,       label: "Analytics" },
     { key: "reports",    icon: <Flag size={17} />,            label: "Reports",    badge: navCounts.reports    || undefined },
     { key: "settings",   icon: <Settings size={17} />,        label: "Settings" },
+    { key: "audit",      icon: <Shield size={17} />,          label: "Audit Log" },
   ];
 
   const navItems = ALL_NAV_ITEMS.filter(item => allowedSections.includes(item.key));
@@ -2492,6 +2705,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail }: AdminAppProps)
       case "analytics":  return <AnalyticsSection role={role} />;
       case "reports":    return <ReportsSection />;
       case "settings":   return <SettingsSection role={role} />;
+      case "audit":      return <AdminAuditSection />;
     }
   };
 
