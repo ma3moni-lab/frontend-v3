@@ -2020,7 +2020,7 @@ type ChatMsg = {
   text: string;
   imageUrl?: string;   // present for image messages
   time: string;
-  status?: "sent" | "delivered" | "read";
+  status?: "sent" | "delivered" | "read" | "failed";
 };
 
 const nowTime = () => new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -2072,20 +2072,24 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
 
   const send = (text: string, imageUrl?: string) => {
     if (!text.trim() && !imageUrl) return;
-    const id = `m${Date.now()}`;
-    setMessages(prev => [...prev, { id, from: "me", text, imageUrl, time: nowTime(), status: "sent" }]);
+    const msgId = `m${Date.now()}`;
+    setMessages(prev => [...prev, { id: msgId, from: "me", text, imageUrl, time: nowTime(), status: "sent" }]);
     setInput("");
     setShowSuggestions(false);
     scrollToBottom();
 
-    // Persist text message to backend (fire-and-forget)
     if (text.trim()) {
-      messagingApi.send(conversationId, text).catch(() => {});
-    }
-
-    setTimeout(() => setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "delivered" } : m)), 600);
-    if (readReceipts) {
-      setTimeout(() => setMessages(prev => prev.map(m => m.id === id ? { ...m, status: "read" } : m)), 1400);
+      messagingApi.send(conversationId, text)
+        .then(() => {
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: "delivered" } : m));
+          if (readReceipts) {
+            setTimeout(() => setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: "read" } : m)), 800);
+          }
+        })
+        .catch(() => {
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: "failed" } : m));
+          toast.error("Message not sent — check your connection and try again.");
+        });
     }
   };
 
@@ -2115,7 +2119,12 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     }
   };
 
-  if (!conv) return null;
+  if (!conv) return (
+    <div className="flex flex-col h-full bg-background items-center justify-center gap-3 text-muted-foreground">
+      <div className="w-8 h-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      <p style={{ fontSize: "0.875rem" }}>Loading conversation…</p>
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -2252,11 +2261,13 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
               <div className={`px-4 pb-2 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/60" : "text-muted-foreground"}`}>
                 <span style={{ fontSize: "0.7rem" }}>{msg.time}</span>
                 {msg.from === "me" && msg.status && (
-                  msg.status === "read" && readReceipts
-                    ? <CheckCheck size={13} className="text-sky-300" aria-label="Read" />
-                    : msg.status === "delivered" || msg.status === "read"
-                      ? <CheckCheck size={13} aria-label="Delivered" />
-                      : <Check size={13} aria-label="Sent" />
+                  msg.status === "failed"
+                    ? <AlertCircle size={13} className="text-red-400" aria-label="Failed" />
+                    : msg.status === "read" && readReceipts
+                      ? <CheckCheck size={13} className="text-sky-300" aria-label="Read" />
+                      : msg.status === "delivered" || msg.status === "read"
+                        ? <CheckCheck size={13} aria-label="Delivered" />
+                        : <Check size={13} aria-label="Sent" />
                 )}
               </div>
             </div>
@@ -4539,7 +4550,23 @@ export function UserApp({ onSignOut }: UserAppProps) {
               isAlreadyChatting={chattingPartnerIds.has(activeMatchId)}
               sentInterest={sentInterests.includes(activeMatchId)}
               onInterest={(id, name) => showInterest(id, name)}
-              onMessage={(id) => { openChat(liveConversations.find(c => c.partnerId === id)?.id ?? "c1"); }}
+              onMessage={async (id) => {
+                const existing = liveConversations.find(c => c.partnerId === id);
+                if (existing) { openChat(existing.id); return; }
+                try {
+                  const apiConv = await messagingApi.start(id);
+                  const convItem = mapApiConversation(apiConv);
+                  setLiveConversations(prev => [convItem, ...prev.filter(c => c.id !== convItem.id)]);
+                  openChat(convItem.id);
+                } catch (err: unknown) {
+                  const detail = (err as { data?: { detail?: string } })?.data?.detail;
+                  if (detail === "both_free") {
+                    toast.error("Upgrade to Basic or Premium to start messaging.");
+                  } else {
+                    toast.error("Could not start conversation. Please try again.");
+                  }
+                }
+              }}
               displayName={displayName}
               onReport={(matchId, name) => setReportModal({ matchId, name })}
               matchesList={liveMatches}
