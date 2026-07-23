@@ -386,6 +386,14 @@ export const auth = {
 // ═══════════════════════════════════════════════════════════════
 // MATCHES — /api/matches/ & /api/interests/
 // ═══════════════════════════════════════════════════════════════
+export interface CompatibilityBreakdown {
+  deen:          number;
+  readiness:     number;
+  family:        number;
+  lifestyle:     number;
+  communication: number;
+}
+
 export interface MatchProfile {
   id:               string;
   full_name:        string;
@@ -396,7 +404,10 @@ export interface MatchProfile {
   bio:              string;
   photos:           ProfilePhoto[];
   completion_score: number;
-  compatibility_score: number;
+  compatibility_score:    number;
+  compatibility_breakdown?: CompatibilityBreakdown;
+  deal_breaker_warning?:   boolean;
+  genotype_risk?:          string | null;
 }
 
 export interface DiscoverResponse {

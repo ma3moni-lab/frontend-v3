@@ -101,7 +101,7 @@ const MATCHES = [
     ],
     highlights: ["Shared values", "Similar goals", "Compatible lifestyle"],
     bio: "I'm driven by purpose — in my work, my faith, and my relationships. I'm looking for someone who values depth over speed, and who sees marriage as a partnership built on shared values and genuine friendship.",
-    compatibility: { values: 96, lifestyle: 92, goals: 94, communication: 90 },
+    compatibility: { deen: 96, readiness: 95, family: 93, lifestyle: 92, communication: 90 },
     education: "MBA", institution: "Lagos Business School",
     profession: "Product Manager", company: "Jumia",
     height: 168, languages: ["English", "Yoruba", "French"],
@@ -111,6 +111,7 @@ const MATCHES = [
     personality: ["Thoughtful", "Ambitious", "Nurturing", "Creative"],
     goals: ["Start a family", "Build a career", "Community service"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "2",
@@ -125,7 +126,7 @@ const MATCHES = [
     ],
     highlights: ["Deep values alignment", "Creative & structured", "Family-first"],
     bio: "Architecture taught me that the most beautiful structures are built on the strongest foundations. I believe the same is true of marriage — intention, patience, and the right partner.",
-    compatibility: { values: 92, lifestyle: 89, goals: 91, communication: 93 },
+    compatibility: { deen: 94, readiness: 88, family: 90, lifestyle: 89, communication: 93 },
     education: "Master's in Architecture", institution: "Ahmadu Bello University",
     profession: "Architect", company: "Design Studio Abuja",
     height: 165, languages: ["English", "Hausa", "Arabic"],
@@ -135,6 +136,7 @@ const MATCHES = [
     personality: ["Creative", "Structured", "Calm", "Thoughtful"],
     goals: ["Build a career", "Buy a home", "Spiritual growth"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "3",
@@ -149,7 +151,7 @@ const MATCHES = [
     ],
     highlights: ["Family-oriented", "Active lifestyle", "Warm personality"],
     bio: "I work with children every day and it's confirmed what I've always known — family is everything. I'm warm, patient, and ready to build something lasting with someone who shares those values.",
-    compatibility: { values: 88, lifestyle: 90, goals: 85, communication: 84 },
+    compatibility: { deen: 90, readiness: 82, family: 88, lifestyle: 86, communication: 84 },
     education: "BSc Nursing", institution: "University of Ghana",
     profession: "Pediatric Nurse", company: "Korle Bu Teaching Hospital",
     height: 162, languages: ["English", "French", "Wolof"],
@@ -159,6 +161,7 @@ const MATCHES = [
     personality: ["Nurturing", "Calm", "Energetic", "Thoughtful"],
     goals: ["Start a family", "Community service", "Spiritual growth"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "4",
@@ -173,7 +176,7 @@ const MATCHES = [
     ],
     highlights: ["Career-driven", "Well-travelled", "Balanced outlook"],
     bio: "I'm pragmatic but passionate. Ambitious in my career, deeply committed to family — I don't see those as opposites. I'm looking for someone built the same way.",
-    compatibility: { values: 83, lifestyle: 86, goals: 88, communication: 84 },
+    compatibility: { deen: 80, readiness: 88, family: 82, lifestyle: 86, communication: 84 },
     education: "LLB + Bar School", institution: "University of Lagos / Inns of Court",
     profession: "Barrister", company: "Gray's Inn Chambers",
     height: 170, languages: ["English", "Yoruba"],
@@ -197,7 +200,7 @@ const MATCHES = [
     ],
     highlights: ["Data-driven thinker", "Creative soul", "Dubai-based"],
     bio: "Data by day, dreamer by night. I believe in slow mornings, long conversations, and building something meaningful with someone who is as curious about the world as I am.",
-    compatibility: { values: 78, lifestyle: 82, goals: 79, communication: 80 },
+    compatibility: { deen: 76, readiness: 80, family: 78, lifestyle: 82, communication: 80 },
     education: "MSc Data Science", institution: "University of Cape Town",
     profession: "Data Scientist", company: "Majid Al Futtaim",
     height: 163, languages: ["English", "Igbo"],
@@ -219,7 +222,7 @@ const MATCHES_MALE = [
     photos: [p("1603085356448-6857558a32b5", 600, 750)],
     highlights: ["Family-oriented", "Ambitious professional", "Deep faith"],
     bio: "Engineer by profession, family man at heart. I value integrity, hard work, and a partner who shares a vision for a purposeful life built on faith and mutual respect.",
-    compatibility: { values: 95, lifestyle: 91, goals: 93, communication: 92 },
+    compatibility: { deen: 95, readiness: 93, family: 91, lifestyle: 91, communication: 92 },
     education: "BEng Civil Engineering", institution: "University of Sharjah",
     profession: "Civil Engineer", company: "AECOM UAE",
     height: 180, languages: ["Arabic", "English"],
@@ -229,6 +232,7 @@ const MATCHES_MALE = [
     personality: ["Ambitious", "Thoughtful", "Patient", "Traditional"],
     goals: ["Start a family", "Build a home", "Spiritual growth"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "m2", name: "Khalid M.", fullName: "Khalid Mansouri",
@@ -237,7 +241,7 @@ const MATCHES_MALE = [
     photos: [p("1765285353856-0d00e478f2c8", 600, 750)],
     highlights: ["Entrepreneur", "Strong values", "Community leader"],
     bio: "Built my business from nothing. I believe in patience, gratitude, and a life partner who stands with you through both the building and the living.",
-    compatibility: { values: 90, lifestyle: 88, goals: 92, communication: 89 },
+    compatibility: { deen: 92, readiness: 90, family: 89, lifestyle: 88, communication: 89 },
     education: "BSc Business Administration", institution: "University of Lagos",
     profession: "Entrepreneur", company: "KM Ventures",
     height: 178, languages: ["English", "Yoruba", "Hausa"],
@@ -247,6 +251,7 @@ const MATCHES_MALE = [
     personality: ["Ambitious", "Empathetic", "Humorous", "Spiritual"],
     goals: ["Start a family", "Entrepreneurship", "Community service"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "m3", name: "Omar H.", fullName: "Omar Hassan",
@@ -255,7 +260,7 @@ const MATCHES_MALE = [
     photos: [p("1667381371084-68280d99f5b3", 600, 750)],
     highlights: ["Medical professional", "Calm personality", "Deep values"],
     bio: "Working as a doctor taught me that life is precious and relationships more so. I am looking for someone grounded in faith with whom I can build a life of purpose.",
-    compatibility: { values: 86, lifestyle: 89, goals: 87, communication: 85 },
+    compatibility: { deen: 88, readiness: 84, family: 87, lifestyle: 89, communication: 85 },
     education: "MBBS", institution: "Ahmadu Bello University",
     profession: "Medical Doctor", company: "National Hospital Abuja",
     height: 176, languages: ["English", "Arabic", "Hausa"],
@@ -265,6 +270,7 @@ const MATCHES_MALE = [
     personality: ["Calm", "Analytical", "Nurturing", "Traditional"],
     goals: ["Start a family", "Academic growth", "Spiritual growth"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "m4", name: "Ibrahim S.", fullName: "Ibrahim Al-Sayed",
@@ -273,7 +279,7 @@ const MATCHES_MALE = [
     photos: [p("1750612306471-46997387626a", 600, 750)],
     highlights: ["Finance professional", "Well-travelled", "Balanced outlook"],
     bio: "Finance by day, history books by night. I'm looking for a partner who appreciates growth, values deep conversations, and wants to build something lasting.",
-    compatibility: { values: 83, lifestyle: 86, goals: 85, communication: 83 },
+    compatibility: { deen: 78, readiness: 85, family: 80, lifestyle: 86, communication: 83 },
     education: "MSc Finance", institution: "London School of Economics",
     profession: "Investment Analyst", company: "Barclays Capital",
     height: 182, languages: ["English", "Arabic", "French"],
@@ -283,6 +289,7 @@ const MATCHES_MALE = [
     personality: ["Analytical", "Extroverted", "Thoughtful", "Ambitious"],
     goals: ["Buy a home", "Travel the world", "Build a career"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
     id: "m5", name: "Tariq B.", fullName: "Tariq Balogun",
@@ -291,7 +298,7 @@ const MATCHES_MALE = [
     photos: [p("1739566583814-fcead808e96f", 600, 750)],
     highlights: ["Tech entrepreneur", "Creative mind", "Family-first"],
     bio: "I build apps and communities. I am patient, faith-driven, and ready for a meaningful partnership with someone who values authenticity over perfection.",
-    compatibility: { values: 80, lifestyle: 83, goals: 79, communication: 81 },
+    compatibility: { deen: 75, readiness: 79, family: 78, lifestyle: 83, communication: 81 },
     education: "BSc Computer Science", institution: "University of Ghana",
     profession: "Software Developer", company: "Andela",
     height: 175, languages: ["English", "Twi"],
@@ -301,6 +308,7 @@ const MATCHES_MALE = [
     personality: ["Creative", "Introverted", "Ambitious", "Humorous"],
     goals: ["Entrepreneurship", "Start a family", "Build a career"],
     smoking: "Never", drinking: "Never", diet: "Halal",
+    dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
 ];
 
@@ -410,13 +418,23 @@ function mapApiMatch(m: ApiMatchProfile): MatchItem {
   const parts = m.full_name.trim().split(" ");
   const shortName = parts[0] + (parts[1] ? " " + parts[1][0] + "." : "");
   const ph0 = m.photos[0]?.image_url ?? "";
+  const s = m.compatibility_score;
+  const bd = m.compatibility_breakdown;
   return {
     id: m.id, name: shortName, fullName: m.full_name,
     age: m.age ?? 0, city: m.location_city, country: m.location_country,
-    nationality: "", score: m.compatibility_score,
+    nationality: "", score: s,
     photo: ph0, photos: m.photos.map(ph => ph.image_url),
     highlights: [], bio: m.bio ?? "",
-    compatibility: { values: m.compatibility_score, lifestyle: m.compatibility_score, goals: m.compatibility_score, communication: m.compatibility_score },
+    compatibility: {
+      deen:          bd?.deen          ?? s,
+      readiness:     bd?.readiness     ?? s,
+      family:        bd?.family        ?? s,
+      lifestyle:     bd?.lifestyle     ?? s,
+      communication: bd?.communication ?? s,
+    },
+    dealBreakerWarning: m.deal_breaker_warning ?? false,
+    genotypeRisk:       m.genotype_risk ?? null,
     education: "", institution: "", profession: m.profession ?? "", company: "",
     height: 0, languages: [], timeline: "", wantsChildren: "",
     religiosity: 0, familyImportance: "",
@@ -502,15 +520,54 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
-function CompatBar({ label, value }: { label: string; value: number }) {
-  const color = value >= 90 ? "#0A6870" : value >= 80 ? "#C5733F" : "#4A8DB8";
+// Human-readable labels + icons for the 5 compatibility pillars
+const COMPAT_META: Record<string, { label: string; icon: string; desc: string }> = {
+  deen:          { label: "Deen & Practice",   icon: "🕌", desc: "Prayer, sect, Quran & hijab alignment" },
+  readiness:     { label: "Marriage Readiness", icon: "💍", desc: "Timeline, children & relationship readiness" },
+  family:        { label: "Family & Culture",   icon: "🏡", desc: "Family involvement, values & cultural fit" },
+  lifestyle:     { label: "Lifestyle & Values", icon: "⚖️", desc: "Age fit, finances & halal lifestyle" },
+  communication: { label: "Personality & Comm", icon: "🤝", desc: "Love language, conflict style & shared interests" },
+};
+
+function CompatBar({ dimKey, value }: { dimKey: string; value: number }) {
+  const meta  = COMPAT_META[dimKey] ?? { label: dimKey, icon: "•", desc: "" };
+  const color = value >= 90 ? "#0A6870" : value >= 78 ? "#C5733F" : "#68747F";
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-muted-foreground" style={{ fontSize: "0.75rem", width: "80px", flexShrink: 0 }}>{label}</span>
-      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${value}%`, background: color }} />
+    <div className="flex items-center gap-3" title={meta.desc}>
+      <div className="flex items-center gap-1.5 flex-shrink-0" style={{ width: 130 }}>
+        <span style={{ fontSize: "0.875rem" }}>{meta.icon}</span>
+        <span className="text-muted-foreground" style={{ fontSize: "0.72rem", lineHeight: 1.2 }}>{meta.label}</span>
       </div>
-      <span style={{ fontSize: "0.75rem", fontWeight: 700, color, width: "32px", textAlign: "right" }}>{value}%</span>
+      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${value}%`, background: color }} />
+      </div>
+      <span style={{ fontSize: "0.75rem", fontWeight: 800, color, width: 30, textAlign: "right" }}>{value}%</span>
+    </div>
+  );
+}
+
+function GenotypeWarningBadge({ risk }: { risk: string | null }) {
+  if (!risk || risk === "safe" || risk === "carrier") return null;
+  const cfg = risk === "critical"
+    ? { bg: "#FEE2E2", border: "#FECACA", text: "#991B1B", icon: "⚠️", msg: "High genotype risk (e.g. SS×SS). Seek genetic counselling before proceeding." }
+    : risk === "high_risk"
+    ? { bg: "#FEF3C7", border: "#FDE68A", text: "#92400E", icon: "⚠️", msg: "Elevated genotype risk. We recommend genetic counselling." }
+    : { bg: "#FEF9C3", border: "#FDE047", text: "#713F12", icon: "ℹ️", msg: "Some genotype risk (e.g. AS×AS). Consider genetic counselling." };
+  return (
+    <div className="flex items-start gap-2 rounded-xl px-3 py-2.5" style={{ background: cfg.bg, border: `1px solid ${cfg.border}` }}>
+      <span style={{ fontSize: "0.875rem", flexShrink: 0, marginTop: 1 }}>{cfg.icon}</span>
+      <p style={{ fontSize: "0.75rem", color: cfg.text, lineHeight: 1.5 }}>{cfg.msg}</p>
+    </div>
+  );
+}
+
+function DealBreakerBadge() {
+  return (
+    <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ background: "#FEE2E2", border: "1px solid #FECACA" }}>
+      <span style={{ fontSize: "0.875rem" }}>🚫</span>
+      <p style={{ fontSize: "0.75rem", color: "#991B1B", lineHeight: 1.5 }}>
+        One or more of your deal-breakers may apply to this profile. Review carefully before proceeding.
+      </p>
     </div>
   );
 }
@@ -639,9 +696,9 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
               <div className="absolute bottom-0 left-0 right-0 p-3">
                 <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "white", lineHeight: 1.2 }}>{m.name}</p>
                 <p style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.65)", marginTop: 1 }}>{m.city}</p>
-                {/* #14 — compatibility bars */}
+                {/* 5-pillar compatibility mini bars */}
                 <div className="flex gap-1 mt-2"
-                  title={`Values ${m.compatibility.values}% · Lifestyle ${m.compatibility.lifestyle}% · Goals ${m.compatibility.goals}% · Comm ${m.compatibility.communication}%`}>
+                  title={`Deen ${m.compatibility.deen}% · Readiness ${m.compatibility.readiness}% · Family ${m.compatibility.family}% · Lifestyle ${m.compatibility.lifestyle}% · Comm ${m.compatibility.communication}%`}>
                   {Object.values(m.compatibility).map((v, i) => (
                     <div key={i} className="flex-1 h-1 rounded-full overflow-hidden bg-white/25">
                       <div className="h-full rounded-full bg-white/85" style={{ width: `${v}%` }} />
@@ -946,8 +1003,8 @@ function MatchCard({ m, onPass, onView, sc, plan = "free", sentInterest = false,
 
         {/* Score badge with tooltip */}
         <div
-          title={`${m.score}% match — Values ${m.compatibility.values}% · Lifestyle ${m.compatibility.lifestyle}% · Goals ${m.compatibility.goals}% · Communication ${m.compatibility.communication}%`}
-          className="absolute top-4 right-4 rounded-2xl flex flex-col items-center justify-center shadow-lg cursor-help group"
+          title={`${m.score}% match — Deen ${m.compatibility.deen}% · Readiness ${m.compatibility.readiness}% · Family ${m.compatibility.family}% · Lifestyle ${m.compatibility.lifestyle}% · Comm ${m.compatibility.communication}%`}
+          className="absolute top-4 right-4 rounded-2xl flex flex-col items-center justify-center shadow-lg cursor-help"
           style={{ background: sc(m.score), minWidth: 58, padding: "8px 10px" }}>
           <span style={{ fontSize: "1.5rem", fontWeight: 900, color: "white", lineHeight: 1 }}>{m.score}</span>
           <span style={{ fontSize: "0.5rem", fontWeight: 800, color: "white", opacity: 0.8, letterSpacing: "0.08em", marginTop: 1 }}>MATCH %</span>
@@ -959,10 +1016,18 @@ function MatchCard({ m, onPass, onView, sc, plan = "free", sentInterest = false,
             <Shield size={11} className="text-white" />
             <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "white" }}>Verified</span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "rgba(197,115,63,0.85)" }}>
-            <Star size={11} className="text-white" />
-            <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "white" }}>Premium</span>
-          </div>
+          {m.dealBreakerWarning && (
+            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "rgba(239,68,68,0.85)" }}>
+              <span style={{ fontSize: "0.625rem" }}>🚫</span>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "white" }}>Deal-breaker</span>
+            </div>
+          )}
+          {m.genotypeRisk && !["safe", "carrier", null].includes(m.genotypeRisk) && (
+            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "rgba(245,158,11,0.85)" }}>
+              <span style={{ fontSize: "0.625rem" }}>⚠️</span>
+              <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: "white" }}>Geno risk</span>
+            </div>
+          )}
           <MatchExpiry matchId={m.id} />
         </div>
 
@@ -978,21 +1043,26 @@ function MatchCard({ m, onPass, onView, sc, plan = "free", sentInterest = false,
             <Briefcase size={12} className="text-white/60" />
             <span style={{ fontSize: "0.8125rem", color: "white", opacity: 0.75 }}>{m.profession} · {m.education}</span>
           </div>
-          <div className="flex flex-wrap gap-1.5 mt-3 mb-4">
+          <div className="flex flex-wrap gap-1.5 mt-3 mb-3">
             {m.highlights.map(h => (
               <span key={h} className="px-3 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 600, background: "rgba(255,255,255,0.14)", color: "white" }}>{h}</span>
             ))}
           </div>
+          {/* 5-pillar compat bars in card */}
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-            {Object.entries(m.compatibility).map(([k, v]) => (
-              <div key={k} className="flex items-center gap-2">
-                <span style={{ fontSize: "0.625rem", color: "rgba(255,255,255,0.55)", width: 75, flexShrink: 0, textTransform: "capitalize" }}>{k}</span>
-                <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.18)" }}>
-                  <div className="h-full rounded-full" style={{ width: `${v}%`, background: sc(m.score) }} />
+            {(["deen","readiness","family","lifestyle","communication"] as const).map(k => {
+              const meta = COMPAT_META[k];
+              const v = m.compatibility[k];
+              return (
+                <div key={k} className="flex items-center gap-2" title={meta.desc}>
+                  <span style={{ fontSize: "0.7rem" }}>{meta.icon}</span>
+                  <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.18)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${v}%`, background: "rgba(255,255,255,0.85)" }} />
+                  </div>
+                  <span style={{ fontSize: "0.6rem", color: "white", fontWeight: 800, width: 20, textAlign: "right" }}>{v}</span>
                 </div>
-                <span style={{ fontSize: "0.625rem", color: "white", fontWeight: 800, width: 22, textAlign: "right" }}>{v}</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1102,77 +1172,114 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
 
   // ── Profile completion gate (after all hooks) ──────────────────────────────
   if (profileStrength < 100) {
-    const circ = 2 * Math.PI * 38;
+    const circ = 2 * Math.PI * 45;
     const offset = circ - (profileStrength / 100) * circ;
-    const nextField = incompleteFields[0];
+    const remaining = incompleteFields.length;
+    const done = 10 - remaining; // total profile fields = 10
+
     return (
       <div className="flex flex-col h-full bg-background">
+        {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b border-border bg-card flex-shrink-0">
           <h2 style={{ fontWeight: 800, fontSize: "1.125rem" }}>Discover Matches</h2>
         </div>
-        <div className="flex-1 overflow-y-auto flex flex-col items-center px-5 py-8 gap-6">
-          {/* Progress ring */}
-          <div className="relative flex items-center justify-center" style={{ width: 112, height: 112 }}>
-            <svg width="112" height="112" className="absolute inset-0" style={{ transform: "rotate(-90deg)" }}>
-              <circle cx="56" cy="56" r="38" fill="none" stroke="var(--muted)" strokeWidth="8" />
-              <circle cx="56" cy="56" r="38" fill="none" stroke="var(--primary)" strokeWidth="8"
-                strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
-                style={{ transition: "stroke-dashoffset 0.6s ease" }} />
-            </svg>
-            <div className="flex flex-col items-center">
-              <span style={{ fontWeight: 900, fontSize: "1.5rem", color: "var(--primary)", lineHeight: 1 }}>{profileStrength}%</span>
-              <span style={{ fontSize: "0.625rem", color: "var(--muted-foreground)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>complete</span>
-            </div>
-          </div>
 
-          {/* Headline */}
-          <div className="text-center px-4">
-            <h3 style={{ fontWeight: 800, fontSize: "1.25rem", lineHeight: 1.25, color: "var(--foreground)" }}>
-              Complete your profile to see matches
-            </h3>
-            <p className="text-muted-foreground mt-2" style={{ fontSize: "0.9375rem", lineHeight: 1.55 }}>
-              A complete profile helps our algorithm find your ideal match and shows you to compatible members.
-            </p>
-          </div>
+        <div className="flex-1 overflow-y-auto">
+          {/* Hero card */}
+          <div className="mx-4 mt-5 rounded-3xl overflow-hidden" style={{ background: "var(--primary)" }}>
+            <div className="p-6 text-white flex items-center gap-5">
+              {/* Progress ring */}
+              <div className="relative flex-shrink-0" style={{ width: 96, height: 96 }}>
+                <svg width="96" height="96" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="48" cy="48" r="45" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
+                  <circle cx="48" cy="48" r="45" fill="none" stroke="white" strokeWidth="6"
+                    strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
+                    style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span style={{ fontWeight: 900, fontSize: "1.5rem", color: "white", lineHeight: 1 }}>{profileStrength}<span style={{ fontSize: "0.75rem" }}>%</span></span>
+                  <span style={{ fontSize: "0.5rem", color: "rgba(255,255,255,0.7)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>done</span>
+                </div>
+              </div>
 
-          {/* Incomplete fields list */}
-          {incompleteFields.length > 0 && (
-            <div className="w-full rounded-2xl border border-border bg-card overflow-hidden">
-              <div className="px-4 py-3 border-b border-border">
-                <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--foreground)" }}>
-                  {incompleteFields.length} thing{incompleteFields.length !== 1 ? "s" : ""} remaining
+              {/* Text */}
+              <div className="flex-1 min-w-0">
+                <p style={{ fontWeight: 900, fontSize: "1.0625rem", color: "white", lineHeight: 1.25 }}>
+                  {done} of {done + remaining} steps complete
+                </p>
+                <p style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.75)", marginTop: 4, lineHeight: 1.5 }}>
+                  Matches are hidden until your profile is 100%. This protects you and ensures compatibility scores are meaningful.
                 </p>
               </div>
-              {incompleteFields.map((f, i) => (
-                <button
-                  key={f.key}
-                  onClick={() => onCompleteProfile?.(f.section)}
-                  className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-muted/40 transition-colors ${i < incompleteFields.length - 1 ? "border-b border-border" : ""}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/40 flex-shrink-0" />
-                    <span style={{ fontSize: "0.9375rem", color: "var(--foreground)" }}>{f.label}</span>
-                  </div>
-                  <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
-                </button>
+            </div>
+
+            {/* Progress track at bottom of hero */}
+            <div style={{ background: "rgba(0,0,0,0.2)" }} className="px-6 pb-4 pt-1">
+              <div className="h-1.5 rounded-full overflow-hidden bg-white/20">
+                <div className="h-full rounded-full bg-white transition-all duration-700" style={{ width: `${profileStrength}%` }} />
+              </div>
+              <div className="flex justify-between mt-1.5">
+                <span style={{ fontSize: "0.625rem", color: "rgba(255,255,255,0.6)" }}>Profile strength</span>
+                <span style={{ fontSize: "0.625rem", color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>{remaining} step{remaining !== 1 ? "s" : ""} left</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Why this matters */}
+          <div className="mx-4 mt-4 rounded-2xl border border-border bg-card p-4">
+            <p style={{ fontWeight: 700, fontSize: "0.8125rem", color: "var(--foreground)", marginBottom: 10 }}>Why a complete profile matters</p>
+            <div className="space-y-2.5">
+              {[
+                { icon: "🕌", text: "Our Deen compatibility score needs your Islamic lifestyle info" },
+                { icon: "🔒", text: "Incomplete profiles are hidden from other members — privacy first" },
+                { icon: "💍", text: "Serious members only see serious candidates" },
+              ].map(({ icon, text }) => (
+                <div key={text} className="flex items-start gap-2.5">
+                  <span style={{ fontSize: "1rem", flexShrink: 0, marginTop: 1 }}>{icon}</span>
+                  <p className="text-muted-foreground" style={{ fontSize: "0.8125rem", lineHeight: 1.5 }}>{text}</p>
+                </div>
               ))}
             </div>
-          )}
+          </div>
 
-          {/* CTA */}
-          {nextField && (
-            <button
-              onClick={() => onCompleteProfile?.(nextField.section)}
-              className="w-full py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
-              style={{ fontWeight: 700, fontSize: "1rem" }}
-            >
-              {nextField.key === "avatar" ? "Upload profile photo" : `Add ${nextField.label.replace(/^(Add|Set|Write|Upload)\s/i, "").toLowerCase()}`} →
-            </button>
-          )}
+          {/* Remaining steps — each is a tappable action */}
+          {incompleteFields.length > 0 && (
+            <div className="mx-4 mt-4 mb-6">
+              <p style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: 10 }}>
+                Complete these steps ({remaining} remaining)
+              </p>
+              <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                {incompleteFields.map((f, i) => (
+                  <button
+                    key={f.key}
+                    onClick={() => onCompleteProfile?.(f.section)}
+                    className={`w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-muted/50 active:bg-muted transition-colors ${i < incompleteFields.length - 1 ? "border-b border-border" : ""}`}
+                  >
+                    {/* Step indicator */}
+                    <div className="w-8 h-8 rounded-full border-2 border-border flex items-center justify-center flex-shrink-0 bg-background">
+                      <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--muted-foreground)" }}>{i + 1}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{f.label}</p>
+                      <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>Tap to complete</p>
+                    </div>
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <ArrowRight size={13} className="text-primary" />
+                    </div>
+                  </button>
+                ))}
+              </div>
 
-          <p className="text-muted-foreground text-center" style={{ fontSize: "0.75rem" }}>
-            Matches are shown once your profile reaches 100% · Your data is private &amp; secure
-          </p>
+              {/* Primary CTA — points to first incomplete step */}
+              <button
+                onClick={() => onCompleteProfile?.(incompleteFields[0].section)}
+                className="w-full mt-4 py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all"
+                style={{ fontWeight: 700, fontSize: "1rem" }}
+              >
+                Continue — {incompleteFields[0].label} →
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1356,10 +1463,11 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
                   {(() => {
                     // Pick top 2 dimensions by score for a meaningful reason.
                     const dims = [
-                      { label: "Strong values alignment",  score: m.compatibility.values },
-                      { label: "Shared life goals",        score: m.compatibility.goals },
-                      { label: "Compatible lifestyle",     score: m.compatibility.lifestyle },
-                      { label: "Great communication",      score: m.compatibility.communication },
+                      { label: "🕌 Strong Deen alignment",   score: m.compatibility.deen },
+                      { label: "💍 Ready for marriage",      score: m.compatibility.readiness },
+                      { label: "🏡 Compatible family values", score: m.compatibility.family },
+                      { label: "⚖️ Shared lifestyle values",  score: m.compatibility.lifestyle },
+                      { label: "🤝 Great communication",      score: m.compatibility.communication },
                     ].sort((a, b) => b.score - a.score).slice(0, 2);
                     return dims.map(d => d.label).join(" · ");
                   })()}
@@ -1595,11 +1703,12 @@ function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBloc
                       <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{match?.age} · {match?.city}</span>
                     </div>
                     {match && (
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1"
+                        title={`Deen ${match.compatibility.deen}% · Readiness ${match.compatibility.readiness}% · Family ${match.compatibility.family}% · Lifestyle ${match.compatibility.lifestyle}% · Comm ${match.compatibility.communication}%`}>
                         <div className="flex gap-0.5 flex-1">
-                          {Object.values(match.compatibility).map((v, i) => (
-                            <div key={i} className="flex-1 h-1 rounded-full overflow-hidden bg-muted">
-                              <div className="h-full rounded-full" style={{ width: `${v}%`, background: sc }} />
+                          {(["deen","readiness","family","lifestyle","communication"] as const).map(k => (
+                            <div key={k} className="flex-1 h-1 rounded-full overflow-hidden bg-muted">
+                              <div className="h-full rounded-full" style={{ width: `${match.compatibility[k]}%`, background: sc }} />
                             </div>
                           ))}
                         </div>
@@ -2522,32 +2631,58 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
       <div className="p-4 space-y-4">
 
         {/* Score summary — always visible */}
-        <div className="rounded-2xl p-5 text-white text-center" style={{ background: sc }}>
-          <p style={{ fontSize: "0.8125rem", opacity: 0.8 }}>Overall Compatibility</p>
-          <p style={{ fontSize: "3.25rem", fontWeight: 900, lineHeight: 1, marginTop: 4 }}>
-            {match.score}<span style={{ fontSize: "1.25rem", opacity: 0.75 }}>%</span>
-          </p>
-          <p style={{ fontSize: "0.875rem", opacity: 0.7, marginTop: 4 }}>{label}</p>
-        </div>
-
-        {/* Highlights/tags — always visible (same as match card) */}
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Why you match</h3>
-          <div className="flex flex-wrap gap-2">
-            {match.highlights.map(h => (
-              <span key={h} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ fontSize: "0.8125rem", fontWeight: 700, background: sc + "18", color: sc }}>
-                <Check size={12} />{h}
-              </span>
-            ))}
+        <div className="rounded-2xl overflow-hidden" style={{ background: sc }}>
+          <div className="p-5 text-white text-center">
+            <p style={{ fontSize: "0.8125rem", opacity: 0.8 }}>Overall Compatibility</p>
+            <p style={{ fontSize: "3.25rem", fontWeight: 900, lineHeight: 1, marginTop: 4 }}>
+              {match.score}<span style={{ fontSize: "1.25rem", opacity: 0.75 }}>%</span>
+            </p>
+            <p style={{ fontSize: "0.875rem", opacity: 0.7, marginTop: 4 }}>{label}</p>
+          </div>
+          {/* Mini 5-pillar bars inside the score card */}
+          <div className="px-5 pb-4 grid grid-cols-5 gap-2">
+            {(["deen","readiness","family","lifestyle","communication"] as const).map(k => {
+              const meta = COMPAT_META[k];
+              const v = match.compatibility[k];
+              return (
+                <div key={k} className="flex flex-col items-center gap-1" title={`${meta.label}: ${v}%`}>
+                  <span style={{ fontSize: "0.875rem" }}>{meta.icon}</span>
+                  <div className="w-full h-1 rounded-full bg-white/25 overflow-hidden">
+                    <div className="h-full rounded-full bg-white/80" style={{ width: `${v}%` }} />
+                  </div>
+                  <span style={{ fontSize: "0.55rem", color: "white", opacity: 0.75, fontWeight: 700 }}>{v}%</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Basic compat bars — always visible */}
+        {/* Deal-breaker / genotype warnings — always visible if flagged */}
+        {match.dealBreakerWarning && <DealBreakerBadge />}
+        {match.genotypeRisk && !["safe", "carrier"].includes(match.genotypeRisk) && (
+          <GenotypeWarningBadge risk={match.genotypeRisk} />
+        )}
+
+        {/* Why you match highlights */}
+        {match.highlights.length > 0 && (
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Why you match</h3>
+            <div className="flex flex-wrap gap-2">
+              {match.highlights.map(h => (
+                <span key={h} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ fontSize: "0.8125rem", fontWeight: 700, background: sc + "18", color: sc }}>
+                  <Check size={12} />{h}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 5-pillar compat bars — always visible */}
         <div className="bg-card rounded-2xl border border-border p-5">
-          <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Compatibility Overview</h3>
-          <div className="space-y-4">
-            {Object.entries(match.compatibility).map(([k, v]) => (
-              <CompatBar key={k} label={k.charAt(0).toUpperCase() + k.slice(1)} value={v} />
+          <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Compatibility Breakdown</h3>
+          <div className="space-y-3.5">
+            {(["deen","readiness","family","lifestyle","communication"] as const).map(k => (
+              <CompatBar key={k} dimKey={k} value={match.compatibility[k]} />
             ))}
           </div>
         </div>
