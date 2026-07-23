@@ -1046,7 +1046,61 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   incompleteFields?: { key: string; label: string; section: SubView }[];
   onCompleteProfile?: (section: SubView) => void;
 }) {
-  // ── Profile completion gate ────────────────────────────────────────────────
+  // ── All hooks must be declared before any conditional return (Rules of Hooks) ──
+  const DATA = matchesList ?? MATCHES;
+
+  // Persist filter state in sessionStorage so it survives tab switches
+  const [filter, setFilter] = useState<"all" | "high" | "new">(() => {
+    try { return (sessionStorage.getItem("ma3_mfilter") as "all" | "high" | "new") ?? "all"; } catch { return "all"; }
+  });
+  const [passed, setPassed] = useState<string[]>([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [adv, setAdv] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("ma3_madv");
+      return raw ? JSON.parse(raw) : { minAge: 18, maxAge: 60, country: "any", minRelig: 0 };
+    } catch { return { minAge: 18, maxAge: 60, country: "any", minRelig: 0 }; }
+  });
+
+  const canFilter = plan !== "free";
+  const dailyLimit = DAILY_LIMITS[plan];
+  const countries = useMemo(() => Array.from(new Set(DATA.map(m => m.country))).sort(), [DATA]);
+
+  const userGender = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("ma3moni_onboarding_progress");
+      if (raw) return (JSON.parse(raw) as { form: Record<string,string> }).form?.gender ?? "";
+    } catch {}
+    return "";
+  }, []);
+  const oppositeGender = userGender === "male" ? "female" : userGender === "female" ? "male" : null;
+
+  const filtered = useMemo(() => DATA.filter(m => {
+    if (blocked.includes(m.id)) return false;
+    if (chattingIds.has(m.id)) return false;
+    if (passed.includes(m.id)) return false;
+    if (oppositeGender && m.nationality !== undefined) {
+      const matchGender = (m as MatchItem & { gender?: string }).gender;
+      if (matchGender && matchGender !== oppositeGender) return false;
+    }
+    // "best" = high compatibility; "new" = not yet expressed interest
+    if (filter === "high" && m.score < 88) return false;
+    if (filter === "new" && sentInterests.includes(m.id)) return false;
+    if (canFilter) {
+      if (m.age < adv.minAge || m.age > adv.maxAge) return false;
+      if (adv.country !== "any" && m.country !== adv.country) return false;
+      if (adv.minRelig && (m.religiosity ?? 0) < adv.minRelig) return false;
+    }
+    return true;
+  }), [DATA, filter, passed, canFilter, adv, blocked, chattingIds, oppositeGender, sentInterests]);
+
+  const visible = useMemo(
+    () => dailyLimit === Infinity ? filtered : filtered.slice(0, dailyLimit),
+    [filtered, dailyLimit]
+  );
+  const limitReached = dailyLimit !== Infinity && filtered.length > dailyLimit;
+
+  // ── Profile completion gate (after all hooks) ──────────────────────────────
   if (profileStrength < 100) {
     const circ = 2 * Math.PI * 38;
     const offset = circ - (profileStrength / 100) * circ;
@@ -1123,59 +1177,6 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
       </div>
     );
   }
-
-  const DATA = matchesList ?? MATCHES;
-  // Persist filter state in sessionStorage so it survives tab switches
-  const [filter, setFilter] = useState<"all" | "high" | "new">(() => {
-    try { return (sessionStorage.getItem("ma3_mfilter") as "all" | "high" | "new") ?? "all"; } catch { return "all"; }
-  });
-  const [passed, setPassed] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
-  const [adv, setAdv] = useState(() => {
-    try {
-      const raw = sessionStorage.getItem("ma3_madv");
-      return raw ? JSON.parse(raw) : { minAge: 18, maxAge: 60, country: "any", minRelig: 0 };
-    } catch { return { minAge: 18, maxAge: 60, country: "any", minRelig: 0 }; }
-  });
-
-  const canFilter = plan !== "free";
-  const dailyLimit = DAILY_LIMITS[plan];
-  const countries = useMemo(() => Array.from(new Set(DATA.map(m => m.country))).sort(), [DATA]);
-
-  // Derive the current user's gender from their onboarding/profile data
-  const userGender = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("ma3moni_onboarding_progress");
-      if (raw) return (JSON.parse(raw) as { form: Record<string,string> }).form?.gender ?? "";
-    } catch {}
-    return "";
-  }, []);
-  const oppositeGender = userGender === "male" ? "female" : userGender === "female" ? "male" : null;
-
-  const filtered = useMemo(() => DATA.filter(m => {
-    if (blocked.includes(m.id)) return false;
-    if (chattingIds.has(m.id)) return false;
-    if (passed.includes(m.id)) return false;
-    // Only show opposite gender when the user's gender is set (backend enforces this too)
-    if (oppositeGender && m.nationality !== undefined) {
-      // If match has a gender field use it; otherwise rely on backend filtering
-      const matchGender = (m as MatchItem & { gender?: string }).gender;
-      if (matchGender && matchGender !== oppositeGender) return false;
-    }
-    if (filter === "high" && m.score < 88) return false;
-    if (canFilter) {
-      if (m.age < adv.minAge || m.age > adv.maxAge) return false;
-      if (adv.country !== "any" && m.country !== adv.country) return false;
-      if (adv.minRelig && (m.religiosity ?? 0) < adv.minRelig) return false;
-    }
-    return true;
-  }), [DATA, filter, passed, canFilter, adv, blocked, chattingIds, oppositeGender]);
-
-  const visible = useMemo(
-    () => dailyLimit === Infinity ? filtered : filtered.slice(0, dailyLimit),
-    [filtered, dailyLimit]
-  );
-  const limitReached = dailyLimit !== Infinity && filtered.length > dailyLimit;
 
   const handlePass = (m: (typeof MATCHES)[number]) => {
     setPassed(prev => [...prev, m.id]);
@@ -1425,7 +1426,7 @@ const RECEIVED_INTERESTS = [
   { id: "ri2", matchId: "5", name: "Halima Y.", score: 88, photo: MATCHES.find(m => m.id === "5")?.photo ?? "" },
 ];
 
-function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBlock, onRequestBlock, onReport, sentInterests, onInterest, conversations, receivedInterests, matchesList }: {
+function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBlock, onRequestBlock, onReport, sentInterests, onInterest, conversations, receivedInterests, matchesList, onBrowseMatches, onStartChat }: {
   onOpenChat: (id: string) => void;
   onOpenMatch: (id: string) => void;
   plan: "free" | "basic" | "premium";
@@ -1440,6 +1441,8 @@ function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBloc
   receivedInterests?: InterestItem[];
   matchesList?: MatchItem[];
   onGoToProfile?: () => void;
+  onBrowseMatches?: () => void;
+  onStartChat?: (partnerId: string) => Promise<void>;
 }) {
   const CONVS = conversations     ?? [];
   const RECVD = receivedInterests ?? [];
@@ -1624,8 +1627,16 @@ function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBloc
                   {canMessage ? (
                     <button onClick={() => {
                       const conv = CONVS.find(c => c.partnerId === r.matchId);
-                      if (conv) { setDismissedInterests(prev => [...prev, r.id]); setExpandedInterest(null); onOpenChat(conv.id); }
-                      else toast("Starting a new conversation…");
+                      if (conv) {
+                        setDismissedInterests(prev => [...prev, r.id]);
+                        setExpandedInterest(null);
+                        onOpenChat(conv.id);
+                      } else if (onStartChat) {
+                        onStartChat(r.matchId).then(() => {
+                          setDismissedInterests(prev => [...prev, r.id]);
+                          setExpandedInterest(null);
+                        });
+                      }
                     }}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                       style={{ fontSize: "0.8125rem", fontWeight: 700 }}>
@@ -1654,7 +1665,7 @@ function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBloc
               <Avatar color={c.avatar.color} initials={c.avatar.initials} size={44} photo={c.photo} />
               <div className="flex-1 min-w-0">
                 <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{c.partnerName}</p>
-                <p className="text-muted-foreground truncate" style={{ fontSize: "0.8125rem" }}>{c.messages[0].text}</p>
+                <p className="text-muted-foreground truncate" style={{ fontSize: "0.8125rem" }}>{c.preview || c.messages[0]?.text || ""}</p>
                 {!canMessage && <p className="text-amber-600 mt-0.5" style={{ fontSize: "0.6875rem", fontWeight: 600 }}>Upgrade to respond</p>}
               </div>
               <div className="flex gap-2">
@@ -1682,10 +1693,11 @@ function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBloc
             </div>
             <p style={{ fontWeight: 700, fontSize: "1rem" }}>No conversations yet</p>
             <p className="text-muted-foreground mt-1.5" style={{ fontSize: "0.875rem" }}>When you connect with a match, your conversation will appear here.</p>
-            <div className="mt-5 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground mx-auto w-fit cursor-pointer hover:bg-primary/90 transition-colors">
+            <button onClick={onBrowseMatches}
+              className="mt-5 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground mx-auto w-fit hover:bg-primary/90 transition-colors">
               <Heart size={15} />
               <span style={{ fontSize: "0.875rem", fontWeight: 700 }}>Browse Matches</span>
-            </div>
+            </button>
           </div>
         ) : (
           <div className="space-y-2">
@@ -4113,7 +4125,8 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const _initGender = (() => { try { const r = localStorage.getItem("ma3moni_onboarding_progress"); return r ? (JSON.parse(r) as { form: Record<string,string> }).form?.gender ?? "" : ""; } catch { return ""; } })();
   const _initMocks  = genderAwareMocks(_initGender);
 
-  const [liveMatches,       setLiveMatches]       = useState<MatchItem[]>([]);
+  // undefined = not yet loaded (shows mock data); [] = loaded but empty; [...] = real data
+  const [liveMatches,       setLiveMatches]       = useState<MatchItem[] | undefined>(undefined);
   const [liveConversations, setLiveConversations] = useState<ConvItem[]>([]);
   const [liveInterests,     setLiveInterests]     = useState<InterestItem[]>([]);
 
@@ -4439,6 +4452,31 @@ export function UserApp({ onSignOut }: UserAppProps) {
     setSubView("chat");
   };
 
+  // Start a conversation with a partner (creates it if it doesn't exist) then opens the chat.
+  // Guards against non-UUID IDs so demo/mock match cards don't crash the API.
+  const startChat = async (partnerId: string) => {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(partnerId)) {
+      toast.error("This is a demo profile — real matches will appear after more users join.");
+      return;
+    }
+    const existing = liveConversations.find(c => c.partnerId === partnerId);
+    if (existing) { openChat(existing.id); return; }
+    try {
+      const apiConv = await messagingApi.start(partnerId);
+      const convItem = mapApiConversation(apiConv);
+      setLiveConversations(prev => [convItem, ...prev.filter(c => c.id !== convItem.id)]);
+      openChat(convItem.id);
+    } catch (err: unknown) {
+      const detail = (err as { data?: { detail?: string } })?.data?.detail;
+      if (detail === "both_free") {
+        toast.error("Upgrade to Basic or Premium to start messaging.");
+      } else {
+        toast.error("Could not start conversation. Please try again.");
+      }
+    }
+  };
+
   const openMatch = (id: string) => {
     setActiveMatchId(id);
     setSubView("match-detail");
@@ -4520,7 +4558,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
             <div className="size-full overflow-y-auto">
               {tab === "home"     && <HomeTab onOpenMatch={openMatch} onOpenChat={openChat} onOpenNotif={() => setSubView("notifications")} setSubView={setSubView} setTab={setTab} onOpenArticle={(id) => openArticle(id, "none")} onOpenGuidance={() => setSubView("blog-list")} displayName={displayName} firstName={firstName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} foundPartner={foundPartner} conversations={liveConversations} matchesList={liveMatches} />}
               {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} />}
-              {tab === "messages" && <MessagesTab onOpenChat={openChat} onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} onBlock={blockMatch} onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })} onReport={(matchId, name) => setReportModal({ matchId, name })} sentInterests={sentInterests} onInterest={showInterest} conversations={liveConversations} receivedInterests={liveInterests} matchesList={liveMatches} />}
+              {tab === "messages" && <MessagesTab onOpenChat={openChat} onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} onBlock={blockMatch} onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })} onReport={(matchId, name) => setReportModal({ matchId, name })} sentInterests={sentInterests} onInterest={showInterest} conversations={liveConversations} receivedInterests={liveInterests} matchesList={liveMatches} onBrowseMatches={() => setTab("matches")} onStartChat={startChat} />}
               {tab === "profile" && <ProfileTab setSubView={setSubView} onSignOut={onSignOut} displayName={displayName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} onAvatarSaved={() => setProfileVersion(v => v + 1)} />}
             </div>
           )}
@@ -4550,23 +4588,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
               isAlreadyChatting={chattingPartnerIds.has(activeMatchId)}
               sentInterest={sentInterests.includes(activeMatchId)}
               onInterest={(id, name) => showInterest(id, name)}
-              onMessage={async (id) => {
-                const existing = liveConversations.find(c => c.partnerId === id);
-                if (existing) { openChat(existing.id); return; }
-                try {
-                  const apiConv = await messagingApi.start(id);
-                  const convItem = mapApiConversation(apiConv);
-                  setLiveConversations(prev => [convItem, ...prev.filter(c => c.id !== convItem.id)]);
-                  openChat(convItem.id);
-                } catch (err: unknown) {
-                  const detail = (err as { data?: { detail?: string } })?.data?.detail;
-                  if (detail === "both_free") {
-                    toast.error("Upgrade to Basic or Premium to start messaging.");
-                  } else {
-                    toast.error("Could not start conversation. Please try again.");
-                  }
-                }
-              }}
+              onMessage={(id) => startChat(id)}
               displayName={displayName}
               onReport={(matchId, name) => setReportModal({ matchId, name })}
               matchesList={liveMatches}
