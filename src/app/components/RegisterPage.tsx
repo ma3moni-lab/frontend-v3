@@ -174,7 +174,6 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
       const res = await apiAuth.register(
         mode === "email" ? email.toLowerCase().trim() : `${phone.replace(/\s/g, "")}@phone.ma3moni`,
         password,
-        "",
         mode === "phone" ? phone.trim() : undefined,
       );
       setUserTokens(res.access, res.refresh);

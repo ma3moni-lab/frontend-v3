@@ -25,6 +25,16 @@ export function AdminRoot() {
     else localStorage.removeItem(ADMIN_KEY);
   }, [session]);
 
+  useEffect(() => {
+    const handleExpiry = () => {
+      clearAdminTokens();
+      setSession(null);
+      navigate("/app/admin", { replace: true });
+    };
+    window.addEventListener("ma3moni:admin-session-expired", handleExpiry);
+    return () => window.removeEventListener("ma3moni:admin-session-expired", handleExpiry);
+  }, [navigate]);
+
   return (
     <div className="size-full overflow-hidden">
       {!session

@@ -196,7 +196,10 @@ let refreshQueue: Array<(token: string) => void> = [];
 async function refreshAccessToken(path: string): Promise<string> {
   const isAdmin  = path.startsWith("/api/admin/");
   const refresh  = refreshForPath(path);
-  if (!refresh) throw new ApiError(401, "No refresh token");
+  if (!refresh) {
+    if (isAdmin) window.dispatchEvent(new Event("ma3moni:admin-session-expired"));
+    throw new ApiError(401, "No refresh token");
+  }
 
   const res = await fetch(`${BASE}/api/auth/refresh/`, {
     method: "POST",
@@ -204,12 +207,16 @@ async function refreshAccessToken(path: string): Promise<string> {
     body: JSON.stringify({ refresh }),
   });
   if (!res.ok) {
-    if (isAdmin) clearAdminTokens(); else clearTokens();
+    if (isAdmin) {
+      clearAdminTokens();
+      window.dispatchEvent(new Event("ma3moni:admin-session-expired"));
+    } else {
+      clearTokens();
+    }
     throw new ApiError(401, "Session expired. Please sign in again.");
   }
   const data = await res.json();
   const newRefresh = data.refresh ?? refresh;
-  // Store back into the correct slot
   if (isAdmin) setAdminTokens(data.access, newRefresh);
   else         setUserTokens(data.access, newRefresh);
   return data.access;
@@ -305,8 +312,8 @@ export const auth = {
   login: (identifier: string, password: string) =>
     post<LoginResponse>("/api/auth/login/", { identifier, password }),
 
-  register: (email: string, password: string, full_name: string, phone?: string) =>
-    post<RegisterResponse>("/api/auth/register/", { email, password, full_name, ...(phone ? { phone } : {}) }),
+  register: (email: string, password: string, phone?: string) =>
+    post<RegisterResponse>("/api/auth/register/", { email, password, ...(phone ? { phone } : {}) }),
 
   /** Send OTP to the given email or phone (no auth required). */
   sendOtp: (identifier: string) =>
