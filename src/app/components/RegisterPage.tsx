@@ -177,6 +177,19 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
         mode === "phone" ? phone.trim() : undefined,
       );
       setUserTokens(res.access, res.refresh);
+      // Persist phone immediately so PersonalInfoEdit is pre-populated before first me() hydration
+      if (mode === "phone" && phone.trim()) {
+        try {
+          const raw = localStorage.getItem("ma3moni_onboarding_progress");
+          const existing: Record<string, unknown> = raw
+            ? (JSON.parse(raw) as { form?: Record<string, unknown> }).form ?? {}
+            : {};
+          localStorage.setItem("ma3moni_onboarding_progress", JSON.stringify({
+            step: existing.step ?? 0,
+            form: { ...existing, phone: phone.trim() },
+          }));
+        } catch {}
+      }
       setOtpId(mode === "email" ? email.toLowerCase().trim() : phone.trim());
     } catch (err) {
       setLoading(false);

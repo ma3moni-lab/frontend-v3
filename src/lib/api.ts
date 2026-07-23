@@ -171,6 +171,7 @@ export interface ProfilePhoto {
 export interface MeResponse {
   id:         string;
   email:      string;
+  phone?:     string;
   role:       DjangoRole;
   plan:       UserPlan;
   profile:    Profile;

@@ -19,7 +19,7 @@ import {
   Settings, Star, Shield, Send, ArrowRight, Copy, Check,
   LogOut, Camera, Edit2, CreditCard, Gift, X, AlertCircle,
   MapPin, Briefcase, BookOpen, ChevronRight, MoreHorizontal,
-  PartyPopper, UserX, Clock, SlidersHorizontal, Lock, CheckCheck, Search, ImagePlus, CheckCircle, Flag
+  PartyPopper, UserX, Clock, SlidersHorizontal, Lock, CheckCheck, Search, ImagePlus, CheckCircle, Flag, Mail
 } from "lucide-react";
 import {
   CareerEducationSection,
@@ -46,6 +46,7 @@ type SubView =
   | "referral"
   | "notifications"
   | "edit-profile"
+  | "photos"
   | "career-education"
   | "values-lifestyle"
   | "life-goals"
@@ -1032,7 +1033,7 @@ const DAILY_LIMITS: Record<"free" | "basic" | "premium", number> = {
   premium: Infinity,
 };
 
-function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList }: {
+function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList, profileStrength = 100, incompleteFields = [], onCompleteProfile }: {
   onOpenMatch: (id: string) => void;
   plan: "free" | "basic" | "premium";
   onUpgrade: () => void;
@@ -1041,7 +1042,88 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   sentInterests: string[];
   onInterest: (id: string, name: string) => void;
   matchesList?: MatchItem[];
+  profileStrength?: number;
+  incompleteFields?: { key: string; label: string; section: SubView }[];
+  onCompleteProfile?: (section: SubView) => void;
 }) {
+  // ── Profile completion gate ────────────────────────────────────────────────
+  if (profileStrength < 100) {
+    const circ = 2 * Math.PI * 38;
+    const offset = circ - (profileStrength / 100) * circ;
+    const nextField = incompleteFields[0];
+    return (
+      <div className="flex flex-col h-full bg-background">
+        <div className="px-5 pt-5 pb-3 border-b border-border bg-card flex-shrink-0">
+          <h2 style={{ fontWeight: 800, fontSize: "1.125rem" }}>Discover Matches</h2>
+        </div>
+        <div className="flex-1 overflow-y-auto flex flex-col items-center px-5 py-8 gap-6">
+          {/* Progress ring */}
+          <div className="relative flex items-center justify-center" style={{ width: 112, height: 112 }}>
+            <svg width="112" height="112" className="absolute inset-0" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="56" cy="56" r="38" fill="none" stroke="var(--muted)" strokeWidth="8" />
+              <circle cx="56" cy="56" r="38" fill="none" stroke="var(--primary)" strokeWidth="8"
+                strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
+                style={{ transition: "stroke-dashoffset 0.6s ease" }} />
+            </svg>
+            <div className="flex flex-col items-center">
+              <span style={{ fontWeight: 900, fontSize: "1.5rem", color: "var(--primary)", lineHeight: 1 }}>{profileStrength}%</span>
+              <span style={{ fontSize: "0.625rem", color: "var(--muted-foreground)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>complete</span>
+            </div>
+          </div>
+
+          {/* Headline */}
+          <div className="text-center px-4">
+            <h3 style={{ fontWeight: 800, fontSize: "1.25rem", lineHeight: 1.25, color: "var(--foreground)" }}>
+              Complete your profile to see matches
+            </h3>
+            <p className="text-muted-foreground mt-2" style={{ fontSize: "0.9375rem", lineHeight: 1.55 }}>
+              A complete profile helps our algorithm find your ideal match and shows you to compatible members.
+            </p>
+          </div>
+
+          {/* Incomplete fields list */}
+          {incompleteFields.length > 0 && (
+            <div className="w-full rounded-2xl border border-border bg-card overflow-hidden">
+              <div className="px-4 py-3 border-b border-border">
+                <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--foreground)" }}>
+                  {incompleteFields.length} thing{incompleteFields.length !== 1 ? "s" : ""} remaining
+                </p>
+              </div>
+              {incompleteFields.map((f, i) => (
+                <button
+                  key={f.key}
+                  onClick={() => onCompleteProfile?.(f.section)}
+                  className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-muted/40 transition-colors ${i < incompleteFields.length - 1 ? "border-b border-border" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/40 flex-shrink-0" />
+                    <span style={{ fontSize: "0.9375rem", color: "var(--foreground)" }}>{f.label}</span>
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* CTA */}
+          {nextField && (
+            <button
+              onClick={() => onCompleteProfile?.(nextField.section)}
+              className="w-full py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+              style={{ fontWeight: 700, fontSize: "1rem" }}
+            >
+              {nextField.key === "avatar" ? "Upload profile photo" : `Add ${nextField.label.replace(/^(Add|Set|Write|Upload)\s/i, "").toLowerCase()}`} →
+            </button>
+          )}
+
+          <p className="text-muted-foreground text-center" style={{ fontSize: "0.75rem" }}>
+            Matches are shown once your profile reaches 100% · Your data is private &amp; secure
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const DATA = matchesList ?? MATCHES;
   // Persist filter state in sessionStorage so it survives tab switches
   const [filter, setFilter] = useState<"all" | "high" | "new">(() => {
@@ -3752,24 +3834,22 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
   const u = <K extends keyof typeof form>(k: K, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   const save = async () => {
-    const fullNameVal = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ");
     try {
       const raw = localStorage.getItem("ma3moni_onboarding_progress");
       const existing = raw ? (JSON.parse(raw) as { form: Record<string, unknown> }).form : {};
+      // Only update the editable fields — name and gender are locked
       localStorage.setItem("ma3moni_onboarding_progress", JSON.stringify({
         step: 8,
-        form: { ...existing, fullName: fullNameVal, gender: form.gender, dob: form.dob, city: form.city, country: form.country, bio: form.bio, phone: form.phone },
+        form: { ...existing, dob: form.dob, city: form.city, country: form.country, bio: form.bio, phone: form.phone },
       }));
     } catch {}
-    // Persist to backend so data survives logout/device changes
+    // Persist editable fields to backend — name/gender remain as-is
     try {
       const { auth: apiAuth } = await import("../../lib/api");
       const patch: Record<string, unknown> = {
-        full_name:       fullNameVal,
-        gender:          form.gender || undefined,
-        location_city:   form.city.trim() || undefined,
+        location_city:    form.city.trim() || undefined,
         location_country: form.country.trim() || undefined,
-        bio:             form.bio.trim() || undefined,
+        bio:              form.bio.trim() || undefined,
       };
       if (form.dob) patch.date_of_birth = form.dob;
       apiAuth.updateProfile(patch as never).catch(() => {});
@@ -3829,42 +3909,72 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        {/* ── Locked fields notice ─────────────────────────────── */}
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2.5">
+          <Lock size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
-            <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>First Name</label>
-            <input value={form.firstName} onChange={e => u("firstName", e.target.value)} placeholder="First name" className={inputCls} style={{ fontSize: "0.9375rem" }} />
-          </div>
-          <div>
-            <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Last Name</label>
-            <input value={form.lastName} onChange={e => u("lastName", e.target.value)} placeholder="Last name" className={inputCls} style={{ fontSize: "0.9375rem" }} />
+            <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#92400e" }}>Name, gender &amp; email are locked</p>
+            <p className="text-amber-700 mt-0.5" style={{ fontSize: "0.75rem", lineHeight: 1.5 }}>
+              These cannot be changed to keep Ma3moni safe and trustworthy. To request a correction,{" "}
+              <a href="mailto:support@ma3moni.com" className="underline font-semibold">contact our team</a>.
+            </p>
           </div>
         </div>
-        {/* Gender */}
+
+        {/* Name — read-only */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+              First Name <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+            </label>
+            <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
+              {form.firstName || <span className="opacity-50">—</span>}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+              Last Name <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+            </label>
+            <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
+              {form.lastName || <span className="opacity-50">—</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Gender — read-only */}
         <div>
-          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Gender</label>
-          <div className="grid grid-cols-2 gap-3">
+          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+            Gender <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+          </label>
+          <div className="grid grid-cols-2 gap-3 opacity-60 pointer-events-none select-none">
             {[
               { value: "male",   label: "Male",   icon: "♂" },
               { value: "female", label: "Female", icon: "♀" },
             ].map(g => (
-              <button
+              <div
                 key={g.value}
-                type="button"
-                onClick={() => u("gender", g.value)}
-                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
+                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 ${
                   form.gender === g.value
                     ? "border-primary bg-primary/8 text-primary"
-                    : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                    : "border-border bg-card text-muted-foreground"
                 }`}>
                 <span style={{ fontSize: "1.25rem", lineHeight: 1 }}>{g.icon}</span>
                 <span style={{ fontSize: "0.8125rem", fontWeight: form.gender === g.value ? 700 : 400 }}>{g.label}</span>
                 {form.gender === g.value && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-              </button>
+              </div>
             ))}
           </div>
-          {!form.gender && (
-            <p className="text-amber-600 mt-1.5" style={{ fontSize: "0.75rem" }}>⚠ Gender not set — required for matching</p>
-          )}
+        </div>
+
+        {/* Email — read-only (locked) */}
+        <div>
+          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+            Email <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+          </label>
+          <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center gap-2`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
+            <Mail size={14} className="flex-shrink-0 opacity-50" />
+            {(() => { try { return localStorage.getItem("ma3moni_login_email") || "—"; } catch { return "—"; } })()}
+          </div>
         </div>
 
         <div>
@@ -4044,6 +4154,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           set("wantsChildren",   (p as Record<string,unknown>).children_preference);
           set("careerAmbition",  (p as Record<string,unknown>).career_ambition_level);
           set("communicationStyle", (p as Record<string,unknown>).communication_style);
+          set("phone",              me.phone);
           if (Array.isArray(p.personality_traits) && p.personality_traits.length && !hydrated.personality)
             hydrated.personality = p.personality_traits;
           if (Array.isArray((p as Record<string,unknown>).interests) && ((p as Record<string,unknown>).interests as unknown[]).length && !hydrated.goals)
@@ -4246,7 +4357,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
     { key: "wantsChildren",   label: "Set your children preference",    section: "life-goals",       check: p => !!p.wantsChildren },
     { key: "goals",           label: "Add your life goals",             section: "life-goals",       check: p => Array.isArray(p.goals) && (p.goals as unknown[]).length > 0 },
     // Avatar photo — checked against localStorage directly (not stored in onboarding form)
-    { key: "avatar",          label: "Upload a profile photo",          section: "edit-profile",     check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
+    { key: "avatar",          label: "Upload a profile photo",          section: "photos",            check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
   ];
 
   const profileStrength = useMemo(() => {
@@ -4397,7 +4508,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           {subView === "none" && (
             <div className="size-full overflow-y-auto">
               {tab === "home"     && <HomeTab onOpenMatch={openMatch} onOpenChat={openChat} onOpenNotif={() => setSubView("notifications")} setSubView={setSubView} setTab={setTab} onOpenArticle={(id) => openArticle(id, "none")} onOpenGuidance={() => setSubView("blog-list")} displayName={displayName} firstName={firstName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} foundPartner={foundPartner} conversations={liveConversations} matchesList={liveMatches} />}
-              {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} />}
+              {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} />}
               {tab === "messages" && <MessagesTab onOpenChat={openChat} onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} onBlock={blockMatch} onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })} onReport={(matchId, name) => setReportModal({ matchId, name })} sentInterests={sentInterests} onInterest={showInterest} conversations={liveConversations} receivedInterests={liveInterests} matchesList={liveMatches} />}
               {tab === "profile" && <ProfileTab setSubView={setSubView} onSignOut={onSignOut} displayName={displayName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} onAvatarSaved={() => setProfileVersion(v => v + 1)} />}
             </div>
@@ -4476,6 +4587,20 @@ export function UserApp({ onSignOut }: UserAppProps) {
 
           {subView === "edit-profile" && (
             <PersonalInfoEdit onBack={goBack} profileData={profileData} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />
+          )}
+          {subView === "photos" && (
+            <div className="flex flex-col h-full bg-background">
+              <div className="flex items-center px-4 py-3 border-b border-border bg-card flex-shrink-0">
+                <button onClick={goBack} aria-label="Go back" className="p-1 text-muted-foreground hover:text-foreground transition-colors mr-3"><ChevronLeft size={22} /></button>
+                <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Profile Photos</h3>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5">
+                <p className="text-muted-foreground mb-4" style={{ fontSize: "0.875rem" }}>
+                  Profiles with photos receive <strong>3× more matches</strong>. Upload up to 6 photos.
+                </p>
+                <ProfilePhotoGrid />
+              </div>
+            </div>
           )}
           {subView === "career-education"  && <CareerEducationSection onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
           {subView === "values-lifestyle"  && <ValuesLifestyleSection onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
