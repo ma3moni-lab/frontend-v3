@@ -848,6 +848,7 @@ export interface PlatformSettings {
   referral_bonus_points:        number;
   maintenance_mode:             boolean;
   revenue_permission_for_admin: boolean;
+  email_verification_enabled:   boolean;
   credo_public_key:             string;
   credo_merchant_id:            string;
   credo_secret_key_set:         boolean;

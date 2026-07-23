@@ -2291,6 +2291,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           referralBonus:        String(s.referral_bonus_points),
           maintenanceMode:      s.maintenance_mode,
           maxPhotos:            String(s.max_photos),
+          emailVerification:    s.email_verification_enabled ?? true,
         }));
         if (s.revenue_permission_for_admin !== undefined) {
           setAdminRevenueAccess(s.revenue_permission_for_admin);
@@ -2322,11 +2323,12 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     setSaving(true);
     try {
       const updated = await adminApi.updateSettings({
-        max_daily_matches_free:      Number(settings.maxDailyMatchesFree),
-        max_daily_matches_basic:     Number(settings.maxDailyMatchesBasic),
-        max_photos:                  Number(settings.maxPhotos),
-        referral_bonus_points:       Number(settings.referralBonus),
-        maintenance_mode:            settings.maintenanceMode as boolean,
+        max_daily_matches_free:       Number(settings.maxDailyMatchesFree),
+        max_daily_matches_basic:      Number(settings.maxDailyMatchesBasic),
+        max_photos:                   Number(settings.maxPhotos),
+        referral_bonus_points:        Number(settings.referralBonus),
+        maintenance_mode:             settings.maintenanceMode as boolean,
+        email_verification_enabled:   settings.emailVerification as boolean,
         revenue_permission_for_admin: adminRevenueAccess,
       });
       onSettingsSaved?.(updated);
@@ -2339,6 +2341,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         referralBonus:        String(updated.referral_bonus_points),
         maintenanceMode:      updated.maintenance_mode,
         maxPhotos:            String(updated.max_photos),
+        emailVerification:    updated.email_verification_enabled ?? true,
       }));
       setLoadError(false);
       toast.success("Settings saved successfully.");
