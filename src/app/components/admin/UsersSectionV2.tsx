@@ -779,6 +779,7 @@ export function UsersSectionV2() {
                           try {
                             await adminApi.deleteUser(u.id);
                             setLiveUsers(prev => prev.filter(x => x.id !== u.id));
+                            window.dispatchEvent(new Event("ma3moni:users-changed"));
                             toast.success(`${u.name} permanently deleted.`);
                           } catch (err) {
                             toast.error(`Delete failed: ${(err as {message?:string})?.message ?? "Unknown error"}`);

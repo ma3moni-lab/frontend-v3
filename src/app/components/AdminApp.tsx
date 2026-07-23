@@ -2763,17 +2763,26 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
     fetchAnalytics();
   }, []);
 
+  // Re-fetch counts when any section mutates shared data (e.g. user deleted)
+  useEffect(() => {
+    const refresh = () => { fetchNavCounts(); fetchAnalytics(); };
+    window.addEventListener("ma3moni:users-changed", refresh);
+    return () => window.removeEventListener("ma3moni:users-changed", refresh);
+  }, []);
+
+  // Prefer live counts from the overview API (always accurate after refresh); fall
+  // back to navCounts (from separate per-section requests) if overview hasn't loaded yet.
+  const ov = liveOverview;
   const ALL_NAV_ITEMS: { key: AdminSection; icon: ReactNode; label: string; badge?: number }[] = [
     { key: "overview",   icon: <LayoutDashboard size={17} />, label: "Overview" },
-    { key: "users",      icon: <Users size={17} />,           label: "Users",      badge: navCounts.users      || undefined },
-    // Moderation removed — photos save directly without review
-    { key: "blacklist",  icon: <Ban size={17} />,             label: "Blacklist",  badge: navCounts.blacklist  || undefined },
-    { key: "support",    icon: <Headphones size={17} />,      label: "Support",    badge: navCounts.support    || undefined },
+    { key: "users",      icon: <Users size={17} />,           label: "Users",     badge: ov?.total_users      ?? navCounts.users },
+    { key: "blacklist",  icon: <Ban size={17} />,             label: "Blacklist", badge: ov?.blacklist_count   ?? navCounts.blacklist },
+    { key: "support",    icon: <Headphones size={17} />,      label: "Support",   badge: ov?.open_tickets_count ?? navCounts.support },
     { key: "roles",      icon: <Key size={17} />,             label: "Roles" },
-    { key: "blog",       icon: <BookOpen size={17} />,        label: "Blog" },
+    { key: "blog",       icon: <BookOpen size={17} />,        label: "Blog",      badge: ov?.blog_published_count },
     { key: "payments",   icon: <CreditCard size={17} />,      label: "Payments" },
     { key: "analytics",  icon: <BarChart2 size={17} />,       label: "Analytics" },
-    { key: "reports",    icon: <Flag size={17} />,            label: "Reports",    badge: navCounts.reports    || undefined },
+    { key: "reports",    icon: <Flag size={17} />,            label: "Reports",   badge: ov?.pending_reports_count ?? navCounts.reports },
     { key: "settings",   icon: <Settings size={17} />,        label: "Settings" },
     { key: "audit",      icon: <Shield size={17} />,          label: "Audit Log" },
   ];
@@ -2832,8 +2841,8 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
               {sidebarOpen && (
                 <>
                   <span style={{ fontSize: "0.875rem", fontWeight: section === key ? 700 : 500, flex: 1, textAlign: "left" }}>{label}</span>
-                  {badge !== undefined && badge > 0 && (
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center" style={{ fontSize: "0.625rem", fontWeight: 700, background: section === key ? "rgba(255,255,255,0.25)" : "var(--sidebar-primary)", color: "white" }}>
+                  {badge !== undefined && (
+                    <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center" style={{ fontSize: "0.625rem", fontWeight: 700, background: section === key ? "rgba(255,255,255,0.25)" : "var(--sidebar-primary)", color: "white" }}>
                       {badge}
                     </span>
                   )}

@@ -1041,19 +1041,23 @@ export interface AuditEntry {
 // ANALYTICS — /api/admin/analytics/
 // ═══════════════════════════════════════════════════════════════
 export interface AnalyticsOverview {
-  total_users:          number;
-  active_today:         number;
-  active_yesterday:     number;
-  active_7d:            number;
-  active_today_growth:  number | null;
-  new_this_month:       number;
-  new_last_month:       number;
-  new_month_growth:     number | null;
-  total_matches:        number;
-  interests_sent:       number;
-  partners_found:       number;
-  referrals_this_month: number;
-  revenue_mtd?:         number;
+  total_users:            number;
+  active_today:           number;
+  active_yesterday:       number;
+  active_7d:              number;
+  active_today_growth:    number | null;
+  new_this_month:         number;
+  new_last_month:         number;
+  new_month_growth:       number | null;
+  total_matches:          number;
+  interests_sent:         number;
+  partners_found:         number;
+  referrals_this_month:   number;
+  blacklist_count:        number;
+  open_tickets_count:     number;
+  pending_reports_count:  number;
+  blog_published_count:   number;
+  revenue_mtd?:           number;
   quick_actions: {
     pending_photo_reviews: number;
     open_tickets:          number;
