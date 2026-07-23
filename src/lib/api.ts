@@ -1043,7 +1043,12 @@ export interface AuditEntry {
 export interface AnalyticsOverview {
   total_users:          number;
   active_today:         number;
+  active_yesterday:     number;
+  active_7d:            number;
+  active_today_growth:  number | null;
   new_this_month:       number;
+  new_last_month:       number;
+  new_month_growth:     number | null;
   total_matches:        number;
   interests_sent:       number;
   partners_found:       number;
@@ -1096,6 +1101,11 @@ export const analytics = {
       cumulative: Array<{ month: string; count: number }>;
       total_partners_found: number;
     }>("/api/admin/analytics/partners/"),
+
+  dailyActiveUsers: (days = 14) =>
+    get<{ series: Array<{ date: string; active: number }> }>(
+      `/api/admin/analytics/daily-active-users/?days=${days}`,
+    ),
 };
 
 // ═══════════════════════════════════════════════════════════════

@@ -446,6 +446,12 @@ function QuickActionsRow({ liveOverview, onNavigate }: { liveOverview?: Analytic
 }
 
 // ─── OVERVIEW SECTION ─────────────────────────────────────
+function fmtGrowth(pct: number | null | undefined): string {
+  if (pct === null || pct === undefined) return "";
+  const sign = pct >= 0 ? "+" : "";
+  return `${sign}${pct}% vs yesterday`;
+}
+
 function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveRevenueChart }: {
   role: AdminRole;
   onNavigate?: (s: AdminSection) => void;
@@ -458,6 +464,19 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
   const isBlogAdmin     = role === "blog-admin";
   const isCustomerCare  = role === "customer-care";
   const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+
+  // Daily active users chart (last 14 days)
+  const [dailyActive, setDailyActive] = useState<Array<{ date: string; active: number }>>([]);
+  const [dauDays, setDauDays] = useState<7 | 14 | 30>(14);
+
+  useEffect(() => {
+    if (isCustomerCare || isBlogAdmin) return;
+    import("../../lib/api").then(({ analytics: api }) => {
+      api.dailyActiveUsers(dauDays)
+        .then(r => setDailyActive(r.series))
+        .catch(() => {});
+    });
+  }, [isCustomerCare, isBlogAdmin, dauDays]);
 
   // Live blog stats — fetched for blog-admin and all admin/super-admin roles
   const [blogStats, setBlogStats] = useState<{
@@ -497,15 +516,15 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
         {/* Users: super-admin, admin */}
         {(role === "super-admin" || role === "admin") && (
           <>
-            <KpiCard icon={<Users size={18} />} label="Total Users" value={liveOverview ? fmt(liveOverview.total_users) : "—"} change="+8.3%" color="#0A6870" />
-            <KpiCard icon={<UserCheck size={18} />} label="Active Today" value={liveOverview ? fmt(liveOverview.active_today) : "—"} change="+12.1%" color="#4A8DB8" />
-            <KpiCard icon={<Heart size={18} />} label="Matches This Month" value={liveOverview ? fmt(liveOverview.total_matches) : "—"} change="+4.6%" color="#C5733F" />
+            <KpiCard icon={<Users size={18} />} label="Total Users" value={liveOverview ? fmt(liveOverview.total_users) : "—"} change={liveOverview?.new_month_growth != null ? fmtGrowth(liveOverview.new_month_growth) : ""} color="#0A6870" />
+            <KpiCard icon={<UserCheck size={18} />} label="Active Today" value={liveOverview ? fmt(liveOverview.active_today) : "—"} change={liveOverview ? fmtGrowth(liveOverview.active_today_growth) : ""} color="#4A8DB8" />
+            <KpiCard icon={<Heart size={18} />} label="Matches This Month" value={liveOverview ? fmt(liveOverview.total_matches) : "—"} change="" color="#C5733F" />
             <KpiCard icon={<BookOpen size={18} />} label="Published Articles" value={blogStats ? String(blogStats.published) : "—"} change="" color="#6B9E78" />
           </>
         )}
         {/* Revenue: only when permitted */}
         {canSeeFinancials && (
-          <KpiCard icon={<DollarSign size={18} />} label="Monthly Revenue" value={liveOverview?.revenue_mtd ? `$${(liveOverview.revenue_mtd / 1000).toFixed(1)}k` : "—"} change="+7.2%" color="#6B9E78" />
+          <KpiCard icon={<DollarSign size={18} />} label="Monthly Revenue" value={liveOverview?.revenue_mtd ? `$${(liveOverview.revenue_mtd / 1000).toFixed(1)}k` : "—"} change="" color="#6B9E78" />
         )}
         {/* Blog Admin KPIs */}
         {isBlogAdmin && (
@@ -522,24 +541,66 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
             <KpiCard icon={<Headphones size={18} />} label="Open Tickets" value="2" change="" color="#C5733F" />
             <KpiCard icon={<UserCheck size={18} />} label="Resolved Today" value="5" change="+2" color="#6B9E78" />
             <KpiCard icon={<AlertTriangle size={18} />} label="Escalated" value="1" change="" color="#D41F3A" />
-            <KpiCard icon={<Users size={18} />} label="Active Members" value="1,234" change="+12.1%" color="#4A8DB8" />
+            <KpiCard icon={<Users size={18} />} label="Active Members" value="—" change="" color="#4A8DB8" />
           </>
         )}
       </div>
 
       {/* ── Main charts — role filtered ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* User Growth — super-admin and admin only */}
+        {/* Daily Active Users — super-admin and admin only */}
         {(role === "super-admin" || role === "admin") && (
           <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
-            <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">User Growth</h3>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Daily Active Users</h3>
+                {liveOverview && (
+                  <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>
+                    <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{liveOverview.active_today}</span> today
+                    {" · "}
+                    <span style={{ fontWeight: 600, color: "var(--foreground)" }}>{liveOverview.active_7d}</span> last 7d
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                {([7, 14, 30] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setDauDays(d)}
+                    className="px-2.5 py-1 rounded-md transition-colors"
+                    style={{
+                      fontSize: "0.75rem", fontWeight: dauDays === d ? 700 : 500,
+                      background: dauDays === d ? "var(--card)" : "transparent",
+                      color: dauDays === d ? "var(--foreground)" : "var(--muted-foreground)",
+                      boxShadow: dauDays === d ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+                    }}
+                  >
+                    {d}d
+                  </button>
+                ))}
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={liveUsersChart ?? analyticsData.users} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                <XAxis key="x" dataKey="month" tick={{ fontSize: 12, fill: "#68747F" }} axisLine={false} tickLine={false} />
-                <YAxis key="y" tick={{ fontSize: 12, fill: "#68747F" }} axisLine={false} tickLine={false} width={48} />
-                <Tooltip key="tip" contentStyle={{ borderRadius: "12px", border: "1px solid var(--border)", fontSize: "0.875rem" }} />
-                <Line key="line" type="monotone" dataKey="total" stroke="#0A6870" strokeWidth={2.5} dot={false} />
-              </LineChart>
+              <BarChart data={dailyActive} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: "#68747F" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={d => {
+                    const dt = new Date(d);
+                    return dt.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                  }}
+                  interval={dauDays <= 7 ? 0 : dauDays <= 14 ? 1 : 4}
+                />
+                <YAxis tick={{ fontSize: 12, fill: "#68747F" }} axisLine={false} tickLine={false} width={36} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ borderRadius: "12px", border: "1px solid var(--border)", fontSize: "0.875rem" }}
+                  labelFormatter={d => new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                  formatter={(v: number) => [v, "Active Users"]}
+                />
+                <Bar dataKey="active" fill="#4A8DB8" radius={[4, 4, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </div>
         )}
@@ -1992,6 +2053,7 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
 function AdminAuditSection() {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -2001,9 +2063,13 @@ function AdminAuditSection() {
 
   const fetchAudit = (p = 1, q = search, act = actionFilter) => {
     setLoading(true);
+    setFetchError(null);
     adminApi.auditLog({ page: p, page_size: 25, search: q, action: act })
       .then(r => { setEntries(r.results); setTotal(r.count); setPage(r.page); setPages(r.pages); })
-      .catch(() => {})
+      .catch((err) => {
+        setEntries([]);
+        setFetchError(err?.message ?? "Failed to load audit log. The database table may need a migration.");
+      })
       .finally(() => setLoading(false));
   };
 
@@ -2086,11 +2152,21 @@ function AdminAuditSection() {
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         {loading ? (
           <div className="py-20 text-center text-muted-foreground"><div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin mx-auto mb-3" />Loading audit log…</div>
+        ) : fetchError ? (
+          <div className="py-16 text-center px-6">
+            <AlertTriangle size={36} className="mx-auto mb-3 opacity-50" style={{ color: "#D41F3A" }} />
+            <p style={{ fontWeight: 700, fontSize: "1rem", color: "#D41F3A" }}>Could not load audit log</p>
+            <p className="text-muted-foreground mt-2" style={{ fontSize: "0.875rem", maxWidth: 420, margin: "0.5rem auto 0" }}>{fetchError}</p>
+            <p className="text-muted-foreground mt-3" style={{ fontSize: "0.8125rem" }}>
+              Ensure the backend is deployed with the latest migrations (<code style={{ background: "var(--muted)", padding: "1px 6px", borderRadius: 4 }}>python manage.py migrate</code>) and the code is up to date.
+            </p>
+            <button onClick={() => fetchAudit()} className="mt-4 px-4 py-2 rounded-lg bg-primary text-white" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Retry</button>
+          </div>
         ) : entries.length === 0 ? (
           <div className="py-20 text-center">
             <Shield size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
             <p style={{ fontWeight: 700, fontSize: "1rem" }}>No audit events yet</p>
-            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Actions taken by admins will appear here.</p>
+            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Actions taken by admins will appear here once the backend is deployed and migrations are run.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
