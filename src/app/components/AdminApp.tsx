@@ -694,9 +694,10 @@ function resolveMediaUrl(url: string): string {
   return url;
 }
 
-/** Return true when a string looks like an image URL or path. */
+/** Return true when a string looks like an image URL, path, or base64 data URI. */
 function isMediaUrl(str: string): boolean {
   if (!str) return false;
+  if (str.startsWith("data:image/")) return true;
   const s = str.toLowerCase();
   return (
     (s.startsWith("/media/") || s.startsWith("http")) &&
