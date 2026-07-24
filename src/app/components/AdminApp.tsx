@@ -1658,18 +1658,13 @@ function ReportsSection() {
       report={selected}
       allReports={displayReports}
       onBack={() => setSelectedId(null)}
-      onAction={async (id, action, note) => {
+      onAction={(id, action) => {
+        // Optimistically update the list row so navigation back reflects the new status
         const updated = displayReports.map(r => r.id === id ? {
-          ...r, status: action === "dismiss" ? "dismissed" : "actioned",
-          adminNotes: note || r.adminNotes,
-          actionHistory: [...r.actionHistory, {
-            action: action === "warn" ? "Warning issued" : action === "suspend" ? "Account suspended" : action === "ban" ? "Account banned" : "Report dismissed",
-            by: "Admin", date: "Today", type: action === "dismiss" ? "admin" : action,
-          }],
+          ...r,
+          status: (action === "dismiss" ? "dismissed" : "actioned") as typeof r.status,
         } : r);
         setReports(updated);
-        setSelectedId(null);
-        try { await adminApi.updateReport(id, { status: action === "dismiss" ? "dismissed" : "actioned", admin_notes: note, action }); } catch {}
       }}
     />;
   }
@@ -1824,164 +1819,421 @@ function ReportsSection() {
 
 // ─── REPORT DETAIL VIEW ───────────────────────────────────
 type ReportType = typeof REPORTS[0];
-function ReportDetailView({ report, allReports, onBack, onAction }: {
+function ReportDetailView({ report: initialReport, allReports, onBack, onAction }: {
   report: ReportType;
   allReports: ReportType[];
   onBack: () => void;
   onAction: (id: string, action: string, note: string) => void;
 }) {
-  const [adminNote, setAdminNote] = useState(report.adminNotes);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [tab, setTab]                   = useState<"details" | "communication" | "history">("details");
+  const [fullReport, setFullReport]     = useState<import("../../lib/api").AdminReport | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+  const [adminNote, setAdminNote]       = useState(initialReport.adminNotes);
+  const [confirming, setConfirming]     = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [chatInput, setChatInput]       = useState("");
+  const [sending, setSending]           = useState(false);
+  const [staffList, setStaffList]       = useState<Array<{ id: string; name: string; role: string }>>([]);
+  const [assigning, setAssigning]       = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const relatedReports = allReports.filter(r => report.relatedReports.includes(r.id));
+  const report = fullReport
+    ? {
+        ...initialReport,
+        status:         fullReport.status as ReportType["status"],
+        priority:       fullReport.priority as ReportType["priority"],
+        adminNotes:     fullReport.admin_notes ?? initialReport.adminNotes,
+        actionHistory:  fullReport.action_history ?? initialReport.actionHistory,
+        evidence:       fullReport.evidence ?? initialReport.evidence,
+        priorReportsAgainstUser: fullReport.prior_reports_against_user ?? initialReport.priorReportsAgainstUser,
+        linked_ticket:  fullReport.linked_ticket,
+        appeal_status:  fullReport.appeal_status,
+      }
+    : { ...initialReport, linked_ticket: null, appeal_status: "none" as const };
+
+  useEffect(() => {
+    setLoadingDetail(true);
+    adminApi.getReport(initialReport.id).then(r => {
+      setFullReport(r);
+      setAdminNote(r.admin_notes ?? "");
+    }).catch(() => {}).finally(() => setLoadingDetail(false));
+
+    adminApi.staff().then(res => {
+      setStaffList(res.results
+        .filter(s => ['admin', 'super_admin', 'moderator', 'cc_agent'].includes(s.role))
+        .map(s => ({ id: s.id, name: s.name || s.email, role: s.role })));
+    }).catch(() => {});
+  }, [initialReport.id]);
+
+  useEffect(() => {
+    if (tab === "communication") {
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+    }
+  }, [tab, report.linked_ticket?.messages?.length]);
 
   const statusColor = (s: string) => ({
-    pending:   { bg: "#dbeafe", text: "#1d4ed8" },
-    actioned:  { bg: "#dcfce7", text: "#166534" },
-    dismissed: { bg: "#f3f4f6", text: "#6b7280" },
-    system:    { bg: "#f3f4f6", text: "#6b7280" },
-    suspend:   { bg: "#fef9c3", text: "#854d0e" },
-    ban:       { bg: "#fee2e2", text: "#991b1b" },
-    moderation:{ bg: "#e0e7ff", text: "#3730a3" },
-    admin:     { bg: "#dcfce7", text: "#166534" },
-    warn:      { bg: "#fef9c3", text: "#854d0e" },
+    pending:       { bg: "#dbeafe", text: "#1d4ed8" },
+    under_review:  { bg: "#e0e7ff", text: "#3730a3" },
+    actioned:      { bg: "#dcfce7", text: "#166534" },
+    dismissed:     { bg: "#f3f4f6", text: "#6b7280" },
+    suspend:       { bg: "#fef9c3", text: "#854d0e" },
+    ban:           { bg: "#fee2e2", text: "#991b1b" },
+    warn:          { bg: "#fef9c3", text: "#854d0e" },
+    admin:         { bg: "#dcfce7", text: "#166534" },
+    system:        { bg: "#f3f4f6", text: "#6b7280" },
+    moderation:    { bg: "#e0e7ff", text: "#3730a3" },
+    dismiss:       { bg: "#f3f4f6", text: "#6b7280" },
   }[s] ?? { bg: "#f3f4f6", text: "#6b7280" });
 
-  const evidenceIcon = (type: string) => type === "message" ? "💬" : type === "photo" ? "📷" : "📝";
+  const appealStatusColor = (s: string) => ({
+    none:         { bg: "#f3f4f6", text: "#6b7280" },
+    pending:      { bg: "#fef9c3", text: "#854d0e" },
+    under_review: { bg: "#e0e7ff", text: "#3730a3" },
+    resolved:     { bg: "#dcfce7", text: "#166534" },
+  }[s] ?? { bg: "#f3f4f6", text: "#6b7280" });
 
-  const isPending = report.status === "pending";
+  const handleAction = async (action: string) => {
+    onAction(initialReport.id, action, adminNote);
+    setConfirming(null);
+    try {
+      const updated = await adminApi.updateReport(initialReport.id, {
+        status:        action === "dismiss" ? "dismissed" : "actioned",
+        admin_notes:   adminNote,
+        action,
+        admin_message: actionMessage,
+      });
+      setFullReport(updated);
+    } catch {}
+    setActionMessage("");
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatInput.trim()) return;
+    setSending(true);
+    try {
+      const ticket = await adminApi.sendReportMessage(initialReport.id, chatInput.trim());
+      if (fullReport) setFullReport({ ...fullReport, linked_ticket: ticket });
+      setChatInput("");
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
+    } catch {}
+    setSending(false);
+  };
+
+  const handleAssign = async (agentId: string) => {
+    setAssigning(true);
+    try {
+      const ticket = await adminApi.assignReportTicket(initialReport.id, agentId);
+      if (fullReport) setFullReport({ ...fullReport, linked_ticket: ticket });
+    } catch {}
+    setAssigning(false);
+  };
+
+  const catIcon: Record<string, string> = {
+    harassment: "⚠️", fake_profile: "🎭", spam: "📢", scam: "🎯",
+    inappropriate_content: "🚫", other: "📋",
+  };
+
+  const msgs = report.linked_ticket?.messages ?? [];
 
   return (
     <div>
-      {/* Page header */}
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={onBack} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.9rem" }}>
-          <ChevronLeft size={18} /> All Reports
-        </button>
-        <div className="h-4 w-px bg-border" />
-        <div className="flex items-center gap-2">
-          <h1 style={{ fontWeight: 800, fontSize: "1.375rem", letterSpacing: "-0.02em" }}>
-            Report #{report.id.toUpperCase()}
-          </h1>
-          <span className="px-2.5 py-1 rounded-full capitalize" style={{ fontSize: "0.75rem", fontWeight: 700, ...statusColor(report.status) }}>
-            {report.status}
-          </span>
-          {report.priority === "high" && (
-            <span className="px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: "#fee2e2", color: "#991b1b" }}>
-              High Priority
-            </span>
-          )}
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.875rem" }}>
+            <ChevronLeft size={18} /> All Reports
+          </button>
+          <div className="h-4 w-px bg-border" />
+          <div>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-xl" style={{ lineHeight: 1 }}>{catIcon[initialReport.category] ?? "📋"}</span>
+              <h1 style={{ fontWeight: 800, fontSize: "1.375rem", letterSpacing: "-0.02em" }}>
+                {initialReport.reason.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+              </h1>
+              <span className="px-2.5 py-1 rounded-full capitalize" style={{ fontSize: "0.7rem", fontWeight: 700, ...statusColor(report.status) }}>
+                {report.status.replace(/_/g, " ")}
+              </span>
+              {report.priority === "high" && (
+                <span className="px-2.5 py-1 rounded-full" style={{ fontSize: "0.7rem", fontWeight: 700, background: "#fee2e2", color: "#991b1b" }}>
+                  High Priority
+                </span>
+              )}
+              {(report.appeal_status && report.appeal_status !== "none") && (
+                <span className="px-2.5 py-1 rounded-full capitalize" style={{ fontSize: "0.7rem", fontWeight: 700, ...appealStatusColor(report.appeal_status) }}>
+                  Appeal: {report.appeal_status.replace(/_/g, " ")}
+                </span>
+              )}
+            </div>
+            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>
+              Report #{initialReport.id.slice(0, 8).toUpperCase()} · {initialReport.date}
+            </p>
+          </div>
         </div>
+        {loadingDetail && (
+          <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin flex-shrink-0 mt-1" />
+        )}
+      </div>
+
+      {/* ── Tabs ── */}
+      <div className="flex gap-1 bg-muted rounded-xl p-1 mb-6 w-fit">
+        {([
+          { key: "details",       label: "Details" },
+          { key: "communication", label: `Communication${msgs.length ? ` (${msgs.length})` : ""}` },
+          { key: "history",       label: "History" },
+        ] as const).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 rounded-lg transition-all ${tab === t.key ? "bg-card shadow-sm font-semibold text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            style={{ fontSize: "0.875rem" }}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* ── Left: report details ── */}
+        {/* ── Left: tab content ── */}
         <div className="xl:col-span-2 space-y-5">
 
-          {/* Parties */}
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Parties Involved</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { role: "Reported User", name: report.reported, email: report.reportedEmail, sub: report.reportedSubscription, status: report.reportedStatus, joined: report.reportedJoined, isReported: true },
-                { role: "Reporter",      name: report.reporter,  email: report.reporterEmail, sub: "—", status: "active", joined: "—", isReported: false },
-              ].map(({ role, name, email, sub, status, joined, isReported }) => (
-                <div key={role} className={`rounded-xl border p-4 ${isReported ? "bg-red-50 border-red-100" : "bg-secondary border-primary/15"}`}>
-                  <p style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: isReported ? "#991b1b" : "var(--primary)", marginBottom: "0.625rem" }}>{role}</p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isReported ? "#fee2e2" : "var(--primary)" + "20" }}>
-                      <span style={{ fontSize: "0.875rem", fontWeight: 800, color: isReported ? "#991b1b" : "var(--primary)" }}>
-                        {name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{name}</p>
-                      <p className="text-muted-foreground truncate" style={{ fontSize: "0.8125rem" }}>{email}</p>
-                    </div>
-                  </div>
-                  {isReported && (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {[
-                        { l: "Subscription", v: sub },
-                        { l: "Status",       v: status },
-                        { l: "Joined",       v: joined },
-                        { l: "Prior Reports", v: String(report.priorReportsAgainstUser) },
-                      ].map(({ l, v }) => (
-                        <div key={l} className="bg-white/60 rounded-lg p-2">
-                          <p style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", color: "#991b1b", marginBottom: 1 }}>{l}</p>
-                          <p style={{ fontWeight: 600, fontSize: "0.8125rem", textTransform: "capitalize" }}>{v}</p>
+          {/* DETAILS TAB */}
+          {tab === "details" && (
+            <>
+              {/* Parties */}
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Parties Involved</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { role: "Reported User", name: initialReport.reported, email: initialReport.reportedEmail, sub: initialReport.reportedSubscription, status: initialReport.reportedStatus, joined: initialReport.reportedJoined, prior: report.priorReportsAgainstUser, isReported: true },
+                    { role: "Reporter",      name: initialReport.reporter, email: initialReport.reporterEmail, sub: "", status: "active", joined: "", prior: 0, isReported: false },
+                  ].map(({ role, name, email, sub, status, joined, prior, isReported }) => (
+                    <div key={role} className={`rounded-xl border p-4 ${isReported ? "bg-red-50 border-red-100" : "bg-secondary border-primary/15"}`}>
+                      <p style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: isReported ? "#991b1b" : "var(--primary)", marginBottom: "0.75rem" }}>{role}</p>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: isReported ? "#fee2e2" : "rgba(10,104,112,0.12)" }}>
+                          <span style={{ fontSize: "0.9rem", fontWeight: 800, color: isReported ? "#991b1b" : "var(--primary)" }}>
+                            {name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Report description */}
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-base">⚠️</div>
-              <div>
-                <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>{report.reason}</h3>
-                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Submitted {report.date} at {report.time}</p>
-              </div>
-            </div>
-            <p style={{ fontSize: "0.9375rem", lineHeight: 1.75 }}>{report.description}</p>
-          </div>
-
-          {/* Evidence */}
-          {report.evidence.length > 0 && (
-            <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Evidence Provided</h3>
-              <div className="space-y-3">
-                {report.evidence.map((ev, i) => {
-                  const isPhoto = ev.type === "photo" || isMediaUrl(ev.content);
-                  return (
-                    <div key={i} className={`rounded-xl p-4 border ${ev.type === "message" ? "bg-muted/50 border-border" : isPhoto ? "bg-blue-50 border-blue-200" : "bg-amber-50 border-amber-200"}`}>
-                      <div className="flex items-start gap-3">
-                        <span style={{ fontSize: "1.125rem" }}>{evidenceIcon(isPhoto ? "photo" : ev.type)}</span>
-                        <div className="flex-1">
-                          {isPhoto ? (
-                            <>
-                              <p className="text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600, marginBottom: 4 }}>Uploaded photo</p>
-                              <PhotoThumb url={ev.content} label="Report evidence photo" />
-                            </>
-                          ) : (
-                            <p style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
-                              {ev.type === "message" ? `"${ev.content}"` : ev.content}
-                            </p>
-                          )}
-                          <p className="text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>{ev.time}</p>
+                        <div className="min-w-0">
+                          <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{name}</p>
+                          <p className="text-muted-foreground truncate" style={{ fontSize: "0.8125rem" }}>{email}</p>
                         </div>
                       </div>
+                      {isReported && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { l: "Plan",         v: sub || "—" },
+                            { l: "Status",       v: status },
+                            { l: "Joined",       v: joined || "—" },
+                            { l: "Prior Reports", v: String(prior) },
+                          ].map(({ l, v }) => (
+                            <div key={l} className="bg-white/70 rounded-lg p-2">
+                              <p style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#991b1b", marginBottom: 2 }}>{l}</p>
+                              <p style={{ fontWeight: 600, fontSize: "0.8125rem", textTransform: "capitalize" }}>{v}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
+
+              {/* Description */}
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-lg flex-shrink-0">⚠️</div>
+                  <div>
+                    <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Complaint Description</h3>
+                    <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                      Category: {initialReport.reason.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} · {initialReport.date}
+                    </p>
+                  </div>
+                </div>
+                <p style={{ fontSize: "0.9375rem", lineHeight: 1.8, color: "var(--foreground)" }}>{initialReport.description}</p>
+              </div>
+
+              {/* Evidence */}
+              {report.evidence.length > 0 && (
+                <div className="bg-card rounded-2xl border border-border p-6">
+                  <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Evidence ({report.evidence.length})</h3>
+                  <div className="space-y-3">
+                    {report.evidence.map((ev: { type: string; content: string; time: string }, i: number) => {
+                      const isPhoto = ev.type === "photo" || isMediaUrl(ev.content);
+                      return (
+                        <div key={i} className={`rounded-xl p-4 border ${isPhoto ? "bg-blue-50 border-blue-200" : ev.type === "message" ? "bg-muted/50 border-border" : "bg-amber-50 border-amber-200"}`}>
+                          <div className="flex items-start gap-3">
+                            <span style={{ fontSize: "1.125rem" }}>{isPhoto ? "📷" : ev.type === "message" ? "💬" : "📝"}</span>
+                            <div className="flex-1">
+                              {isPhoto ? (
+                                <>
+                                  <p className="text-muted-foreground mb-2" style={{ fontSize: "0.75rem", fontWeight: 600 }}>Uploaded photo evidence</p>
+                                  <PhotoThumb url={ev.content} label="Report evidence" />
+                                </>
+                              ) : (
+                                <p style={{ fontSize: "0.875rem", lineHeight: 1.65 }}>
+                                  {ev.type === "message" ? `"${ev.content}"` : ev.content}
+                                </p>
+                              )}
+                              <p className="text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>{ev.time}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* COMMUNICATION TAB */}
+          {tab === "communication" && (
+            <div className="bg-card rounded-2xl border border-border overflow-hidden">
+              {/* Thread header */}
+              <div className="px-6 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
+                <div>
+                  <h3 style={{ fontWeight: 700, fontSize: "0.9375rem" }}>Support Thread</h3>
+                  <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                    {report.linked_ticket
+                      ? `Ticket ${report.linked_ticket.id.slice(0, 8).toUpperCase()} · ${report.linked_ticket.status}`
+                      : "Thread will be created when you take an action"}
+                  </p>
+                </div>
+                {report.linked_ticket?.assigned_to && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-xl border border-primary/15">
+                    <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--primary)" }}>
+                        {report.linked_ticket.assigned_to.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{report.linked_ticket.assigned_to.name}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Messages */}
+              <div className="p-6 space-y-4 overflow-y-auto" style={{ maxHeight: "420px", minHeight: "200px" }}>
+                {msgs.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-3 text-2xl">💬</div>
+                    <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>No messages yet</p>
+                    <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>
+                      Take an action on this report to open a support thread with the user.
+                    </p>
+                  </div>
+                ) : (
+                  msgs.map((m: import("../../lib/api").ReportTicketMessage, i: number) => {
+                    const isAdmin = m.sender_role !== "user";
+                    return (
+                      <div key={i} className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[78%] ${isAdmin ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                          <div className="flex items-center gap-2">
+                            {!isAdmin && (
+                              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                <span style={{ fontSize: "0.6rem", fontWeight: 700 }}>
+                                  {m.sender_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 600 }}>
+                              {isAdmin ? "You" : m.sender_name}
+                            </span>
+                            {isAdmin && (
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "var(--primary)" }}>
+                                <span style={{ fontSize: "0.6rem", fontWeight: 700, color: "white" }}>
+                                  {m.sender_name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            className={`px-4 py-3 rounded-2xl ${isAdmin ? "rounded-tr-sm" : "rounded-tl-sm"}`}
+                            style={{
+                              background:   isAdmin ? "var(--primary)" : "var(--muted)",
+                              color:        isAdmin ? "white" : "var(--foreground)",
+                              fontSize:     "0.875rem",
+                              lineHeight:   1.65,
+                              whiteSpace:   "pre-wrap",
+                            }}
+                          >
+                            {m.body}
+                          </div>
+                          <p className="text-muted-foreground" style={{ fontSize: "0.7rem" }}>
+                            {new Date(m.sent_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Reply input */}
+              {report.linked_ticket && (
+                <div className="px-6 pb-6 pt-2 border-t border-border">
+                  <div className="flex gap-3 items-end">
+                    <textarea
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                      rows={3}
+                      placeholder="Type a message to the user… (Enter to send, Shift+Enter for new line)"
+                      className="flex-1 px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                      style={{ fontSize: "0.875rem" }}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={!chatInput.trim() || sending}
+                      className="flex-shrink-0 px-5 py-3 rounded-xl text-white transition-all disabled:opacity-50"
+                      style={{ background: "var(--primary)", fontSize: "0.875rem", fontWeight: 700 }}
+                    >
+                      {sending ? "…" : "Send"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Related reports */}
-          {relatedReports.length > 0 && (
+          {/* HISTORY TAB */}
+          {tab === "history" && (
             <div className="bg-card rounded-2xl border border-border p-6">
-              <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>
-                Related Reports ({relatedReports.length})
-              </h3>
-              <div className="space-y-2">
-                {relatedReports.map(r => (
-                  <div key={r.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-xl border border-border">
-                    <div>
-                      <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{r.reason} — {r.reported}</p>
-                      <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>by {r.reporter} · {r.date}</p>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full capitalize" style={{ fontSize: "0.6875rem", fontWeight: 700, ...statusColor(r.status) }}>
-                      {r.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1.5rem" }}>Action Timeline</h3>
+              {report.actionHistory.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>No actions taken yet.</p>
+                </div>
+              ) : (
+                <div className="relative space-y-6">
+                  <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-border" />
+                  {[
+                    { action: "Report submitted", by: initialReport.reporter, date: initialReport.date, type: "system" },
+                    ...report.actionHistory,
+                  ].map((h, i) => {
+                    const hs = statusColor(h.type);
+                    const actionIcons: Record<string, string> = { warn: "⚠️", suspend: "🔴", ban: "🚫", dismiss: "✕", admin: "✅", system: "📋", moderation: "👁" };
+                    return (
+                      <div key={i} className="flex items-start gap-5 relative pl-10">
+                        <div className="absolute left-0 w-8 h-8 rounded-full flex items-center justify-center border-2 border-background text-sm" style={{ background: hs.bg }}>
+                          {actionIcons[h.type] ?? "●"}
+                        </div>
+                        <div className="flex-1 pb-1">
+                          <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{h.action}</p>
+                          <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>
+                            by {h.by}
+                            {h.date && ` · ${typeof h.date === "string" && h.date.includes("T")
+                              ? new Date(h.date).toLocaleString()
+                              : h.date}`}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1989,101 +2241,190 @@ function ReportDetailView({ report, allReports, onBack, onAction }: {
         {/* ── Right: action panel ── */}
         <div className="space-y-5">
 
-          {/* Action history / timeline */}
+          {/* Take action */}
           <div className="bg-card rounded-2xl border border-border p-5">
-            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>History</h3>
-            <div className="space-y-4 relative">
-              <div className="absolute left-3 top-2 bottom-2 w-px bg-border" />
-              {report.actionHistory.map((h, i) => {
-                const hs = statusColor(h.type);
-                return (
-                  <div key={i} className="flex items-start gap-3 relative pl-8">
-                    <div className="absolute left-0 w-6 h-6 rounded-full flex items-center justify-center border-2 border-background" style={{ background: hs.bg }}>
-                      <div className="w-2 h-2 rounded-full" style={{ background: hs.text }} />
+            {report.status === "actioned" || report.status === "dismissed" ? (
+              <div className="text-center py-4">
+                <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-xl">✅</div>
+                <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>Report {report.status}</p>
+                <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>No further action required.</p>
+              </div>
+            ) : (
+              <>
+                <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Take Action</h3>
+                {confirming ? (
+                  <div className="space-y-4">
+                    <div className={`p-4 rounded-xl border ${
+                      confirming === "ban"     ? "bg-red-50 border-red-200" :
+                      confirming === "suspend" ? "bg-amber-50 border-amber-200" :
+                      confirming === "dismiss" ? "bg-muted border-border" :
+                      "bg-secondary border-primary/15"
+                    }`}>
+                      <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
+                        {confirming === "warn"    ? "⚠️ Issue Warning" :
+                         confirming === "suspend" ? "🔴 Suspend Account" :
+                         confirming === "ban"     ? "🚫 Permanent Ban" :
+                         "Dismiss Report"}
+                      </p>
+                      <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>
+                        {confirming === "warn"    ? "The user receives a formal warning via their support inbox." :
+                         confirming === "suspend" ? "Account suspended immediately. User can appeal via support." :
+                         confirming === "ban"     ? "Permanent and irreversible. User data retained for 90 days." :
+                         "Report closed without action. Reopen if new evidence emerges."}
+                      </p>
                     </div>
                     <div>
-                      <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{h.action}</p>
-                      <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>by {h.by} · {h.date}</p>
+                      <label className="block text-muted-foreground mb-1.5" style={{ fontSize: "0.75rem", fontWeight: 600 }}>
+                        Message to user {confirming !== "dismiss" ? "(sent via support inbox)" : "(optional)"}
+                      </label>
+                      <textarea
+                        value={actionMessage}
+                        onChange={e => setActionMessage(e.target.value)}
+                        rows={3}
+                        placeholder={confirming === "dismiss" ? "Optional note…" : "Explain the reason for this action to the user…"}
+                        className="w-full px-3 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                        style={{ fontSize: "0.8125rem" }}
+                      />
+                    </div>
+                    <div className="flex gap-2.5">
+                      <button onClick={() => setConfirming(null)} className="flex-1 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors" style={{ fontSize: "0.875rem" }}>
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleAction(confirming)}
+                        className="flex-1 py-2.5 rounded-xl text-white transition-all"
+                        style={{
+                          fontSize: "0.875rem", fontWeight: 700,
+                          background: confirming === "ban" ? "#dc2626" : confirming === "suspend" ? "#f59e0b" : confirming === "dismiss" ? "#68747F" : "var(--primary)",
+                        }}
+                      >
+                        Confirm
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ) : (
+                  <div className="space-y-2">
+                    {[
+                      { key: "warn",    label: "Issue Warning",   desc: "Formal notice to the user",    bg: "var(--secondary)", color: "var(--primary)",             border: "rgba(10,104,112,0.25)" },
+                      { key: "suspend", label: "Suspend Account", desc: "Temporary access removal",      bg: "#fffbeb",          color: "#92400e",                    border: "#fcd34d" },
+                      { key: "ban",     label: "Permanent Ban",   desc: "Irreversible account removal",  bg: "#fef2f2",          color: "#991b1b",                    border: "#fca5a5" },
+                      { key: "dismiss", label: "Dismiss Report",  desc: "Close without action",          bg: "var(--muted)",     color: "var(--muted-foreground)",    border: "var(--border)" },
+                    ].map(({ key, label, desc, bg, color, border }) => (
+                      <button
+                        key={key}
+                        onClick={() => setConfirming(key)}
+                        className="w-full flex items-center justify-between p-3.5 rounded-xl border transition-all hover:opacity-85 text-left"
+                        style={{ background: bg, borderColor: border }}
+                      >
+                        <div>
+                          <p style={{ fontWeight: 700, fontSize: "0.875rem", color }}>{label}</p>
+                          <p style={{ fontSize: "0.75rem", color, opacity: 0.65 }}>{desc}</p>
+                        </div>
+                        <ChevronRight size={14} style={{ color, opacity: 0.5 }} />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           {/* Admin notes */}
           <div className="bg-card rounded-2xl border border-border p-5">
-            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Admin Notes</h3>
+            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Internal Notes</h3>
             <textarea
               value={adminNote}
               onChange={e => setAdminNote(e.target.value)}
               rows={3}
-              placeholder="Add internal notes about this report…"
+              placeholder="Private admin notes (not visible to users)…"
               className="w-full px-3 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
               style={{ fontSize: "0.875rem" }}
             />
+            <button
+              onClick={async () => {
+                try { await adminApi.updateReport(initialReport.id, { admin_notes: adminNote }); } catch {}
+              }}
+              className="mt-2 w-full py-2 rounded-xl border border-border hover:bg-muted transition-colors"
+              style={{ fontSize: "0.8125rem", fontWeight: 600 }}
+            >
+              Save Notes
+            </button>
           </div>
 
-          {/* Take action */}
-          {isPending ? (
+          {/* Assign agent */}
+          {staffList.length > 0 && (
             <div className="bg-card rounded-2xl border border-border p-5">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Take Action</h3>
-
-              {confirming ? (
-                <div className="space-y-4">
-                  <div className={`p-4 rounded-xl border ${confirming === "ban" ? "bg-red-50 border-red-200" : confirming === "suspend" ? "bg-amber-50 border-amber-200" : confirming === "dismiss" ? "bg-muted border-border" : "bg-secondary border-primary/15"}`}>
-                    <p style={{ fontWeight: 700, fontSize: "0.9375rem", textTransform: "capitalize" }}>
-                      {confirming === "warn" ? "Issue a warning" : confirming === "suspend" ? "Suspend account" : confirming === "ban" ? "Permanently ban account" : "Dismiss report"}
-                    </p>
-                    <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>
-                      {confirming === "warn"    ? "The user will receive a formal warning. A second violation may lead to suspension." :
-                       confirming === "suspend" ? "Account will be suspended immediately. User can appeal within 7 days." :
-                       confirming === "ban"     ? "This action is permanent and cannot be undone. The user's data will be retained for 90 days." :
-                       "The report will be closed without action. You can reopen it if new evidence emerges."}
-                    </p>
+              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.875rem" }}>Assign to Agent</h3>
+              {report.linked_ticket?.assigned_to && (
+                <div className="flex items-center gap-2 mb-3 p-2.5 bg-secondary rounded-xl border border-primary/15">
+                  <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <span style={{ fontSize: "0.6rem", fontWeight: 800, color: "var(--primary)" }}>
+                      {report.linked_ticket.assigned_to.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </span>
                   </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => setConfirming(null)} className="flex-1 py-3 rounded-xl border border-border hover:bg-muted transition-colors" style={{ fontSize: "0.875rem" }}>
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => { onAction(report.id, confirming, adminNote); setConfirming(null); }}
-                      className="flex-1 py-3 rounded-xl text-white transition-all capitalize"
-                      style={{ fontSize: "0.875rem", fontWeight: 700, background: confirming === "ban" ? "var(--destructive)" : confirming === "suspend" ? "#f59e0b" : confirming === "dismiss" ? "#68747F" : "var(--primary)" }}
-                    >
-                      Confirm
-                    </button>
+                  <div>
+                    <p style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{report.linked_ticket.assigned_to.name}</p>
+                    <p className="text-muted-foreground" style={{ fontSize: "0.7rem" }}>Currently assigned</p>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {[
-                    { key: "warn",    label: "Issue Warning",     desc: "Formal notice to the user",     bg: "var(--secondary)", color: "var(--primary)", border: "var(--primary)" },
-                    { key: "suspend", label: "Suspend Account",   desc: "Temporary access removal",       bg: "#fef9c3",         color: "#854d0e",        border: "#d97706" },
-                    { key: "ban",     label: "Permanent Ban",     desc: "Irreversible account removal",   bg: "#fee2e2",         color: "#991b1b",        border: "#dc2626" },
-                    { key: "dismiss", label: "Dismiss Report",    desc: "Close without action",           bg: "var(--muted)",    color: "var(--muted-foreground)", border: "var(--border)" },
-                  ].map(({ key, label, desc, bg, color, border }) => (
-                    <button
-                      key={key}
-                      onClick={() => setConfirming(key)}
-                      className="w-full flex items-center justify-between p-3.5 rounded-xl border transition-all hover:opacity-90 text-left"
-                      style={{ background: bg, borderColor: border }}
-                    >
-                      <div>
-                        <p style={{ fontWeight: 700, fontSize: "0.9rem", color }}>{label}</p>
-                        <p style={{ fontSize: "0.75rem", color, opacity: 0.7 }}>{desc}</p>
-                      </div>
-                      <ChevronRight size={15} style={{ color, opacity: 0.7 }} />
-                    </button>
-                  ))}
                 </div>
               )}
+              {!report.linked_ticket && (
+                <p className="text-muted-foreground mb-3" style={{ fontSize: "0.8125rem" }}>
+                  Take an action first to create a ticket thread, then assign it.
+                </p>
+              )}
+              <div className="space-y-1.5">
+                {staffList.slice(0, 6).map(agent => (
+                  <button
+                    key={agent.id}
+                    onClick={() => handleAssign(agent.id)}
+                    disabled={assigning || !report.linked_ticket}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border border-border hover:bg-muted transition-colors disabled:opacity-50 text-left"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
+                        <span style={{ fontSize: "0.6rem", fontWeight: 700 }}>
+                          {agent.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{agent.name}</p>
+                        <p className="text-muted-foreground capitalize" style={{ fontSize: "0.7rem" }}>{agent.role.replace(/_/g, " ")}</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={13} className="text-muted-foreground" />
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="bg-muted rounded-2xl border border-border p-5 text-center">
-              <CheckCircle size={24} className="text-primary mx-auto mb-2" />
-              <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Report {report.status}</p>
-              <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>No further action required.</p>
+          )}
+
+          {/* Appeal status control */}
+          {report.appeal_status && report.appeal_status !== "none" && (
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Appeal Status</h3>
+              <div className="flex flex-wrap gap-2">
+                {(["pending", "under_review", "resolved"] as const).map(s => (
+                  <button
+                    key={s}
+                    onClick={async () => {
+                      try {
+                        const updated = await adminApi.updateReport(initialReport.id, { appeal_status: s });
+                        setFullReport(updated);
+                      } catch {}
+                    }}
+                    className="px-3 py-1.5 rounded-xl border capitalize transition-all"
+                    style={{
+                      fontSize: "0.8125rem", fontWeight: 600,
+                      ...(report.appeal_status === s
+                        ? appealStatusColor(s)
+                        : { background: "var(--muted)", color: "var(--muted-foreground)", borderColor: "var(--border)" }),
+                    }}
+                  >
+                    {s.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
