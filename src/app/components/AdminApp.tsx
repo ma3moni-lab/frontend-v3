@@ -681,6 +681,67 @@ function SortHeader({ label, field, sortField, sortDir, onSort }: {
   );
 }
 
+// ─── SHARED PHOTO HELPERS ─────────────────────────────────
+
+/** Resolve a relative /media/… path to a full URL using the configured API base. */
+function resolveMediaUrl(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("/")) {
+    const base = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+    return base + url;
+  }
+  return url;
+}
+
+/** Return true when a string looks like an image URL or path. */
+function isMediaUrl(str: string): boolean {
+  if (!str) return false;
+  const s = str.toLowerCase();
+  return (
+    (s.startsWith("/media/") || s.startsWith("http")) &&
+    (s.includes(".jpg") || s.includes(".jpeg") || s.includes(".png") ||
+     s.includes(".webp") || s.includes(".gif") || s.includes("/photos/"))
+  );
+}
+
+/** Small inline photo thumbnail used in evidence and audit rows. */
+function PhotoThumb({ url, label = "Evidence photo" }: { url: string; label?: string }) {
+  const [open, setOpen] = useState(false);
+  const src = resolveMediaUrl(url);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="group relative mt-2 block rounded-xl overflow-hidden border border-border hover:border-primary transition-colors"
+        style={{ width: 120, height: 80, flexShrink: 0 }}
+        title="Click to expand"
+      >
+        <img src={src} alt={label} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+          <span className="opacity-0 group-hover:opacity-100 text-white text-xs font-semibold transition-opacity">Expand</span>
+        </div>
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div className="relative max-w-2xl max-h-[80vh] rounded-2xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <img src={src} alt={label} className="w-full h-full object-contain" />
+            <button
+              onClick={() => setOpen(false)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center text-white hover:bg-black/80"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── MODERATION SECTION ───────────────────────────────────
 // Extended moderation item with photo URL and user details
 interface ModerationItem {
@@ -725,12 +786,7 @@ function ModerationSection() {
       // Always replace items — filter out already-reviewed ones server-side isn't possible yet
       // so we use localStorage to remember which IDs the admin already actioned
       const mapped: ModerationItem[] = res.results.map(p => {
-        // Resolve relative /media/ URLs to full Django URL
-        let photoUrl = p.photo_url ?? "";
-        if (photoUrl && photoUrl.startsWith("/")) {
-          const base = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
-          photoUrl = base + photoUrl;
-        }
+        const photoUrl = resolveMediaUrl(p.photo_url ?? "");
         return {
           id:               p.id,
           userId:           p.user.id,
@@ -1790,7 +1846,7 @@ function ReportDetailView({ report, allReports, onBack, onAction }: {
     warn:      { bg: "#fef9c3", text: "#854d0e" },
   }[s] ?? { bg: "#f3f4f6", text: "#6b7280" });
 
-  const evidenceIcon = (type: string) => type === "message" ? "💬" : "📝";
+  const evidenceIcon = (type: string) => type === "message" ? "💬" : type === "photo" ? "📷" : "📝";
 
   const isPending = report.status === "pending";
 
@@ -1879,19 +1935,29 @@ function ReportDetailView({ report, allReports, onBack, onAction }: {
             <div className="bg-card rounded-2xl border border-border p-6">
               <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Evidence Provided</h3>
               <div className="space-y-3">
-                {report.evidence.map((ev, i) => (
-                  <div key={i} className={`rounded-xl p-4 border ${ev.type === "message" ? "bg-muted/50 border-border" : "bg-amber-50 border-amber-200"}`}>
-                    <div className="flex items-start gap-3">
-                      <span style={{ fontSize: "1.125rem" }}>{evidenceIcon(ev.type)}</span>
-                      <div className="flex-1">
-                        <p style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
-                          {ev.type === "message" ? `"${ev.content}"` : ev.content}
-                        </p>
-                        <p className="text-muted-foreground mt-1" style={{ fontSize: "0.75rem" }}>{ev.time}</p>
+                {report.evidence.map((ev, i) => {
+                  const isPhoto = ev.type === "photo" || isMediaUrl(ev.content);
+                  return (
+                    <div key={i} className={`rounded-xl p-4 border ${ev.type === "message" ? "bg-muted/50 border-border" : isPhoto ? "bg-blue-50 border-blue-200" : "bg-amber-50 border-amber-200"}`}>
+                      <div className="flex items-start gap-3">
+                        <span style={{ fontSize: "1.125rem" }}>{evidenceIcon(isPhoto ? "photo" : ev.type)}</span>
+                        <div className="flex-1">
+                          {isPhoto ? (
+                            <>
+                              <p className="text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600, marginBottom: 4 }}>Uploaded photo</p>
+                              <PhotoThumb url={ev.content} label="Report evidence photo" />
+                            </>
+                          ) : (
+                            <p style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
+                              {ev.type === "message" ? `"${ev.content}"` : ev.content}
+                            </p>
+                          )}
+                          <p className="text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>{ev.time}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -2213,8 +2279,14 @@ function AdminAuditSection() {
                           </div>
                         ) : <span className="text-muted-foreground">—</span>}
                       </td>
-                      <td className="px-4 py-3" style={{ color: "var(--muted-foreground)", maxWidth: 260 }}>
-                        <span className="line-clamp-2">{e.detail || "—"}</span>
+                      <td className="px-4 py-3" style={{ color: "var(--muted-foreground)", maxWidth: 280 }}>
+                        {isMediaUrl(e.detail) ? (
+                          <div className="flex items-center gap-2">
+                            <PhotoThumb url={e.detail} label="Audit photo" />
+                          </div>
+                        ) : (
+                          <span className="line-clamp-2">{e.detail || "—"}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontFamily: "monospace", fontSize: "0.75rem" }}>
                         {e.ip_address ?? "—"}
