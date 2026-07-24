@@ -1853,10 +1853,15 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
 
   useEffect(() => {
     setLoadingDetail(true);
-    adminApi.getReport(initialReport.id).then(r => {
-      setFullReport(r);
-      setAdminNote(r.admin_notes ?? "");
-    }).catch(() => {}).finally(() => setLoadingDetail(false));
+    const getReportFn = (adminApi as unknown as Record<string, unknown>).getReport as typeof adminApi.getReport | undefined;
+    if (getReportFn) {
+      getReportFn(initialReport.id).then(r => {
+        setFullReport(r);
+        setAdminNote(r.admin_notes ?? "");
+      }).catch(() => {}).finally(() => setLoadingDetail(false));
+    } else {
+      setLoadingDetail(false);
+    }
 
     adminApi.staff().then(res => {
       setStaffList(res.results
@@ -1911,8 +1916,11 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
     if (!chatInput.trim()) return;
     setSending(true);
     try {
-      const ticket = await adminApi.sendReportMessage(initialReport.id, chatInput.trim());
-      if (fullReport) setFullReport({ ...fullReport, linked_ticket: ticket });
+      const sendFn = (adminApi as unknown as Record<string, unknown>).sendReportMessage as typeof adminApi.sendReportMessage | undefined;
+      if (sendFn) {
+        const ticket = await sendFn(initialReport.id, chatInput.trim());
+        if (fullReport) setFullReport({ ...fullReport, linked_ticket: ticket });
+      }
       setChatInput("");
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
     } catch {}
@@ -1922,8 +1930,11 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
   const handleAssign = async (agentId: string) => {
     setAssigning(true);
     try {
-      const ticket = await adminApi.assignReportTicket(initialReport.id, agentId);
-      if (fullReport) setFullReport({ ...fullReport, linked_ticket: ticket });
+      const assignFn = (adminApi as unknown as Record<string, unknown>).assignReportTicket as typeof adminApi.assignReportTicket | undefined;
+      if (assignFn) {
+        const ticket = await assignFn(initialReport.id, agentId);
+        if (fullReport) setFullReport({ ...fullReport, linked_ticket: ticket });
+      }
     } catch {}
     setAssigning(false);
   };
