@@ -360,7 +360,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
 
   if (completed) {
     const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ") || "Your Profile";
-    const religiosityLabel = ["", "Minimal", "Moderate", "Practicing", "Devout", "Very Devout"][form.religiosity] ?? "";
+    const religiosityLabel = ["", "Light", "Moderate", "Practising", "Devout", "Very Devout"][form.religiosity] ?? "";
     const timelineLabel = form.marriageTimeline ? {
       "6months": "Within 6 months", "6-12months": "6–12 months",
       "1-2years": "1–2 years", "2plus": "No rush (2+ years)",
@@ -423,7 +423,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
               {
                 title: "Values & Lifestyle",
                 rows: [
-                  { label: "Religiosity", val: religiosityLabel },
+                  { label: "Spiritual Practice", val: religiosityLabel },
                   { label: "Family",      val: form.familyImportance === "high" ? "Very Important" : form.familyImportance === "medium" ? "Important" : "Values independence" },
                   ...(form.lifestyle.length ? [{ label: "Lifestyle", val: form.lifestyle.join(", ") }] : []),
                   ...(form.personality.length ? [{ label: "Personality", val: form.personality.join(", ") }] : []),
@@ -633,7 +633,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Shared values are the foundation of a lasting partnership.</p>
               <div className="space-y-7">
                 <div>
-                  <FieldLabel>Religious Practice Level</FieldLabel>
+                  <FieldLabel>Spiritual Practice Level</FieldLabel>
                   <div className="mt-4">
                     <input
                       type="range"
@@ -644,8 +644,8 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
                       className="w-full accent-primary"
                     />
                     <div className="flex justify-between text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>
-                      <span>Not Religious</span>
-                      <span className="font-medium" style={{ color: "var(--primary)" }}>{["","Minimal","Moderate","Practicing","Devout","Very Devout"][form.religiosity]}</span>
+                      <span>Secular / None</span>
+                      <span className="font-medium" style={{ color: "var(--primary)" }}>{["","Light","Moderate","Practising","Devout","Very Devout"][form.religiosity]}</span>
                       <span>Very Devout</span>
                     </div>
                   </div>

@@ -82,7 +82,7 @@ const TRUST_ITEMS = [
   "Manual profile review",
   "No data selling",
   "GDPR compliant",
-  "Halal-by-design",
+  "Values-first design",
 ];
 
 // ─────────────────────────── POLICY MODAL ────────────────────────

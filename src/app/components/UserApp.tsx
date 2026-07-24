@@ -110,7 +110,7 @@ const MATCHES = [
     lifestyle: ["Non-smoker", "Active / Fitness", "Traveler", "Health-conscious"],
     personality: ["Thoughtful", "Ambitious", "Nurturing", "Creative"],
     goals: ["Start a family", "Build a career", "Community service"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -135,7 +135,7 @@ const MATCHES = [
     lifestyle: ["Non-smoker", "Homebody", "Art & Culture", "Health-conscious"],
     personality: ["Creative", "Structured", "Calm", "Thoughtful"],
     goals: ["Build a career", "Buy a home", "Spiritual growth"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -160,7 +160,7 @@ const MATCHES = [
     lifestyle: ["Non-smoker", "Active / Fitness", "Health-conscious", "Homebody"],
     personality: ["Nurturing", "Calm", "Energetic", "Thoughtful"],
     goals: ["Start a family", "Community service", "Spiritual growth"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -231,7 +231,7 @@ const MATCHES_MALE = [
     lifestyle: ["Non-smoker", "Active / Fitness", "Family-first"],
     personality: ["Ambitious", "Thoughtful", "Patient", "Traditional"],
     goals: ["Start a family", "Build a home", "Spiritual growth"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -250,7 +250,7 @@ const MATCHES_MALE = [
     lifestyle: ["Non-smoker", "Homebody", "Community service"],
     personality: ["Ambitious", "Empathetic", "Humorous", "Spiritual"],
     goals: ["Start a family", "Entrepreneurship", "Community service"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -269,7 +269,7 @@ const MATCHES_MALE = [
     lifestyle: ["Non-smoker", "Health-conscious", "Active / Fitness"],
     personality: ["Calm", "Analytical", "Nurturing", "Traditional"],
     goals: ["Start a family", "Academic growth", "Spiritual growth"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -288,7 +288,7 @@ const MATCHES_MALE = [
     lifestyle: ["Non-smoker", "Traveler", "Art & Culture"],
     personality: ["Analytical", "Extroverted", "Thoughtful", "Ambitious"],
     goals: ["Buy a home", "Travel the world", "Build a career"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
   {
@@ -307,7 +307,7 @@ const MATCHES_MALE = [
     lifestyle: ["Non-smoker", "Tech-savvy", "Active / Fitness"],
     personality: ["Creative", "Introverted", "Ambitious", "Humorous"],
     goals: ["Entrepreneurship", "Start a family", "Build a career"],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
     dealBreakerWarning: false, genotypeRisk: null as string | null,
   },
 ];
@@ -315,19 +315,19 @@ const MATCHES_MALE = [
 // Male conversations/interests — shown when user is female
 const CONVERSATIONS_MALE = [
   {
-    id: "cm1", partnerId: "m1", partnerName: "Yusuf A.", preview: "Assalamu alaikum! Our compatibility score surprised me.", time: "5m ago", unread: 1, status: "active" as const,
+    id: "cm1", partnerId: "m1", partnerName: "Yusuf A.", preview: "Hi! Our compatibility score genuinely surprised me.", time: "5m ago", unread: 1, status: "active" as const,
     avatar: { color: "#0A6870", initials: "YA" }, photo: p("1603085356448-6857558a32b5", 80, 80),
     messages: [
-      { id: "msg1", from: "them" as const, text: "Assalamu alaikum! I noticed our 93% compatibility and had to reach out. I really appreciated how you described your values.", time: "10:20 AM" },
-      { id: "msg2", from: "me" as const,   text: "Wa alaikum assalam! Yes, it stood out to me too. What aspect of your work do you enjoy most?", time: "10:28 AM" },
-      { id: "msg3", from: "them" as const, text: "Assalamu alaikum! Our compatibility score surprised me.", time: "10:35 AM" },
+      { id: "msg1", from: "them" as const, text: "Hi! I noticed our 93% compatibility and had to reach out. I really appreciated how you described your values.", time: "10:20 AM" },
+      { id: "msg2", from: "me" as const,   text: "Hi! Yes, it stood out to me too. What aspect of your work do you enjoy most?", time: "10:28 AM" },
+      { id: "msg3", from: "them" as const, text: "Hi! Our compatibility score genuinely surprised me.", time: "10:35 AM" },
     ],
   },
   {
     id: "cm2", partnerId: "m2", partnerName: "Khalid M.", preview: "Looking forward to learning more about you.", time: "2h ago", unread: 0, status: "pending" as const,
     avatar: { color: "#C5733F", initials: "KM" }, photo: p("1765285353856-0d00e478f2c8", 80, 80),
     messages: [
-      { id: "msg1", from: "them" as const, text: "Hello! Your profile resonated with me — the way you described what you're looking for feels very aligned with my values.", time: "9:15 AM" },
+      { id: "msg1", from: "them" as const, text: "Hi! Your profile resonated with me — the way you described what you're looking for feels very aligned with my values.", time: "9:15 AM" },
     ],
   },
 ];
@@ -356,8 +356,8 @@ const CONVERSATIONS = [
     avatar: { color: "#0A6870", initials: "AO" },
     photo: p("1613005341945-35e159e522f1", 80, 80),
     messages: [
-      { id: "m1", from: "them", text: "Assalamu alaikum! I saw we have a 94% compatibility score — I'm genuinely surprised at how aligned we are.", time: "10:20 AM" },
-      { id: "m2", from: "me", text: "Wa alaikum assalam! Yes, I noticed that too. Your profile is really thoughtful and I appreciate that you included your community work.", time: "10:25 AM" },
+      { id: "m1", from: "them", text: "Hi! I saw we have a 94% compatibility score — I'm genuinely surprised at how aligned we are.", time: "10:20 AM" },
+      { id: "m2", from: "me", text: "Hi! Yes, I noticed that too. Your profile is really thoughtful and I appreciate that you included your community work.", time: "10:25 AM" },
       { id: "m3", from: "them", text: "Thank you! Community service is something I'm passionate about. I volunteer every month at the Ikeja Women's Shelter.", time: "10:28 AM" },
       { id: "m4", from: "me", text: "That's incredible. I've been involved in youth mentoring here. We should compare notes sometime.", time: "10:31 AM" },
       { id: "m5", from: "them", text: "That sounds like a wonderful idea!", time: "10:35 AM" },
@@ -439,7 +439,7 @@ function mapApiMatch(m: ApiMatchProfile): MatchItem {
     height: 0, languages: [], timeline: "", wantsChildren: "",
     religiosity: 0, familyImportance: "",
     lifestyle: [], personality: [], goals: [],
-    smoking: "Never", drinking: "Never", diet: "Halal",
+    smoking: "Never", drinking: "Never", diet: "No restriction",
   };
 }
 
@@ -522,11 +522,11 @@ function ScoreBadge({ score }: { score: number }) {
 
 // Human-readable labels + icons for the 5 compatibility pillars
 const COMPAT_META: Record<string, { label: string; icon: string; desc: string }> = {
-  deen:          { label: "Deen & Practice",   icon: "🕌", desc: "Prayer, sect, Quran & hijab alignment" },
-  readiness:     { label: "Marriage Readiness", icon: "💍", desc: "Timeline, children & relationship readiness" },
-  family:        { label: "Family & Culture",   icon: "🏡", desc: "Family involvement, values & cultural fit" },
-  lifestyle:     { label: "Lifestyle & Values", icon: "⚖️", desc: "Age fit, finances & halal lifestyle" },
-  communication: { label: "Personality & Comm", icon: "🤝", desc: "Love language, conflict style & shared interests" },
+  deen:          { label: "Values & Spirituality",    icon: "✨", desc: "Spiritual engagement, faith tradition & shared life values" },
+  readiness:     { label: "Relationship Intent",      icon: "💍", desc: "Timeline, children preference & readiness for commitment" },
+  family:        { label: "Family & Heritage",        icon: "🏡", desc: "Family involvement, cultural background & lifestyle fit" },
+  lifestyle:     { label: "Lifestyle & Wellness",     icon: "🌿", desc: "Age fit, financial alignment & health choices" },
+  communication: { label: "Connection & Personality", icon: "🤝", desc: "Love language, communication style & shared interests" },
 };
 
 function CompatBar({ dimKey, value }: { dimKey: string; value: number }) {
@@ -698,7 +698,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
                 <p style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.65)", marginTop: 1 }}>{m.city}</p>
                 {/* 5-pillar compatibility mini bars */}
                 <div className="flex gap-1 mt-2"
-                  title={`Deen ${m.compatibility.deen}% · Readiness ${m.compatibility.readiness}% · Family ${m.compatibility.family}% · Lifestyle ${m.compatibility.lifestyle}% · Comm ${m.compatibility.communication}%`}>
+                  title={`Values ${m.compatibility.deen}% · Intent ${m.compatibility.readiness}% · Family ${m.compatibility.family}% · Lifestyle ${m.compatibility.lifestyle}% · Connection ${m.compatibility.communication}%`}>
                   {Object.values(m.compatibility).map((v, i) => (
                     <div key={i} className="flex-1 h-1 rounded-full overflow-hidden bg-white/25">
                       <div className="h-full rounded-full bg-white/85" style={{ width: `${v}%` }} />
@@ -1003,7 +1003,7 @@ function MatchCard({ m, onPass, onView, sc, plan = "free", sentInterest = false,
 
         {/* Score badge with tooltip */}
         <div
-          title={`${m.score}% match — Deen ${m.compatibility.deen}% · Readiness ${m.compatibility.readiness}% · Family ${m.compatibility.family}% · Lifestyle ${m.compatibility.lifestyle}% · Comm ${m.compatibility.communication}%`}
+          title={`${m.score}% match — Values ${m.compatibility.deen}% · Intent ${m.compatibility.readiness}% · Family ${m.compatibility.family}% · Lifestyle ${m.compatibility.lifestyle}% · Connection ${m.compatibility.communication}%`}
           className="absolute top-4 right-4 rounded-2xl flex flex-col items-center justify-center shadow-lg cursor-help"
           style={{ background: sc(m.score), minWidth: 58, padding: "8px 10px" }}>
           <span style={{ fontSize: "1.5rem", fontWeight: 900, color: "white", lineHeight: 1 }}>{m.score}</span>
@@ -1230,7 +1230,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
             <p style={{ fontWeight: 700, fontSize: "0.8125rem", color: "var(--foreground)", marginBottom: 10 }}>Why a complete profile matters</p>
             <div className="space-y-2.5">
               {[
-                { icon: "🕌", text: "Our Deen compatibility score needs your Islamic lifestyle info" },
+                { icon: "✨", text: "Our Values & Spirituality score needs your lifestyle and faith engagement info" },
                 { icon: "🔒", text: "Incomplete profiles are hidden from other members — privacy first" },
                 { icon: "💍", text: "Serious members only see serious candidates" },
               ].map(({ icon, text }) => (
@@ -1421,11 +1421,11 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
               </div>
               <div className="flex gap-2">
                 {[
-                  { v: 0, l: "Any",   icon: "🌙" },
-                  { v: 2, l: "Casual", icon: "🕌" },
-                  { v: 3, l: "Pract.", icon: "📿" },
+                  { v: 0, l: "Any",    icon: "🌍" },
+                  { v: 2, l: "Light",  icon: "🌱" },
+                  { v: 3, l: "Active", icon: "✨" },
                   { v: 4, l: "Devout", icon: "⭐" },
-                  { v: 5, l: "5/5",   icon: "✨" },
+                  { v: 5, l: "Deep",   icon: "🌟" },
                 ].map(({ v, l, icon }) => (
                   <button key={v} onClick={() => persistAdv({ ...adv, minRelig: v })}
                     className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 transition-all ${adv.minRelig === v ? "border-primary bg-primary/8 text-primary" : "border-border bg-card text-muted-foreground hover:border-primary/30"}`}
@@ -1463,11 +1463,11 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
                   {(() => {
                     // Pick top 2 dimensions by score for a meaningful reason.
                     const dims = [
-                      { label: "🕌 Strong Deen alignment",   score: m.compatibility.deen },
-                      { label: "💍 Ready for marriage",      score: m.compatibility.readiness },
-                      { label: "🏡 Compatible family values", score: m.compatibility.family },
-                      { label: "⚖️ Shared lifestyle values",  score: m.compatibility.lifestyle },
-                      { label: "🤝 Great communication",      score: m.compatibility.communication },
+                      { label: "✨ Strong values alignment",    score: m.compatibility.deen },
+                      { label: "💍 Clear relationship intent", score: m.compatibility.readiness },
+                      { label: "🏡 Compatible family values",  score: m.compatibility.family },
+                      { label: "🌿 Shared lifestyle outlook",  score: m.compatibility.lifestyle },
+                      { label: "🤝 Great connection potential", score: m.compatibility.communication },
                     ].sort((a, b) => b.score - a.score).slice(0, 2);
                     return dims.map(d => d.label).join(" · ");
                   })()}
@@ -1704,7 +1704,7 @@ function MessagesTab({ onOpenChat, onOpenMatch, plan, onUpgrade, blocked, onBloc
                     </div>
                     {match && (
                       <div className="flex items-center gap-2 mt-1"
-                        title={`Deen ${match.compatibility.deen}% · Readiness ${match.compatibility.readiness}% · Family ${match.compatibility.family}% · Lifestyle ${match.compatibility.lifestyle}% · Comm ${match.compatibility.communication}%`}>
+                        title={`Values ${match.compatibility.deen}% · Intent ${match.compatibility.readiness}% · Family ${match.compatibility.family}% · Lifestyle ${match.compatibility.lifestyle}% · Connection ${match.compatibility.communication}%`}>
                         <div className="flex gap-0.5 flex-1">
                           {(["deen","readiness","family","lifestyle","communication"] as const).map(k => (
                             <div key={k} className="flex-1 h-1 rounded-full overflow-hidden bg-muted">
@@ -2870,7 +2870,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
                 <button
                   onClick={() => {
                     const senderName = (displayName ?? "").replace(/\s*\(.*\)/, "").trim() || "a fellow member";
-                    const intro = `Assalamu alaikum ${match.fullName.split(" ")[0]}, my name is ${senderName}. I came across your profile and I was genuinely impressed by your values and goals — I think we could have a meaningful conversation. I'd love to connect if you're open to it.`;
+                    const intro = `Hi ${match.fullName.split(" ")[0]}, my name is ${senderName}. I came across your profile and was genuinely impressed by your values and goals — I think we could have a meaningful conversation. I'd love to connect if you're open to it.`;
                     toast("Introduction copied! Paste it as your first message.", { duration: 4000 });
                     navigator.clipboard?.writeText(intro).catch(() => {});
                   }}
@@ -4509,7 +4509,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
     { key: "bio",             label: "Write a short bio",               section: "edit-profile",     check: p => !!(p.bio as string)?.trim() },
     { key: "profession",      label: "Add career & education",          section: "career-education", check: p => !!(p.profession as string)?.trim() },
     { key: "education",       label: "Add your education level",        section: "career-education", check: p => !!p.education },
-    { key: "religiosity",     label: "Set your religiosity level",      section: "values-lifestyle", check: p => !!p.religiosity },
+    { key: "religiosity",     label: "Set your spiritual practice level", section: "values-lifestyle", check: p => !!p.religiosity },
     { key: "lifestyle",       label: "Add lifestyle tags",              section: "values-lifestyle", check: p => Array.isArray(p.lifestyle) && (p.lifestyle as unknown[]).length > 0 },
     { key: "personality",     label: "Add personality traits",          section: "values-lifestyle", check: p => Array.isArray(p.personality) && (p.personality as unknown[]).length > 0 },
     { key: "marriageTimeline",label: "Set your marriage timeline",      section: "life-goals",       check: p => !!p.marriageTimeline },

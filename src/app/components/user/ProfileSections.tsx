@@ -215,7 +215,7 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
       familyImportance: (p.familyImportance as string) || "high",
       smoking:          (p.smoking          as string) || "never",
       drinking:         (p.drinking         as string) || "never",
-      diet:             (p.diet             as string) || "halal",
+      diet:             (p.diet             as string) || "no-restriction",
       exercise:         (p.exercise         as string) || "regularly",
       socialStyle:      (p.socialStyle      as string) || "ambivert",
       lifestyle:        (p.lifestyle        as string[]) || [],
@@ -254,11 +254,11 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
 
         {/* Religiosity */}
         <div>
-          <FL>Religious Practice Level</FL>
+          <FL>Spiritual Practice Level</FL>
           <input type="range" min={1} max={5} value={f.religiosity} onChange={e => u("religiosity", parseInt(e.target.value))} className="w-full accent-primary mt-3" />
           <div className="flex justify-between text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>
-            <span>Not Religious</span>
-            <span style={{ fontWeight: 700, color: "var(--primary)" }}>{["","Minimal","Moderate","Practicing","Devout","Very Devout"][f.religiosity]}</span>
+            <span>Secular / None</span>
+            <span style={{ fontWeight: 700, color: "var(--primary)" }}>{["","Light","Moderate","Practising","Devout","Very Devout"][f.religiosity]}</span>
             <span>Very Devout</span>
           </div>
         </div>
@@ -278,7 +278,7 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
           {([
             { k: "smoking", label: "Smoking", opts: [{ value: "never", label: "Never" }, { value: "occasionally", label: "Occasionally" }, { value: "regularly", label: "Regularly" }] },
             { k: "drinking", label: "Alcohol", opts: [{ value: "never", label: "Never" }, { value: "socially", label: "Socially" }, { value: "regularly", label: "Regularly" }] },
-            { k: "diet", label: "Diet", opts: [{ value: "halal", label: "Halal only" }, { value: "vegetarian", label: "Vegetarian" }, { value: "vegan", label: "Vegan" }, { value: "no-restriction", label: "No restriction" }] },
+            { k: "diet", label: "Diet", opts: [{ value: "no-restriction", label: "No restriction" }, { value: "halal", label: "Halal" }, { value: "kosher", label: "Kosher" }, { value: "vegetarian", label: "Vegetarian" }, { value: "vegan", label: "Vegan" }] },
             { k: "exercise", label: "Exercise", opts: [{ value: "daily", label: "Daily" }, { value: "regularly", label: "3–5×/week" }, { value: "sometimes", label: "Sometimes" }, { value: "rarely", label: "Rarely" }] },
           ] as const).map(({ k, label, opts }) => (
             <div key={k}>
@@ -544,7 +544,7 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
         </p>
         {[
           { key: "educationImp", label: "Education Level" },
-          { key: "religiosityImp", label: "Religious Practice Alignment" },
+          { key: "religiosityImp", label: "Spiritual Practice Alignment" },
           { key: "incomeImp", label: "Income / Financial Stability" },
         ].map(({ key, label }) => (
           <div key={key} className="pb-5 border-b border-border last:border-0">

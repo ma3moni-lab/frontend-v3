@@ -243,7 +243,7 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
         <div className="mb-7">
           <h1 style={{ fontSize: "1.875rem", fontWeight: 900, letterSpacing: "-0.035em" }}>Create your account</h1>
           <p className="text-muted-foreground mt-1.5" style={{ fontSize: "0.9375rem" }}>
-            Start your journey to finding a halal partner.
+            Start your journey to finding a meaningful, lasting partnership.
           </p>
         </div>
 
