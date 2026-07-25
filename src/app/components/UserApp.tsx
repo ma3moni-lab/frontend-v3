@@ -32,6 +32,7 @@ import {
   DeactivateSection,
 } from "./user/ProfileSections";
 import { BlogDetail } from "./BlogDetail";
+import { SupportCenterView } from "./user/SupportCenterView";
 
 interface UserAppProps {
   onSignOut: () => void;
@@ -56,7 +57,8 @@ type SubView =
   | "found-partner"
   | "deactivate"
   | "blog-list"
-  | "blog-detail";
+  | "blog-detail"
+  | "support-center";
 
 // ── Unsplash helper (for match discovery mock data only) ─
 const p = (id: string, w = 600, h = 750) =>
@@ -1957,9 +1959,10 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
   const ACCOUNT_ROWS: { icon: ReactNode; label: string; sub: string; view: SubView; color: string }[] = [
     { icon: <BookOpen size={15} />,label: "Guidance & Articles", sub: "Reading on values, faith & marriage", view: "blog-list",      color: "#6B9E78" },
     { icon: <Gift size={15} />,    label: "Refer & Earn",    sub: `Earn $${referralBonus} per referral`, view: "referral",       color: "#C5733F" },
-    { icon: <Bell size={15} />,    label: "Notifications",   sub: "Manage your alerts",                 view: "notifications",  color: "#4A8DB8" },
-    { icon: <Shield size={15} />,  label: "Privacy & Safety",sub: "Visibility, blocked users, data",    view: "privacy-safety", color: "#0A6870" },
-    { icon: <Settings size={15} />,label: "Settings",        sub: "Language, theme, support",           view: "app-settings",   color: "#68747F" },
+    { icon: <Bell size={15} />,    label: "Notifications",   sub: "Manage your alerts",                 view: "notifications",    color: "#4A8DB8" },
+    { icon: <Shield size={15} />,  label: "Privacy & Safety",sub: "Visibility, blocked users, data",    view: "privacy-safety",   color: "#0A6870" },
+    { icon: <Flag size={15} />,    label: "Support & Appeals",sub: "Tickets, report status, appeals",   view: "support-center",   color: "#C5733F" },
+    { icon: <Settings size={15} />,label: "Settings",        sub: "Language, theme, notifications",     view: "app-settings",     color: "#68747F" },
   ];
 
   return (
@@ -4803,6 +4806,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           {subView === "partner-prefs"     && <PartnerPrefsSection      onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
           {subView === "privacy-safety"    && <PrivacySafetySection onBack={goBack} plan={userPlan} onUpgrade={() => setSubView("subscription")} />}
           {subView === "app-settings"      && <AppSettingsSection onBack={goBack} />}
+          {subView === "support-center"    && <SupportCenterView onBack={goBack} />}
           {subView === "found-partner"     && <FoundPartnerSection onBack={goBack} onComplete={() => { setFoundPartner(true); try { localStorage.setItem("ma3moni_found_partner","true"); } catch {} goBack(); }} />}
           {subView === "deactivate"        && <DeactivateSection onBack={goBack} onSignOut={onSignOut} />}
         </div>

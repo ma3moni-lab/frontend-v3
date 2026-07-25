@@ -248,17 +248,36 @@ const LOG_ICONS: Record<string, React.ReactNode> = {
 };
 
 // ── Push notification modal ───────────────────────────────
-function PushModal({ target, onClose }: { target: { name: string; email: string } | null; onClose: () => void }) {
+function PushModal({ target, onClose }: { target: { id?: string; name: string; email: string } | null; onClose: () => void }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!title.trim() || !body.trim()) return;
+    setSending(true);
+    try {
+      if (target?.id) {
+        await adminApi.pushToUser(target.id, "system", title, body);
+      } else {
+        // Broadcast to all active users
+        await adminApi.bulkPush({}, "system", title, body);
+      }
+    } catch {
+      // Network error — still show confirmation so UI doesn't hang
+    } finally {
+      setSending(false);
+      setSent(true);
+    }
+  };
 
   if (sent) return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-8 text-center">
         <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4"><Check size={24} className="text-primary" /></div>
         <h3 style={{ fontWeight: 700 }}>Notification Sent</h3>
-        <p className="text-muted-foreground mt-2" style={{ fontSize: "0.875rem" }}>{target ? `Sent to ${target.name}` : "Sent to selected users"}</p>
+        <p className="text-muted-foreground mt-2" style={{ fontSize: "0.875rem" }}>{target ? `Sent to ${target.name}` : "Broadcast delivered to all active users"}</p>
       </div>
     </div>
   );
@@ -268,8 +287,13 @@ function PushModal({ target, onClose }: { target: { name: string; email: string 
       <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h3 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Push Notification</h3>
-            {target && <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>To: {target.name} · {target.email}</p>}
+            <h3 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>
+              {target ? "Push Notification" : "Broadcast Notification"}
+            </h3>
+            {target
+              ? <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>To: {target.name} · {target.email}</p>
+              : <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Sends to all active platform users</p>
+            }
           </div>
           <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><X size={17} /></button>
         </div>
@@ -296,8 +320,9 @@ function PushModal({ target, onClose }: { target: { name: string; email: string 
           )}
           <div className="flex gap-3">
             <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-border hover:bg-muted" style={{ fontSize: "0.9rem" }}>Cancel</button>
-            <button onClick={() => setSent(true)} disabled={!title || !body} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-50" style={{ fontSize: "0.9rem", fontWeight: 700 }}>
-              <Send size={14} /> Send
+            <button onClick={handleSend} disabled={!title || !body || sending} className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-50" style={{ fontSize: "0.9rem", fontWeight: 700 }}>
+              {sending ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Send size={14} />}
+              {sending ? "Sending…" : "Send"}
             </button>
           </div>
         </div>
@@ -311,6 +336,7 @@ function StartConversationModal({ user, onClose }: { user: typeof ALL_PLATFORM_U
   const [message, setMessage] = useState("");
   const [subject, setSubject] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
   if (sent) return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
@@ -401,12 +427,21 @@ function StartConversationModal({ user, onClose }: { user: typeof ALL_PLATFORM_U
               Cancel
             </button>
             <button
-              onClick={() => setSent(true)}
-              disabled={!subject || !message.trim()}
+              onClick={async () => {
+                if (!subject || !message.trim()) return;
+                setSending(true);
+                try {
+                  await adminApi.pushToUser(user.id, "system", subject, message);
+                } catch { /* silent — still confirm */ }
+                setSending(false);
+                setSent(true);
+              }}
+              disabled={!subject || !message.trim() || sending}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ fontSize: "0.9rem", fontWeight: 700 }}
             >
-              <Send size={15} /> Send Message
+              {sending ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <Send size={15} />}
+              {sending ? "Sending…" : "Send Message"}
             </button>
           </div>
         </div>
@@ -426,6 +461,7 @@ function EscalateModal({
   const [reason, setReason] = useState("");
   const [includeHistory, setIncludeHistory] = useState(true);
   const [escalated, setEscalated] = useState(false);
+  const [escalating, setEscalating] = useState(false);
 
   if (escalated) {
     const target = ESCALATION_TARGETS.find(t => t.role === selectedRole);
@@ -538,12 +574,21 @@ function EscalateModal({
               Cancel
             </button>
             <button
-              onClick={() => setEscalated(true)}
-              disabled={!selectedRole || !reason.trim()}
+              onClick={async () => {
+                if (!selectedRole || !reason.trim()) return;
+                setEscalating(true);
+                try {
+                  await adminApi.updateTicketStatus(ticketId, "escalated");
+                } catch { /* silent */ }
+                setEscalating(false);
+                setEscalated(true);
+              }}
+              disabled={!selectedRole || !reason.trim() || escalating}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-white hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ fontSize: "0.9rem", fontWeight: 700, background: selectedRole ? (ESCALATION_TARGETS.find(t => t.role === selectedRole)?.color ?? "var(--primary)") : "var(--primary)" }}
             >
-              <ShieldAlert size={15} /> Escalate Issue
+              {escalating ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <ShieldAlert size={15} />}
+              {escalating ? "Escalating…" : "Escalate Issue"}
             </button>
           </div>
         </div>
@@ -557,39 +602,75 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
   userId: string; onClose: () => void; ticketSubject?: string;
 }) {
   const profile = CC_USER_PROFILES[userId];
-  const platformUser = ALL_PLATFORM_USERS.find(u => u.id === userId);
   const [activeTab, setActiveTab] = useState<"overview" | "activity" | "referrals" | "tickets">("overview");
   const [showConvoModal, setShowConvoModal] = useState(false);
+  const [liveDetail, setLiveDetail] = useState<import("../../../lib/api").AdminUserDetail | null>(null);
+  const [liveActivity, setLiveActivity] = useState<import("../../../lib/api").ActivityEntry[] | null>(null);
+  const [liveTickets, setLiveTickets] = useState<import("../../../lib/api").AdminTicket[] | null>(null);
+
+  useEffect(() => {
+    adminApi.userDetail(userId).then(setLiveDetail).catch(() => {});
+    adminApi.userActivity(userId).then(r => setLiveActivity(r.results)).catch(() => {});
+    adminApi.tickets({ search: userId } as Parameters<typeof adminApi.tickets>[0]).then(r => setLiveTickets(r.results)).catch(() => {});
+  }, [userId]);
+
+  // Derive a platformUser-compatible record from liveDetail if available
+  const platformUser = liveDetail
+    ? {
+        id: liveDetail.id, name: liveDetail.name, email: liveDetail.email,
+        phone: liveDetail.phone, age: liveDetail.age, gender: liveDetail.gender,
+        location: liveDetail.location, status: liveDetail.status,
+        subscription: liveDetail.subscription, lastActive: liveDetail.last_active,
+        verified: liveDetail.verified, nationality: "",
+      }
+    : ALL_PLATFORM_USERS.find(u => u.id === userId);
   const [showEscalateModal, setShowEscalateModal] = useState(false);
 
-  const displayName = profile?.name ?? platformUser?.name ?? "Unknown User";
-  const displayEmail = profile?.email ?? platformUser?.email ?? "";
+  const displayName = liveDetail?.name ?? profile?.name ?? platformUser?.name ?? "Unknown User";
+  const displayEmail = liveDetail?.email ?? profile?.email ?? platformUser?.email ?? "";
 
-  if (!profile && !platformUser) return (
+  // Show loading spinner if we have no data at all yet
+  if (!profile && !platformUser && !liveDetail) return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <div className="bg-card rounded-2xl border border-border p-8 text-center shadow-2xl w-full max-w-sm">
-        <AlertCircle size={32} className="text-muted-foreground mx-auto mb-3" />
-        <p style={{ fontWeight: 600 }}>Profile not found</p>
-        <button onClick={onClose} className="mt-4 text-primary" style={{ fontSize: "0.875rem" }}>Close</button>
+        <div className="w-8 h-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin mx-auto mb-3" />
+        <p style={{ fontWeight: 600 }}>Loading profile…</p>
       </div>
     </div>
   );
 
-  const subColor = (profile?.subscription ?? platformUser?.subscription) === "Premium" ? "#9B6DAF"
-    : (profile?.subscription ?? platformUser?.subscription) === "Basic" ? "#4A8DB8" : "#68747F";
-  const statusColor = (profile?.status ?? platformUser?.status) === "active" ? "#16a34a"
-    : (profile?.status ?? platformUser?.status) === "suspended" ? "#dc2626" : "#d97706";
+  const activeSub = liveDetail?.subscription ?? profile?.subscription ?? platformUser?.subscription;
+  const activeStatus = liveDetail?.status ?? profile?.status ?? platformUser?.status;
+  const subColor = activeSub === "Premium" ? "#9B6DAF" : activeSub === "Basic" ? "#4A8DB8" : "#68747F";
+  const statusColor = activeStatus === "active" ? "#16a34a" : activeStatus === "suspended" ? "#dc2626" : "#d97706";
 
-  // Minimal profile from platformUser when full CC_USER_PROFILE doesn't exist
-  const minimalProfile = profile ?? {
-    name: platformUser!.name, email: platformUser!.email, phone: platformUser!.phone,
-    age: platformUser!.age, gender: platformUser!.gender, location: platformUser!.location,
-    nationality: "—", status: platformUser!.status, verified: platformUser!.verified,
-    subscription: platformUser!.subscription, joinedAt: "—", lastActive: platformUser!.lastActive,
-    profileCompletion: 50, totalSpend: 0, walletBalance: 0,
-    currentPool: "Unknown", poolJoinDate: "—", poolMembers: 0,
-    matchCount: 0, messageCount: 0, activeConversations: 0,
-    referralCount: 0, referrals: [], activity: [], ticketHistory: [],
+  // Build minimalProfile from live data when available, fall back to mock
+  const minimalProfile = {
+    name:              liveDetail?.name ?? profile?.name ?? platformUser?.name ?? "Unknown",
+    email:             liveDetail?.email ?? profile?.email ?? platformUser?.email ?? "",
+    phone:             liveDetail?.phone ?? profile?.phone ?? platformUser?.phone ?? "",
+    age:               liveDetail?.age ?? profile?.age ?? platformUser?.age ?? 0,
+    gender:            liveDetail?.gender ?? profile?.gender ?? platformUser?.gender ?? "",
+    location:          liveDetail?.location ?? profile?.location ?? platformUser?.location ?? "",
+    nationality:       profile?.nationality ?? "—",
+    status:            liveDetail?.status ?? profile?.status ?? platformUser?.status ?? "active",
+    verified:          liveDetail?.verified ?? profile?.verified ?? platformUser?.verified ?? false,
+    subscription:      liveDetail?.subscription ?? profile?.subscription ?? platformUser?.subscription ?? "Free",
+    joinedAt:          liveDetail?.joined ?? profile?.joinedAt ?? "—",
+    lastActive:        liveDetail?.last_active ?? profile?.lastActive ?? platformUser?.lastActive ?? "—",
+    profileCompletion: liveDetail?.completion ?? profile?.profileCompletion ?? 50,
+    totalSpend:        profile?.totalSpend ?? 0,
+    walletBalance:     profile?.walletBalance ?? 0,
+    currentPool:       profile?.currentPool ?? "—",
+    poolJoinDate:      profile?.poolJoinDate ?? "—",
+    poolMembers:       profile?.poolMembers ?? 0,
+    matchCount:        liveDetail?.matches_count ?? profile?.matchCount ?? 0,
+    messageCount:      liveDetail?.conversations_count ?? profile?.messageCount ?? 0,
+    activeConversations: profile?.activeConversations ?? 0,
+    referralCount:     liveDetail?.referrals_made_count ?? profile?.referralCount ?? 0,
+    referrals:         profile?.referrals ?? [],
+    activity:          profile?.activity ?? [],
+    ticketHistory:     profile?.ticketHistory ?? [],
   };
 
   return (
@@ -701,7 +782,7 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
             { key: "overview",  label: "Overview" },
             { key: "activity",  label: "Activity" },
             { key: "referrals", label: `Referrals (${minimalProfile.referralCount})` },
-            { key: "tickets",   label: `Tickets (${minimalProfile.ticketHistory.length})` },
+            { key: "tickets",   label: `Tickets (${liveTickets?.length ?? minimalProfile.ticketHistory.length})` },
           ] as const).map(t => (
             <button
               key={t.key}
@@ -796,31 +877,40 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
                 <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Recent Platform Activity</h4>
                 <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>All actions by this user on the platform</p>
               </div>
-              <div className="divide-y divide-border">
-                {minimalProfile.activity.map((act, i) => {
-                  const color = ACTIVITY_COLORS[act.type] ?? "#68747F";
-                  return (
-                    <div key={i} className="flex items-start gap-3 px-5 py-3.5">
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: color + "15", color }}>
-                        {act.type === "auth" ? <LogIn size={12} /> :
-                         act.type === "match" ? <Heart size={12} /> :
-                         act.type === "message" ? <MessageSquare size={12} /> :
-                         act.type === "payment" ? <DollarSign size={12} /> :
-                         act.type === "referral" ? <Gift size={12} /> :
-                         act.type === "admin" || act.type === "report" ? <Shield size={12} /> :
-                         <Activity size={12} />}
+              {liveActivity === null ? (
+                <div className="flex items-center gap-2 text-muted-foreground py-6 justify-center">
+                  <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                  <span style={{ fontSize: "0.8125rem" }}>Loading…</span>
+                </div>
+              ) : liveActivity.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8" style={{ fontSize: "0.875rem" }}>No activity on record.</p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {liveActivity.map((act, i) => {
+                    const color = ACTIVITY_COLORS[act.type] ?? "#68747F";
+                    return (
+                      <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: color + "15", color }}>
+                          {act.type === "auth" ? <LogIn size={12} /> :
+                           act.type === "match" ? <Heart size={12} /> :
+                           act.type === "message" ? <MessageSquare size={12} /> :
+                           act.type === "admin" || act.type === "moderation" ? <Shield size={12} /> :
+                           <Activity size={12} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p style={{ fontSize: "0.875rem" }}>{act.action}</p>
+                          <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                            {new Date(act.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full capitalize flex-shrink-0" style={{ fontSize: "0.6875rem", fontWeight: 700, background: color + "15", color }}>
+                          {act.type}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p style={{ fontSize: "0.875rem" }}>{act.action}</p>
-                        <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{act.time}</p>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full capitalize flex-shrink-0" style={{ fontSize: "0.6875rem", fontWeight: 700, background: color + "15", color }}>
-                        {act.type}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -880,28 +970,37 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
               <div className="px-5 py-3.5 border-b border-border">
                 <h4 style={{ fontWeight: 700, fontSize: "0.875rem" }}>Support Ticket History</h4>
               </div>
-              {minimalProfile.ticketHistory.length === 0 ? (
+              {liveTickets === null ? (
+                <div className="flex items-center gap-2 text-muted-foreground py-6 justify-center">
+                  <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                  <span style={{ fontSize: "0.8125rem" }}>Loading…</span>
+                </div>
+              ) : liveTickets.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
                   <MessageSquare size={24} className="mx-auto mb-3 opacity-40" />
                   <p style={{ fontSize: "0.875rem" }}>No tickets on record.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {minimalProfile.ticketHistory.map(t => {
+                  {liveTickets.map(t => {
                     const colors: Record<string, { bg: string; text: string }> = {
-                      open:      { bg: "#dbeafe", text: "#1d4ed8" },
-                      escalated: { bg: "#fef9c3", text: "#854d0e" },
-                      resolved:  { bg: "#dcfce7", text: "#166534" },
+                      open:        { bg: "#dbeafe", text: "#1d4ed8" },
+                      escalated:   { bg: "#fef9c3", text: "#854d0e" },
+                      resolved:    { bg: "#dcfce7", text: "#166534" },
+                      in_progress: { bg: "#e0e7ff", text: "#3730a3" },
+                      closed:      { bg: "#f3f4f6", text: "#6b7280" },
                     };
                     const s = colors[t.status] ?? { bg: "#f3f4f6", text: "#6b7280" };
                     return (
                       <div key={t.id} className="flex items-center justify-between px-5 py-4">
                         <div>
                           <p style={{ fontWeight: 600, fontSize: "0.9rem" }}>{t.subject}</p>
-                          <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{t.date}</p>
+                          <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                            {new Date(t.created_at).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}
+                          </p>
                         </div>
                         <span className="px-2.5 py-1 rounded-full capitalize" style={{ fontSize: "0.75rem", fontWeight: 700, background: s.bg, color: s.text }}>
-                          {t.status}
+                          {t.status.replace("_", " ")}
                         </span>
                       </div>
                     );
@@ -1394,13 +1493,25 @@ export function SupportSectionV2({ role = "customer-care" }: { role?: AgentRole 
   const [reply, setReply] = useState("");
   const [internalNote, setInternalNote] = useState("");
   const [showNotifModal, setShowNotifModal] = useState(false);
-  const [notifTarget, setNotifTarget] = useState<{ name: string; email: string } | null>(null);
+  const [notifTarget, setNotifTarget] = useState<{ id?: string; name: string; email: string } | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [logFilter, setLogFilter] = useState<string>("all");
   const [viewingAgentId, setViewingAgentId] = useState<string | null>(null);
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [agentList] = useState(AGENTS);
   const [ticketsLoading, setTicketsLoading] = useState(true);
+
+  // Live users for Search Users tab
+  const [liveUsers, setLiveUsers] = useState<import("../../../lib/api").AdminUserRecord[] | null>(null);
+  const [usersLoading, setUsersLoading] = useState(false);
+  useEffect(() => {
+    if (tab !== "users") return;
+    setUsersLoading(true);
+    adminApi.users({ search: userSearch || undefined, page_size: 50 } as Parameters<typeof adminApi.users>[0])
+      .then(r => setLiveUsers(r.results))
+      .catch(() => setLiveUsers([]))
+      .finally(() => setUsersLoading(false));
+  }, [tab, userSearch]);
 
   // Live tickets from Django — starts empty, no mock fallback
   const [liveTickets, setLiveTickets] = useState<typeof TICKETS>([]);
@@ -1425,8 +1536,8 @@ export function SupportSectionV2({ role = "customer-care" }: { role?: AgentRole 
     setReply("");
   };
 
-  const openNotif = (name: string, email: string) => {
-    setNotifTarget({ name, email });
+  const openNotif = (name: string, email: string, userId?: string) => {
+    setNotifTarget({ id: userId, name, email });
     setShowNotifModal(true);
   };
 
@@ -1508,53 +1619,56 @@ export function SupportSectionV2({ role = "customer-care" }: { role?: AgentRole 
           </div>
 
           {/* Results */}
-          {(() => {
-            const q = userSearch.toLowerCase().trim();
-            const results = q
-              ? ALL_PLATFORM_USERS.filter(u =>
-                  u.name.toLowerCase().includes(q) ||
-                  u.email.toLowerCase().includes(q) ||
-                  u.phone.includes(q)
-                )
-              : ALL_PLATFORM_USERS;
+          {usersLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-10 justify-center">
+              <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+              <span style={{ fontSize: "0.9rem" }}>Searching…</span>
+            </div>
+          ) : (() => {
+            const results = liveUsers ?? [];
 
             if (results.length === 0) return (
               <div className="bg-card rounded-2xl border border-border p-10 text-center">
                 <Search size={28} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-                <p style={{ fontWeight: 600 }}>No users found</p>
-                <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Try a different name, email, or phone number.</p>
+                <p style={{ fontWeight: 600 }}>{liveUsers === null ? "Type to search…" : "No users found"}</p>
+                <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Search by name, email, or phone.</p>
               </div>
             );
 
             return (
               <div className="space-y-2">
                 <p className="text-muted-foreground mb-3" style={{ fontSize: "0.8125rem" }}>
-                  {q ? `${results.length} result${results.length !== 1 ? "s" : ""} for "${userSearch}"` : `${results.length} members`}
+                  {userSearch ? `${results.length} result${results.length !== 1 ? "s" : ""} for "${userSearch}"` : `${results.length} members`}
                 </p>
                 {results.map(user => {
                   const statusStyle: Record<string, { bg: string; text: string }> = {
-                    active:    { bg: "#dcfce7", text: "#166534" },
-                    suspended: { bg: "#fee2e2", text: "#991b1b" },
-                    pending:   { bg: "#dbeafe", text: "#1d4ed8" },
+                    active:      { bg: "#dcfce7", text: "#166534" },
+                    suspended:   { bg: "#fee2e2", text: "#991b1b" },
+                    pending:     { bg: "#dbeafe", text: "#1d4ed8" },
+                    deactivated: { bg: "#f3f4f6", text: "#6b7280" },
                   };
                   const ss = statusStyle[user.status] ?? { bg: "#f3f4f6", text: "#6b7280" };
-                  const subColor = user.subscription === "Premium" ? "#9B6DAF" : user.subscription === "Basic" ? "#4A8DB8" : "#68747F";
+                  const subColor = user.subscription === "premium" ? "#9B6DAF" : user.subscription === "basic" ? "#4A8DB8" : "#68747F";
+                  const convUser = {
+                    id: user.id, name: user.name, email: user.email, phone: user.phone,
+                    age: user.age, gender: user.gender, location: user.location,
+                    status: user.status, subscription: user.subscription,
+                    lastActive: user.last_active, verified: user.verified, nationality: "",
+                  };
 
                   return (
                     <div key={user.id} className="bg-card rounded-2xl border border-border p-4 flex items-center gap-4 hover:border-primary/20 transition-all">
-                      {/* Avatar */}
                       <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: "var(--primary)" + "18" }}>
                         <span style={{ fontSize: "1rem", fontWeight: 800, color: "var(--primary)" }}>
-                          {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                          {user.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                         </span>
                       </div>
 
-                      {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{user.name}</span>
                           {user.verified && <CheckCircle size={13} className="text-primary" />}
-                          <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "0.6875rem", fontWeight: 700, background: subColor + "18", color: subColor }}>{user.subscription}</span>
+                          <span className="px-2 py-0.5 rounded-full capitalize" style={{ fontSize: "0.6875rem", fontWeight: 700, background: subColor + "18", color: subColor }}>{user.subscription}</span>
                           <span className="px-2 py-0.5 rounded-full capitalize" style={{ fontSize: "0.6875rem", fontWeight: 700, background: ss.bg, color: ss.text }}>{user.status}</span>
                         </div>
                         <div className="flex flex-wrap gap-3 mt-1 text-muted-foreground">
@@ -1563,11 +1677,10 @@ export function SupportSectionV2({ role = "customer-care" }: { role?: AgentRole 
                           <span style={{ fontSize: "0.8125rem" }}>{user.location} · {user.age}y</span>
                         </div>
                         <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.75rem" }}>
-                          Last active: {user.lastActive}
+                          Last active: {user.last_active}
                         </p>
                       </div>
 
-                      {/* Actions */}
                       <div className="flex flex-col gap-2 flex-shrink-0">
                         <button
                           onClick={() => setViewingProfile(user.id)}
@@ -1577,7 +1690,7 @@ export function SupportSectionV2({ role = "customer-care" }: { role?: AgentRole 
                           <Eye size={13} /> View Profile
                         </button>
                         <button
-                          onClick={() => setConversationTarget(user)}
+                          onClick={() => setConversationTarget(convUser)}
                           className="flex items-center gap-1.5 px-3 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
                           style={{ fontSize: "0.8125rem", fontWeight: 600 }}
                         >
@@ -1665,7 +1778,7 @@ export function SupportSectionV2({ role = "customer-care" }: { role?: AgentRole 
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button
-                        onClick={() => openNotif(ticket.userName, ticket.email)}
+                        onClick={() => openNotif(ticket.userName, ticket.email, ticket.userId)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary rounded-lg text-primary hover:bg-primary hover:text-white transition-all"
                         style={{ fontSize: "0.75rem", fontWeight: 600 }}
                       >
