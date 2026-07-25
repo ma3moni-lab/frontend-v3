@@ -3685,6 +3685,57 @@ const MAX_PHOTOS = 4;
 const PHOTOS_KEY = "ma3moni_profile_photos";
 const AVATAR_KEY = "ma3moni_avatar_photo";
 
+// ── Profile completion field lists (module-level to avoid TDZ in useMemo closures) ──
+
+// All fields shown in the user-facing completion checklist (localStorage-keyed).
+const PROFILE_FIELDS_STATIC: { key: string; label: string; section: SubView; check: (p: Record<string, unknown>) => boolean }[] = [
+  { key: "fullName",        label: "Add your full name",              section: "edit-profile",     check: p => !!(p.fullName as string)?.trim() },
+  { key: "gender",          label: "Set your gender",                 section: "edit-profile",     check: p => p.gender === "male" || p.gender === "female" },
+  { key: "age",             label: "Add your date of birth",          section: "edit-profile",     check: p => !!p.age || !!p.dob },
+  { key: "city",            label: "Add your city & country",         section: "edit-profile",     check: p => !!(p.city as string)?.trim() && !!(p.country as string)?.trim() },
+  { key: "bio",             label: "Write a short bio",               section: "edit-profile",     check: p => !!(p.bio as string)?.trim() },
+  { key: "profession",      label: "Add career & education",          section: "career-education", check: p => !!(p.profession as string)?.trim() },
+  { key: "education",       label: "Add your education level",        section: "career-education", check: p => !!p.education },
+  { key: "religion",        label: "Set your religious affiliation",  section: "values-lifestyle", check: p => !!(p.religion as string || p.sect as string) },
+  { key: "religiosity",     label: "Set your spiritual practice level", section: "values-lifestyle", check: p => !!p.religiosity },
+  { key: "lifestyle",       label: "Add lifestyle tags",              section: "values-lifestyle", check: p => Array.isArray(p.lifestyle) && (p.lifestyle as unknown[]).length > 0 },
+  { key: "personality",     label: "Add personality traits",          section: "values-lifestyle", check: p => Array.isArray(p.personality) && (p.personality as unknown[]).length > 0 },
+  { key: "marriageTimeline",label: "Set your marriage timeline",      section: "life-goals",       check: p => !!p.marriageTimeline },
+  { key: "wantsChildren",   label: "Set your children preference",    section: "life-goals",       check: p => !!p.wantsChildren },
+  { key: "goals",           label: "Add your life goals",             section: "life-goals",       check: p => Array.isArray(p.goals) && (p.goals as unknown[]).length > 0 },
+  { key: "avatar",          label: "Upload a profile photo",          section: "photos",            check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
+];
+
+// Backend fields that contribute to completion_score (maps to Profile model fields).
+const BACKEND_COMPLETION_FIELDS: { key: string; label: string; section: SubView }[] = [
+  { key: "full_name",        label: "Add your full name",              section: "edit-profile" },
+  { key: "gender",           label: "Set your gender",                 section: "edit-profile" },
+  { key: "date_of_birth",    label: "Add your date of birth",          section: "edit-profile" },
+  { key: "nationality",      label: "Add your nationality",             section: "edit-profile" },
+  { key: "location_city",    label: "Add your city",                   section: "edit-profile" },
+  { key: "bio",              label: "Write a short bio",                section: "edit-profile" },
+  { key: "sect",             label: "Set your religious affiliation",   section: "values-lifestyle" },
+  { key: "prayer_frequency", label: "Set your spiritual practice level",section: "values-lifestyle" },
+  { key: "education",        label: "Add your education level",         section: "career-education" },
+  { key: "profession",       label: "Add your profession",              section: "career-education" },
+];
+
+// Maps backend field names → localStorage keys so the fallback check works correctly.
+const BACKEND_TO_LOCAL_KEY: Record<string, string> = {
+  full_name: "fullName", date_of_birth: "dob", location_city: "city",
+  sect: "religion", prayer_frequency: "religiosity",
+};
+
+// UX completeness fields (not scored by backend but shown in checklist).
+const UX_COMPLETION_FIELDS: { key: string; label: string; section: SubView; check: (p: Record<string, unknown>) => boolean }[] = [
+  { key: "lifestyle",        label: "Add lifestyle tags",              section: "values-lifestyle", check: p => Array.isArray(p.lifestyle)   && (p.lifestyle as unknown[]).length > 0 },
+  { key: "personality",      label: "Add personality traits",          section: "values-lifestyle", check: p => Array.isArray(p.personality) && (p.personality as unknown[]).length > 0 },
+  { key: "marriageTimeline", label: "Set your marriage timeline",      section: "life-goals",       check: p => !!p.marriageTimeline },
+  { key: "wantsChildren",    label: "Set your children preference",    section: "life-goals",       check: p => !!p.wantsChildren },
+  { key: "goals",            label: "Add your life goals",             section: "life-goals",       check: p => Array.isArray(p.goals)       && (p.goals as unknown[]).length > 0 },
+  { key: "avatar",           label: "Upload a profile photo",          section: "photos",           check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
+];
+
 // Convert a File to a base64 data-URL so it survives page reloads.
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -4571,82 +4622,30 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const loginEmail  = (() => { try { return localStorage.getItem("ma3moni_login_email") ?? ""; } catch { return ""; } })();
   const displayName = (profileData?.fullName as string) || DEMO_NAMES[loginEmail] || loginEmail.split("@")[0] || "Member";
   const firstName   = displayName.split(" ")[0].replace(/\s*\(.*\)/, ""); // strip plan suffix for greeting
-  // Comprehensive field checklist — each item has a label (shown in suggestions)
-  // and a check function that returns true when that item is complete.
-  const PROFILE_FIELDS: { key: string; label: string; section: SubView; check: (p: Record<string, unknown>) => boolean }[] = [
-    { key: "fullName",        label: "Add your full name",              section: "edit-profile",     check: p => !!(p.fullName as string)?.trim() },
-    { key: "gender",          label: "Set your gender",                 section: "edit-profile",     check: p => p.gender === "male" || p.gender === "female" },
-    { key: "age",             label: "Add your date of birth",          section: "edit-profile",     check: p => !!p.age || !!p.dob },
-    { key: "city",            label: "Add your city & country",         section: "edit-profile",     check: p => !!(p.city as string)?.trim() && !!(p.country as string)?.trim() },
-    { key: "bio",             label: "Write a short bio",               section: "edit-profile",     check: p => !!(p.bio as string)?.trim() },
-    { key: "profession",      label: "Add career & education",          section: "career-education", check: p => !!(p.profession as string)?.trim() },
-    { key: "education",       label: "Add your education level",        section: "career-education", check: p => !!p.education },
-    { key: "religiosity",     label: "Set your spiritual practice level", section: "values-lifestyle", check: p => !!p.religiosity },
-    { key: "lifestyle",       label: "Add lifestyle tags",              section: "values-lifestyle", check: p => Array.isArray(p.lifestyle) && (p.lifestyle as unknown[]).length > 0 },
-    { key: "personality",     label: "Add personality traits",          section: "values-lifestyle", check: p => Array.isArray(p.personality) && (p.personality as unknown[]).length > 0 },
-    { key: "marriageTimeline",label: "Set your marriage timeline",      section: "life-goals",       check: p => !!p.marriageTimeline },
-    { key: "wantsChildren",   label: "Set your children preference",    section: "life-goals",       check: p => !!p.wantsChildren },
-    { key: "goals",           label: "Add your life goals",             section: "life-goals",       check: p => Array.isArray(p.goals) && (p.goals as unknown[]).length > 0 },
-    // Avatar photo — checked against localStorage directly (not stored in onboarding form)
-    { key: "avatar",          label: "Upload a profile photo",          section: "photos",            check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
-  ];
 
   const profileStrength = useMemo(() => {
-    // Backend score is authoritative — ensures user and admin see the same value
     if (backendScore !== null) return backendScore;
     if (!profileData) return 0;
-    const filled = PROFILE_FIELDS.filter(f => f.check(profileData)).length;
-    return Math.round((filled / PROFILE_FIELDS.length) * 100);
+    const filled = PROFILE_FIELDS_STATIC.filter(f => f.check(profileData)).length;
+    return Math.round((filled / PROFILE_FIELDS_STATIC.length) * 100);
   }, [profileData, backendScore]);
-
-  // Fields the backend uses to compute completion_score — must stay in sync with
-  // apps/accounts/models.py Profile.completion_score property (11 fields + photo).
-  const BACKEND_PROFILE_FIELDS: { key: string; label: string; section: SubView }[] = [
-    { key: "full_name",        label: "Add your full name",           section: "edit-profile" },
-    { key: "gender",           label: "Set your gender",              section: "edit-profile" },
-    { key: "date_of_birth",    label: "Add your date of birth",       section: "edit-profile" },
-    { key: "nationality",      label: "Add your nationality",          section: "edit-profile" },
-    { key: "location_city",    label: "Add your city",                section: "edit-profile" },
-    { key: "bio",              label: "Write a short bio",             section: "edit-profile" },
-    { key: "sect",             label: "Set your religious affiliation", section: "values-lifestyle" },
-    { key: "prayer_frequency", label: "Set your spiritual practice level", section: "values-lifestyle" },
-    { key: "education",        label: "Add your education level",     section: "career-education" },
-    { key: "profession",       label: "Add your profession",           section: "career-education" },
-  ];
-
-  // LocalStorage key aliases for backend field names
-  const BACKEND_TO_LOCAL: Record<string, string> = {
-    full_name: "fullName", date_of_birth: "dob", location_city: "city",
-    sect: "religion", prayer_frequency: "religiosity",
-  };
-
-  // Extra UX fields not tracked by completion_score but important for profile quality
-  const UX_FIELDS: { key: string; label: string; section: SubView; check: (p: Record<string, unknown>) => boolean }[] = [
-    { key: "lifestyle",        label: "Add lifestyle tags",            section: "values-lifestyle", check: p => Array.isArray(p.lifestyle)   && (p.lifestyle as unknown[]).length > 0 },
-    { key: "personality",      label: "Add personality traits",        section: "values-lifestyle", check: p => Array.isArray(p.personality) && (p.personality as unknown[]).length > 0 },
-    { key: "marriageTimeline", label: "Set your marriage timeline",    section: "life-goals",       check: p => !!p.marriageTimeline },
-    { key: "wantsChildren",    label: "Set your children preference",  section: "life-goals",       check: p => !!p.wantsChildren },
-    { key: "goals",            label: "Add your life goals",           section: "life-goals",       check: p => Array.isArray(p.goals)       && (p.goals as unknown[]).length > 0 },
-    { key: "avatar",           label: "Upload a profile photo",        section: "photos",           check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
-  ];
 
   const incompleteFields = useMemo((): { key: string; label: string; section: SubView }[] => {
     const missing: { key: string; label: string; section: SubView }[] = [];
     const lp = profileData ?? {} as Record<string, unknown>;
     const bp = backendProfileData ?? {} as Record<string, unknown>;
 
-    // ── Core backend fields ─────────────────────────────
-    // Check backend data first; fall back to localStorage with key mapping.
-    BACKEND_PROFILE_FIELDS.forEach(f => {
+    // Core backend fields — check backend data first, fall back to localStorage.
+    BACKEND_COMPLETION_FIELDS.forEach(f => {
       const bVal = bp[f.key];
-      if (bVal && (typeof bVal !== "string" || bVal.trim())) return; // filled in backend
-      const localKey = BACKEND_TO_LOCAL[f.key] ?? f.key;
+      if (bVal && (typeof bVal !== "string" || bVal.trim())) return;
+      const localKey = BACKEND_TO_LOCAL_KEY[f.key] ?? f.key;
       const lVal = lp[localKey];
       if (!lVal || (typeof lVal === "string" && !lVal.trim())) missing.push(f);
     });
 
-    // ── Extended UX fields (lifestyle, personality, goals, photo) ──
-    UX_FIELDS.forEach(f => {
+    // Extended UX fields (lifestyle, personality, goals, photo).
+    UX_COMPLETION_FIELDS.forEach(f => {
       if (!f.check(lp)) missing.push({ key: f.key, label: f.label, section: f.section });
     });
 
