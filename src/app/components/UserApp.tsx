@@ -4374,6 +4374,13 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [blockModal, setBlockModal] = useState<{ matchId: string; name: string } | null>(null);
   const [reportModal, setReportModal] = useState<{ matchId: string; name: string } | null>(null);
 
+  // Profile version + backend state — declared here so any useEffect dependency
+  // array that references them doesn't hit the temporal dead zone.
+  const [profileVersion, setProfileVersion] = useState(0);
+  const [backendScore, setBackendScore] = useState<number | null>(null);
+  const [backendProfileData, setBackendProfileData] = useState<Record<string, unknown> | null>(null);
+  const [backendEmail, setBackendEmail] = useState<string>("");
+
   // ── Hydrate localStorage profile from backend on mount ──────
   // Runs once on mount. Fetches /me/ and merges backend profile fields into
   // the localStorage key so data survives logout/device changes.
@@ -4594,22 +4601,6 @@ export function UserApp({ onSignOut }: UserAppProps) {
     "yusuf@example.com":        "Yusuf",
     "demo@ma3moni.com":         "Demo User",
   };
-
-  // Derive display name + profile strength from onboarding localStorage.
-  // Falls back to the logged-in email's demo name so each account shows
-  // a distinct, plan-appropriate label instead of the hardcoded "Yusuf".
-  // Increment this whenever a profile section saves so profileData re-reads
-  // from localStorage and profileStrength recomputes immediately.
-  const [profileVersion, setProfileVersion] = useState(0);
-  // Backend-authoritative completion score — set on mount from /api/auth/me/
-  const [backendScore, setBackendScore] = useState<number | null>(null);
-  // Raw backend profile object — used to derive which fields are actually missing
-  const [backendProfileData, setBackendProfileData] = useState<Record<string, unknown> | null>(null);
-  // Full email from backend — used to detect phone-registered users (@phone.ma3moni)
-  const [backendEmail, setBackendEmail] = useState<string>("");
-
-  // Declared here (after profileVersion) to avoid temporal dead zone error
-  // Photo moderation removed — photos save directly, no gate on messaging
 
   const profileData = useMemo(() => {
     try {
