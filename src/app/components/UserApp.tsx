@@ -4332,6 +4332,8 @@ export function UserApp({ onSignOut }: UserAppProps) {
         if (!p) return;
         // Use backend completion_score as the authoritative profile strength
         if (typeof p.completion_score === "number") setBackendScore(p.completion_score);
+        // Store raw backend profile so incompleteFields can check the real field values
+        setBackendProfileData(p as unknown as Record<string, unknown>);
         // Store full email (including fake phone emails) for detection
         if (me.email) setBackendEmail(me.email);
         const PROFILE_KEY = "ma3moni_onboarding_progress";
@@ -4491,8 +4493,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
             try { localStorage.setItem(PLAN_KEY, me.plan); } catch {}
           }
         }
-        // Refresh backend completion score and email on each sync
+        // Refresh backend completion score, profile data, and email on each sync
         if (typeof me.profile?.completion_score === "number") setBackendScore(me.profile.completion_score);
+        if (me.profile) setBackendProfileData(me.profile as unknown as Record<string, unknown>);
         if (me.email) setBackendEmail(me.email);
       } catch { /* offline */ }
 
@@ -4535,6 +4538,8 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [profileVersion, setProfileVersion] = useState(0);
   // Backend-authoritative completion score — set on mount from /api/auth/me/
   const [backendScore, setBackendScore] = useState<number | null>(null);
+  // Raw backend profile object — used to derive which fields are actually missing
+  const [backendProfileData, setBackendProfileData] = useState<Record<string, unknown> | null>(null);
   // Full email from backend — used to detect phone-registered users (@phone.ma3moni)
   const [backendEmail, setBackendEmail] = useState<string>("");
 
@@ -4580,10 +4585,39 @@ export function UserApp({ onSignOut }: UserAppProps) {
     return Math.round((filled / PROFILE_FIELDS.length) * 100);
   }, [profileData, backendScore]);
 
-  const incompleteFields = useMemo(() => {
+  // Fields the backend uses to compute completion_score — must stay in sync with
+  // apps/accounts/models.py Profile.completion_score property (11 fields + photo).
+  const BACKEND_PROFILE_FIELDS: { key: string; label: string; section: SubView }[] = [
+    { key: "full_name",        label: "Add your full name",           section: "edit-profile" },
+    { key: "gender",           label: "Set your gender",              section: "edit-profile" },
+    { key: "date_of_birth",    label: "Add your date of birth",       section: "edit-profile" },
+    { key: "nationality",      label: "Add your nationality",          section: "edit-profile" },
+    { key: "location_city",    label: "Add your city",                section: "edit-profile" },
+    { key: "bio",              label: "Write a short bio",             section: "edit-profile" },
+    { key: "sect",             label: "Set your Islamic sect",         section: "values-lifestyle" },
+    { key: "prayer_frequency", label: "Set your prayer frequency",    section: "values-lifestyle" },
+    { key: "education",        label: "Add your education level",     section: "career-education" },
+    { key: "profession",       label: "Add your profession",           section: "career-education" },
+  ];
+
+  const incompleteFields = useMemo((): { key: string; label: string; section: SubView }[] => {
+    if (backendProfileData) {
+      // Derive from backend profile — matches what completion_score tracks exactly
+      const missing = BACKEND_PROFILE_FIELDS.filter(f => {
+        const v = backendProfileData[f.key];
+        return !v || (typeof v === "string" && !v.trim());
+      });
+      // If photo is also tracked and avatar not uploaded, append it
+      const hasPhoto = !!(backendProfileData.photo_url || backendProfileData.profile_picture);
+      if (!hasPhoto) {
+        missing.push({ key: "avatar", label: "Upload a profile photo", section: "photos" });
+      }
+      return missing;
+    }
+    // Fallback when backend data not yet loaded
     if (!profileData) return PROFILE_FIELDS;
     return PROFILE_FIELDS.filter(f => !f.check(profileData));
-  }, [profileData]);
+  }, [backendProfileData, profileData]);
 
   const upgradePlan = async (plan: UserPlan) => {
     try {

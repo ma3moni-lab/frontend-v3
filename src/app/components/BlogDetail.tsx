@@ -38,31 +38,34 @@ function renderInline(text: string) {
 
 const PARA_STYLE: CSSProperties = {
   fontSize: "1.0625rem",
-  lineHeight: 1.85,
-  marginBottom: "1.5rem",
+  lineHeight: 1.75,
+  marginBottom: "1.125rem",
   marginTop: 0,
 };
 
 function ParagraphBlock({ text, index }: { text: string; index: number }) {
-  // Split on blank lines first; if there are none, split on single newlines so
-  // each line the user typed becomes its own visible paragraph with spacing.
-  const rawChunks = text.split(/\n{2,}/);
-  const chunks =
-    rawChunks.length > 1
-      ? rawChunks.map(c => c.trim()).filter(Boolean)
-      : text.split(/\n/).map(c => c.trim()).filter(Boolean);
+  // Double newlines = paragraph break (each gets its own <p> with spacing).
+  // Single newlines = line break within the same paragraph (use <br>, no extra margin).
+  const paragraphs = text.split(/\n{2,}/).map(c => c.trim()).filter(Boolean);
 
-  if (chunks.length === 0) return null;
-  if (chunks.length === 1) {
-    return <p style={PARA_STYLE}>{renderInline(chunks[0])}</p>;
-  }
-  return (
-    <>
-      {chunks.map((chunk, j) => (
-        <p key={`${index}-${j}`} style={PARA_STYLE}>{renderInline(chunk)}</p>
-      ))}
-    </>
-  );
+  if (paragraphs.length === 0) return null;
+
+  const renderLines = (chunk: string, key: string | number) => {
+    const lines = chunk.split(/\n/).map(l => l.trim()).filter(Boolean);
+    return (
+      <p key={key} style={PARA_STYLE}>
+        {lines.map((line, k) => (
+          <span key={k}>
+            {renderInline(line)}
+            {k < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    );
+  };
+
+  if (paragraphs.length === 1) return renderLines(paragraphs[0], index);
+  return <>{paragraphs.map((p, j) => renderLines(p, `${index}-${j}`))}</>;
 }
 
 function ContentRenderer({ content }: { content: string }) {
