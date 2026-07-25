@@ -1879,7 +1879,7 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
   // #4 — derive sub-row descriptions from actual onboarding data
   const personalSub = [pf.fullName as string, pf.age ? `${pf.age}` : "", pf.city as string].filter(Boolean).join(" · ") || "Add personal info";
   const careerSub   = [pf.profession as string, pf.education as string].filter(Boolean).join(" · ") || "Add career & education";
-  const valuesSub   = [pf.religiosity ? `Religiosity ${pf.religiosity}/5` : "", pf.smoking as string].filter(Boolean).join(" · ") || "Add values & lifestyle";
+  const valuesSub   = [(pf.religion || pf.sect) as string, pf.religiosity ? `Practice ${pf.religiosity}/5` : "", pf.smoking as string].filter(Boolean).join(" · ") || "Add values & lifestyle";
   const goalsSub    = [pf.marriageTimeline as string, pf.wantsChildren as string].filter(Boolean).join(" · ") || "Add life goals";
 
   const [referralBonus, setReferralBonus] = useState<number>(10);
@@ -2518,7 +2518,8 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
 
   const sc = match.score >= 90 ? "#0A6870" : match.score >= 85 ? "#C5733F" : "#68747F";
   const label = match.score >= 90 ? "Exceptional Match" : match.score >= 85 ? "Strong Match" : match.score >= 80 ? "Good Match" : "Compatible";
-  const religiosity = ["", "Minimal", "Moderate", "Practicing", "Devout", "Very Devout"][match.religiosity] ?? "";
+  const spiritualPractice = ["", "Minimal", "Moderate", "Practicing", "Devout", "Very Devout"][match.religiosity] ?? "";
+  const religionLabel = (match as Record<string, unknown>).religion as string || (match as Record<string, unknown>).sect as string || "";
 
   // Only FREE members are restricted to the preview. Members with an active
   // subscription (basic or premium) get the full profile view.
@@ -2710,7 +2711,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
                 {[
                   ["Age", `${match.age} years`],
                   ["Nationality", match.nationality],
-                  ["Religion", religiosity],
+                  ["Religion", religionLabel || spiritualPractice],
                   ["Profession", match.profession],
                   ["Marriage Timeline", match.timeline],
                 ].map(([l, v]) => (
@@ -2780,7 +2781,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
                   { label: "Nationality", value: match.nationality },
                   { label: "City",        value: `${match.city}, ${match.country}` },
                   { label: "Languages",   value: match.languages.join(", ") },
-                  { label: "Religion",    value: religiosity },
+                  { label: "Religion",    value: religionLabel || spiritualPractice },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-muted/50 rounded-xl p-3">
                     <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</p>
@@ -2815,7 +2816,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Values & Lifestyle</h3>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {[
-                  { label: "Religiosity", value: religiosity },
+                  { label: "Spiritual Practice", value: spiritualPractice },
                   { label: "Family",      value: match.familyImportance },
                   { label: "Smoking",     value: match.smoking },
                   { label: "Drinks",      value: match.drinking },
@@ -4594,8 +4595,8 @@ export function UserApp({ onSignOut }: UserAppProps) {
     { key: "nationality",      label: "Add your nationality",          section: "edit-profile" },
     { key: "location_city",    label: "Add your city",                section: "edit-profile" },
     { key: "bio",              label: "Write a short bio",             section: "edit-profile" },
-    { key: "sect",             label: "Set your Islamic sect",         section: "values-lifestyle" },
-    { key: "prayer_frequency", label: "Set your prayer frequency",    section: "values-lifestyle" },
+    { key: "sect",             label: "Set your religious affiliation", section: "values-lifestyle" },
+    { key: "prayer_frequency", label: "Set your spiritual practice level", section: "values-lifestyle" },
     { key: "education",        label: "Add your education level",     section: "career-education" },
     { key: "profession",       label: "Add your profession",           section: "career-education" },
   ];

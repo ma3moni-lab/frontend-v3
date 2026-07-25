@@ -895,8 +895,8 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
               { key: "nationality",      label: "Nationality",          hint: "Used in compatibility matching" },
               { key: "location_city",    label: "City",                 hint: "Location helps with proximity matches" },
               { key: "bio",              label: "Bio",                  hint: "Helps other members get to know them" },
-              { key: "sect",             label: "Islamic Sect",         hint: "Important for compatibility filters" },
-              { key: "prayer_frequency", label: "Prayer Frequency",     hint: "Used in deen compatibility score" },
+              { key: "sect",             label: "Religious Affiliation", hint: "Used in faith compatibility score" },
+              { key: "prayer_frequency", label: "Spiritual Practice",   hint: "Used in spiritual compatibility score" },
               { key: "education",        label: "Education Level",      hint: "Career section — affects matches" },
               { key: "profession",       label: "Profession",           hint: "Career section — shown on profile" },
             ];

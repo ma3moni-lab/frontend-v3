@@ -127,6 +127,7 @@ interface FormState {
   city: string;
   education: EducationLevel | "";
   profession: string;
+  religion: string;
   religiosity: number;
   familyImportance: "high" | "medium" | "low" | "";
   communicationStyle: CommunicationStyle | "";
@@ -154,6 +155,7 @@ const initialForm: FormState = {
   city: "",
   education: "",
   profession: "",
+  religion: "",
   religiosity: 3,
   familyImportance: "",
   communicationStyle: "",
@@ -239,18 +241,18 @@ function CardSelect<T extends string>({
   value: T | ""; onChange: (v: T) => void; options: { value: T; label: string; desc?: string }[]; cols?: number;
 }) {
   return (
-    <div className={`grid gap-3`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+    <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {options.map(opt => (
         <button
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`p-4 rounded-xl border text-left transition-all ${value === opt.value ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/30"}`}
+          className={`px-3 py-2.5 rounded-xl border text-left transition-all ${value === opt.value ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/30"}`}
         >
-          <div style={{ fontWeight: 600, fontSize: "0.9375rem", color: value === opt.value ? "var(--primary)" : "var(--foreground)" }}>
+          <div style={{ fontWeight: 600, fontSize: "0.875rem", color: value === opt.value ? "var(--primary)" : "var(--foreground)" }}>
             {opt.label}
           </div>
-          {opt.desc && <div className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>{opt.desc}</div>}
+          {opt.desc && <div className="text-muted-foreground" style={{ fontSize: "0.7rem", lineHeight: 1.3, marginTop: 1 }}>{opt.desc}</div>}
         </button>
       ))}
     </div>
@@ -340,6 +342,8 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
           pref_age_max:         form.partnerAgeMax || undefined,
           pref_location:        form.partnerLocation || undefined,
           pref_education:       form.educationImportance || undefined,
+          sect:                 form.religion || undefined,
+          prayer_frequency:     form.religiosity ? String(form.religiosity) : undefined,
         };
         if (form.bloodGroup) payload.blood_group = form.bloodGroup;
         if (form.genotype)   payload.genotype    = form.genotype;
@@ -421,8 +425,9 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
                 ],
               },
               {
-                title: "Values & Lifestyle",
+                title: "Faith & Values",
                 rows: [
+                  { label: "Religion",          val: form.religion ? (form.religion.charAt(0).toUpperCase() + form.religion.slice(1)) : "" },
                   { label: "Spiritual Practice", val: religiosityLabel },
                   { label: "Family",      val: form.familyImportance === "high" ? "Very Important" : form.familyImportance === "medium" ? "Important" : "Values independence" },
                   ...(form.lifestyle.length ? [{ label: "Lifestyle", val: form.lifestyle.join(", ") }] : []),
@@ -631,10 +636,30 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Your values</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Shared values are the foundation of a lasting partnership.</p>
-              <div className="space-y-7">
+              <div className="space-y-6">
+                <div>
+                  <FieldLabel>Religious Affiliation</FieldLabel>
+                  <select
+                    value={form.religion}
+                    onChange={e => update("religion", e.target.value)}
+                    className="w-full mt-2 px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    style={{ fontSize: "0.9375rem" }}
+                  >
+                    <option value="">Select your religion…</option>
+                    <option value="islam">Islam</option>
+                    <option value="christianity">Christianity</option>
+                    <option value="judaism">Judaism</option>
+                    <option value="hinduism">Hinduism</option>
+                    <option value="buddhism">Buddhism</option>
+                    <option value="sikhism">Sikhism</option>
+                    <option value="agnostic">Agnostic</option>
+                    <option value="atheist">Atheist / None</option>
+                    <option value="other">Other / Prefer not to say</option>
+                  </select>
+                </div>
                 <div>
                   <FieldLabel>Spiritual Practice Level</FieldLabel>
-                  <div className="mt-4">
+                  <div className="mt-3">
                     <input
                       type="range"
                       min={1}

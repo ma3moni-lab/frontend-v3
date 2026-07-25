@@ -96,12 +96,12 @@ function CardPick<T extends string>({ value, onChange, opts, cols = 2 }: {
   opts: { value: T; label: string; desc?: string }[]; cols?: number;
 }) {
   return (
-    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+    <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {opts.map(o => (
         <button key={o.value} type="button" onClick={() => onChange(o.value)}
-          className={`p-3 rounded-xl border text-left transition-all ${value === o.value ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/30"}`}>
-          <p style={{ fontWeight: 600, fontSize: "0.875rem", color: value === o.value ? "var(--primary)" : "var(--foreground)" }}>{o.label}</p>
-          {o.desc && <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.75rem" }}>{o.desc}</p>}
+          className={`px-3 py-2 rounded-xl border text-left transition-all ${value === o.value ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/30"}`}>
+          <p style={{ fontWeight: 600, fontSize: "0.8125rem", color: value === o.value ? "var(--primary)" : "var(--foreground)" }}>{o.label}</p>
+          {o.desc && <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", lineHeight: 1.3, marginTop: 1 }}>{o.desc}</p>}
         </button>
       ))}
     </div>
@@ -204,6 +204,18 @@ export function CareerEducationSection({ onBack, onSaved }: { onBack: () => void
 // ═══════════════════════════════════════════════════════
 const LIFESTYLE_TAGS = ["Non-smoker", "Active / Fitness", "Traveler", "Homebody", "Health-conscious", "Social butterfly", "Foodie", "Early riser", "Night owl", "Pet lover", "Art & Culture", "Tech-savvy", "Minimalist", "Outdoor lover"];
 
+const RELIGION_OPTS = [
+  { value: "islam",        label: "Islam" },
+  { value: "christianity", label: "Christianity" },
+  { value: "judaism",      label: "Judaism" },
+  { value: "hinduism",     label: "Hinduism" },
+  { value: "buddhism",     label: "Buddhism" },
+  { value: "sikhism",      label: "Sikhism" },
+  { value: "agnostic",     label: "Agnostic" },
+  { value: "atheist",      label: "Atheist / None" },
+  { value: "other",        label: "Other" },
+];
+
 const PERSONALITY_OPTS = ["Introverted", "Extroverted", "Thoughtful", "Energetic", "Humorous", "Calm", "Ambitious", "Nurturing", "Creative", "Structured"];
 const MAX_PERSONALITY = 5;
 
@@ -211,6 +223,7 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
   const [f, setF] = useState(() => {
     const p = readProfile();
     return {
+      religion:         (p.religion         as string) || (p.sect as string) || "",
       religiosity:      Number(p.religiosity      ?? 3),
       familyImportance: (p.familyImportance as string) || "high",
       smoking:          (p.smoking          as string) || "never",
@@ -228,8 +241,9 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
   const toApiDrink  = (v: string): "none" | "occasionally" | "regularly" =>
     (v === "never" || v === "non-drinker") ? "none" : (v === "socially" ? "occasionally" : v === "regularly" ? "regularly" : "none");
   const s = () => {
-    saveProfile({ religiosity: f.religiosity, familyImportance: f.familyImportance, smoking: f.smoking, drinking: f.drinking, diet: f.diet, exercise: f.exercise, socialStyle: f.socialStyle, lifestyle: f.lifestyle, personality: f.personality });
+    saveProfile({ religion: f.religion, sect: f.religion, religiosity: f.religiosity, familyImportance: f.familyImportance, smoking: f.smoking, drinking: f.drinking, diet: f.diet, exercise: f.exercise, socialStyle: f.socialStyle, lifestyle: f.lifestyle, personality: f.personality });
     apiAuth.updateProfile({
+      sect: f.religion,
       smoking: toApiSmoke(f.smoking),
       drinking: toApiDrink(f.drinking),
       personality_traits: f.personality,
@@ -249,14 +263,20 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
 
   return (
     <Shell title="Values & Lifestyle" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5 space-y-6">
-        <Divider title="Values" />
+      <div className="p-5 space-y-5">
+        <Divider title="Faith & Values" />
 
-        {/* Religiosity */}
+        {/* Religion */}
+        <div>
+          <FL>Religious Affiliation</FL>
+          <SI value={f.religion} onChange={v => u("religion", v)} opts={RELIGION_OPTS} />
+        </div>
+
+        {/* Spiritual practice level */}
         <div>
           <FL>Spiritual Practice Level</FL>
-          <input type="range" min={1} max={5} value={f.religiosity} onChange={e => u("religiosity", parseInt(e.target.value))} className="w-full accent-primary mt-3" />
-          <div className="flex justify-between text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>
+          <input type="range" min={1} max={5} value={f.religiosity} onChange={e => u("religiosity", parseInt(e.target.value))} className="w-full accent-primary mt-2" />
+          <div className="flex justify-between text-muted-foreground mt-1.5" style={{ fontSize: "0.75rem" }}>
             <span>Secular / None</span>
             <span style={{ fontWeight: 700, color: "var(--primary)" }}>{["","Light","Moderate","Practising","Devout","Very Devout"][f.religiosity]}</span>
             <span>Very Devout</span>
@@ -274,7 +294,7 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
         </div>
 
         <Divider title="Habits" />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           {([
             { k: "smoking", label: "Smoking", opts: [{ value: "never", label: "Never" }, { value: "occasionally", label: "Occasionally" }, { value: "regularly", label: "Regularly" }] },
             { k: "drinking", label: "Alcohol", opts: [{ value: "never", label: "Never" }, { value: "socially", label: "Socially" }, { value: "regularly", label: "Regularly" }] },
@@ -405,10 +425,10 @@ export function LifeGoalsSection({ onBack, onSaved }: { onBack: () => void; onSa
             { value: "2plus", label: "No rush — 2+ years", desc: "When the right person comes along" },
           ].map(({ value, label, desc }) => (
             <button key={value} type="button" onClick={() => u("timeline", value)}
-              className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${f.timeline === value ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/20"}`}>
+              className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border transition-all ${f.timeline === value ? "border-primary bg-secondary" : "border-border bg-card hover:border-primary/20"}`}>
               <div className="text-left">
-                <p style={{ fontWeight: 600, fontSize: "0.9375rem", color: f.timeline === value ? "var(--primary)" : "var(--foreground)" }}>{label}</p>
-                <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{desc}</p>
+                <p style={{ fontWeight: 600, fontSize: "0.875rem", color: f.timeline === value ? "var(--primary)" : "var(--foreground)" }}>{label}</p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.7rem" }}>{desc}</p>
               </div>
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${f.timeline === value ? "border-primary bg-primary" : "border-border"}`}>
                 {f.timeline === value && <div className="w-2 h-2 rounded-full bg-white" />}
@@ -481,6 +501,7 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
       ageMin:         Number(p.prefAgeMin      ?? 24),
       ageMax:         Number(p.prefAgeMax      ?? 35),
       location:       (p.prefLocation   as string) || "same-country",
+      prefReligion:   (p.prefReligion   as string) || "open",
       educationImp:   (p.educationImp   as string) || "important",
       religiosityImp: (p.religiosityImp as string) || "must-have",
       incomeImp:      (p.incomeImp      as string) || "not-important",
@@ -494,7 +515,7 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
   });
   const [saved, setSaved] = useState(false);
   const s = () => {
-    saveProfile({ prefAgeMin: f.ageMin, prefAgeMax: f.ageMax, prefLocation: f.location, educationImp: f.educationImp, religiosityImp: f.religiosityImp, incomeImp: f.incomeImp, prefSmoking: f.smoking, prefDrinking: f.drinking, prefChildren: f.children, prefNationality: f.nationality, prefHeightMin: f.heightMin, prefHeightMax: f.heightMax });
+    saveProfile({ prefAgeMin: f.ageMin, prefAgeMax: f.ageMax, prefLocation: f.location, prefReligion: f.prefReligion, educationImp: f.educationImp, religiosityImp: f.religiosityImp, incomeImp: f.incomeImp, prefSmoking: f.smoking, prefDrinking: f.drinking, prefChildren: f.children, prefNationality: f.nationality, prefHeightMin: f.heightMin, prefHeightMax: f.heightMax });
     apiAuth.updateProfile({
       pref_age_min: f.ageMin,
       pref_age_max: f.ageMax,
@@ -537,6 +558,23 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
           { value: "same-country", label: "Same Country" },
           { value: "worldwide", label: "Worldwide" },
         ]} />
+
+        <Divider title="Religious Preference" />
+        <div>
+          <FL>Partner's Religion</FL>
+          <SI value={f.prefReligion} onChange={v => u("prefReligion", v)} opts={[
+            { value: "open",        label: "Open to all" },
+            { value: "same",        label: "Same as mine" },
+            { value: "islam",       label: "Islam" },
+            { value: "christianity",label: "Christianity" },
+            { value: "judaism",     label: "Judaism" },
+            { value: "hinduism",    label: "Hinduism" },
+            { value: "buddhism",    label: "Buddhism" },
+            { value: "sikhism",     label: "Sikhism" },
+            { value: "agnostic",    label: "Agnostic" },
+            { value: "atheist",     label: "Atheist / None" },
+          ]} />
+        </div>
 
         <Divider title="Importance Weights" />
         <p className="text-muted-foreground -mt-1 mb-3" style={{ fontSize: "0.8125rem" }}>
