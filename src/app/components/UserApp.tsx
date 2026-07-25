@@ -3979,7 +3979,8 @@ function PhotoDebugPanel() {
 }
 
 // ── Personal Info edit (controlled + persisted) ───────────
-function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void; profileData: Record<string, unknown> | null; onSaved?: () => void }) {
+function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { onBack: () => void; profileData: Record<string, unknown> | null; onSaved?: () => void; userEmail?: string }) {
+  const isPhoneUser = userEmail.endsWith("@phone.ma3moni");
   const pf = profileData ?? {};
   const fullName = (pf.fullName as string) ?? "";
   const parts = fullName.trim().split(" ");
@@ -3992,6 +3993,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
     country:   (pf.country   as string) ?? "",
     bio:       (pf.bio       as string) ?? "",
     phone:     (pf.phone     as string) ?? "",
+    email:     "",  // real email for phone users to fill in
   });
   const [saved, setSaved] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(() => {
@@ -4024,6 +4026,10 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
         bio:              form.bio.trim() || undefined,
       };
       if (form.dob) patch.date_of_birth = form.dob;
+      // Phone users can add a real email address
+      if (isPhoneUser && form.email.trim() && form.email.includes("@") && !form.email.endsWith("@phone.ma3moni")) {
+        patch.update_email = form.email.trim().toLowerCase();
+      }
       apiAuth.updateProfile(patch as never).catch(() => {});
     } catch {}
     setSaved(true);
@@ -4138,16 +4144,38 @@ function PersonalInfoEdit({ onBack, profileData, onSaved }: { onBack: () => void
           </div>
         </div>
 
-        {/* Email — read-only (locked) */}
-        <div>
-          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-            Email <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
-          </label>
-          <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center gap-2`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
-            <Mail size={14} className="flex-shrink-0 opacity-50" />
-            {(() => { try { return localStorage.getItem("ma3moni_login_email") || "—"; } catch { return "—"; } })()}
+        {/* Email — read-only for email users; editable prompt for phone users */}
+        {isPhoneUser ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <Mail size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#92400e" }}>Add your email address</p>
+                <p className="text-amber-700 mt-0.5" style={{ fontSize: "0.75rem", lineHeight: 1.5 }}>
+                  Your account was created with a phone number. Adding an email lets you receive important notifications and recover your account.
+                </p>
+              </div>
+            </div>
+            <input
+              type="email"
+              value={form.email}
+              onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+              placeholder="Enter your email address"
+              className={inputCls}
+              style={{ fontSize: "0.9375rem" }}
+            />
           </div>
-        </div>
+        ) : (
+          <div>
+            <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+              Email <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+            </label>
+            <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center gap-2`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
+              <Mail size={14} className="flex-shrink-0 opacity-50" />
+              {(() => { try { return localStorage.getItem("ma3moni_login_email") || "—"; } catch { return "—"; } })()}
+            </div>
+          </div>
+        )}
 
         <div>
           <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Date of Birth</label>
@@ -4302,6 +4330,10 @@ export function UserApp({ onSignOut }: UserAppProps) {
       auth.me().then(me => {
         const p = me.profile;
         if (!p) return;
+        // Use backend completion_score as the authoritative profile strength
+        if (typeof p.completion_score === "number") setBackendScore(p.completion_score);
+        // Store full email (including fake phone emails) for detection
+        if (me.email) setBackendEmail(me.email);
         const PROFILE_KEY = "ma3moni_onboarding_progress";
         try {
           const raw = localStorage.getItem(PROFILE_KEY);
@@ -4459,6 +4491,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
             try { localStorage.setItem(PLAN_KEY, me.plan); } catch {}
           }
         }
+        // Refresh backend completion score and email on each sync
+        if (typeof me.profile?.completion_score === "number") setBackendScore(me.profile.completion_score);
+        if (me.email) setBackendEmail(me.email);
       } catch { /* offline */ }
 
       // 2. Sync notifications
@@ -4498,6 +4533,10 @@ export function UserApp({ onSignOut }: UserAppProps) {
   // Increment this whenever a profile section saves so profileData re-reads
   // from localStorage and profileStrength recomputes immediately.
   const [profileVersion, setProfileVersion] = useState(0);
+  // Backend-authoritative completion score — set on mount from /api/auth/me/
+  const [backendScore, setBackendScore] = useState<number | null>(null);
+  // Full email from backend — used to detect phone-registered users (@phone.ma3moni)
+  const [backendEmail, setBackendEmail] = useState<string>("");
 
   // Declared here (after profileVersion) to avoid temporal dead zone error
   // Photo moderation removed — photos save directly, no gate on messaging
@@ -4534,10 +4573,12 @@ export function UserApp({ onSignOut }: UserAppProps) {
   ];
 
   const profileStrength = useMemo(() => {
+    // Backend score is authoritative — ensures user and admin see the same value
+    if (backendScore !== null) return backendScore;
     if (!profileData) return 0;
     const filled = PROFILE_FIELDS.filter(f => f.check(profileData)).length;
     return Math.round((filled / PROFILE_FIELDS.length) * 100);
-  }, [profileData]);
+  }, [profileData, backendScore]);
 
   const incompleteFields = useMemo(() => {
     if (!profileData) return PROFILE_FIELDS;
@@ -4784,7 +4825,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           )}
 
           {subView === "edit-profile" && (
-            <PersonalInfoEdit onBack={goBack} profileData={profileData} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />
+            <PersonalInfoEdit onBack={goBack} profileData={profileData} userEmail={backendEmail} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />
           )}
           {subView === "photos" && (
             <div className="flex flex-col h-full bg-background">

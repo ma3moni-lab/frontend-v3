@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, lazy, Suspense, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { USERS as USERS_DATA } from "../../data/users";
-import { adminApi, analytics as analyticsApi, restoreAdminToken, type AnalyticsOverview, type PlatformSettings, type AuditEntry } from "../../lib/api";
+import { adminApi, analytics as analyticsApi, restoreAdminToken, type AnalyticsOverview, type PlatformSettings, type AuditEntry, type ActivityEntry } from "../../lib/api";
 
 // Heavy admin sections are code-split — they only load when their tab is opened,
 // keeping the initial admin bundle small.
@@ -26,7 +26,7 @@ import {
   CheckCircle, XCircle, Clock, Send, User, MessageSquare,
   Lock, Unlock, Menu, ChevronDown, Star, ArrowUpRight,
   BookOpen, ThumbsUp, UserPlus, Pencil,
-  Tag, Trash
+  Tag, Trash, Activity, Info
 } from "lucide-react";
 import { BlogSection, TopArticlesPanel } from "./admin/AdminBlogSection";
 import {
@@ -2470,7 +2470,10 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
 };
 
 function AdminAuditSection() {
+  // "admin" = AdminAuditLog entries; "user" = platform activity (notifications sent to users)
+  const [logSource, setLogSource] = useState<"admin" | "user">("admin");
   const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [userActivityRows, setUserActivityRows] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
@@ -2479,6 +2482,7 @@ function AdminAuditSection() {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [showIpTooltip, setShowIpTooltip] = useState(false);
 
   const fetchAudit = (p = 1, q = search, act = actionFilter) => {
     setLoading(true);
@@ -2492,10 +2496,25 @@ function AdminAuditSection() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchAudit(); }, []);
+  const fetchUserActivity = () => {
+    setLoading(true);
+    setFetchError(null);
+    adminApi.platformActivity("user")
+      .then(r => { setUserActivityRows(r.results); setTotal(r.results.length); setPage(1); setPages(1); })
+      .catch((err) => {
+        setUserActivityRows([]);
+        setFetchError(err?.message ?? "Failed to load user activity.");
+      })
+      .finally(() => setLoading(false));
+  };
 
-  const applySearch = () => { setSearch(searchInput); fetchAudit(1, searchInput, actionFilter); };
-  const applyAction = (act: string) => { setActionFilter(act); fetchAudit(1, search, act); };
+  useEffect(() => {
+    if (logSource === "admin") fetchAudit();
+    else fetchUserActivity();
+  }, [logSource]);
+
+  const applySearch = () => { setSearch(searchInput); if (logSource === "admin") fetchAudit(1, searchInput, actionFilter); };
+  const applyAction = (act: string) => { setActionFilter(act); if (logSource === "admin") fetchAudit(1, search, act); };
 
   const fmtTime = (iso: string) => {
     const d = new Date(iso);
@@ -2522,12 +2541,44 @@ function AdminAuditSection() {
     { value: "login",           label: "Admin Login" },
   ];
 
+  // Filter user activity rows client-side by search term
+  const filteredUserRows = search.trim()
+    ? userActivityRows.filter(r =>
+        r.actor.toLowerCase().includes(search.toLowerCase()) ||
+        r.action.toLowerCase().includes(search.toLowerCase()) ||
+        r.detail?.toLowerCase().includes(search.toLowerCase()))
+    : userActivityRows;
+
   return (
     <div>
       <SectionHeader
-        title="Admin Audit Log"
-        sub="Complete tamper-evident log of all admin actions — visible to super admins only"
+        title="Audit Log"
+        sub="Combined log of admin actions and user platform activity"
       />
+
+      {/* Log source toggle */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex gap-1 bg-muted rounded-xl p-1">
+          {([
+            { key: "admin", label: "Admin Actions" },
+            { key: "user",  label: "User Activity" },
+          ] as const).map(t => (
+            <button
+              key={t.key}
+              onClick={() => { setLogSource(t.key); setSearch(""); setSearchInput(""); setActionFilter(""); }}
+              className={`px-4 py-2 rounded-lg transition-all ${logSource === t.key ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
+              style={{ fontSize: "0.875rem", fontWeight: logSource === t.key ? 700 : 400 }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+          {logSource === "admin"
+            ? "Tamper-evident log of all admin actions"
+            : "Recent system notifications and events sent to users"}
+        </span>
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
@@ -2537,124 +2588,194 @@ function AdminAuditSection() {
             value={searchInput}
             onChange={e => setSearchInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && applySearch()}
-            placeholder="Search admin, target, detail…"
+            placeholder={logSource === "admin" ? "Search admin, target, detail…" : "Search user, action, detail…"}
             className="flex-1 bg-transparent focus:outline-none text-foreground placeholder:text-muted-foreground"
             style={{ fontSize: "0.875rem" }}
           />
           {searchInput && (
-            <button onClick={() => { setSearchInput(""); setSearch(""); fetchAudit(1, "", actionFilter); }} className="text-muted-foreground hover:text-foreground">
+            <button onClick={() => {
+              setSearchInput(""); setSearch("");
+              if (logSource === "admin") fetchAudit(1, "", actionFilter);
+            }} className="text-muted-foreground hover:text-foreground">
               <X size={13} />
             </button>
           )}
         </div>
-        <select
-          value={actionFilter}
-          onChange={e => applyAction(e.target.value)}
-          className="px-3 py-2.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
-          style={{ fontSize: "0.875rem" }}
-        >
-          {ALL_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-        </select>
+        {logSource === "admin" && (
+          <select
+            value={actionFilter}
+            onChange={e => applyAction(e.target.value)}
+            className="px-3 py-2.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+            style={{ fontSize: "0.875rem" }}
+          >
+            {ALL_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+          </select>
+        )}
         <button
-          onClick={() => fetchAudit(page)}
+          onClick={() => { if (logSource === "admin") fetchAudit(page); else fetchUserActivity(); }}
           className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors"
           style={{ fontSize: "0.875rem" }}
         >
           <RefreshCw size={14} /> Refresh
         </button>
+        {/* IP address explanation tooltip — only shown for admin log */}
+        {logSource === "admin" && (
+          <div className="relative">
+            <button
+              onClick={() => setShowIpTooltip(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-muted-foreground"
+              style={{ fontSize: "0.875rem" }}
+            >
+              <Info size={14} /> IP Info
+            </button>
+            {showIpTooltip && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-xl shadow-lg p-4 z-20">
+                <button onClick={() => setShowIpTooltip(false)} className="absolute top-2 right-2 text-muted-foreground hover:text-foreground"><X size={12} /></button>
+                <p style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: 6 }}>Why does the IP address vary?</p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem", lineHeight: 1.6 }}>
+                  The backend reads the <code style={{ background: "var(--muted)", padding: "1px 5px", borderRadius: 4, fontSize: "0.75rem" }}>X-Forwarded-For</code> header
+                  set by reverse proxies (Render, Cloudflare, load balancers). Each proxy appends its own IP to this chain.
+                  The first IP in the chain is the client&apos;s real IP, but proxy IPs and shared NAT addresses may appear for users on the same network.
+                  Local development shows <code style={{ background: "var(--muted)", padding: "1px 5px", borderRadius: 4, fontSize: "0.75rem" }}>127.0.0.1</code> since no proxy is involved.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
         <span className="text-muted-foreground ml-auto" style={{ fontSize: "0.875rem" }}>
-          {total.toLocaleString()} event{total !== 1 ? "s" : ""}
+          {(logSource === "admin" ? total : filteredUserRows.length).toLocaleString()} event{total !== 1 ? "s" : ""}
         </span>
       </div>
 
       {/* Table */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         {loading ? (
-          <div className="py-20 text-center text-muted-foreground"><div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin mx-auto mb-3" />Loading audit log…</div>
+          <div className="py-20 text-center text-muted-foreground"><div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin mx-auto mb-3" />Loading…</div>
         ) : fetchError ? (
           <div className="py-16 text-center px-6">
             <AlertTriangle size={36} className="mx-auto mb-3 opacity-50" style={{ color: "#D41F3A" }} />
-            <p style={{ fontWeight: 700, fontSize: "1rem", color: "#D41F3A" }}>Could not load audit log</p>
+            <p style={{ fontWeight: 700, fontSize: "1rem", color: "#D41F3A" }}>Could not load {logSource === "admin" ? "audit log" : "user activity"}</p>
             <p className="text-muted-foreground mt-2" style={{ fontSize: "0.875rem", maxWidth: 420, margin: "0.5rem auto 0" }}>{fetchError}</p>
-            <p className="text-muted-foreground mt-3" style={{ fontSize: "0.8125rem" }}>
-              Ensure the backend is deployed with the latest migrations (<code style={{ background: "var(--muted)", padding: "1px 6px", borderRadius: 4 }}>python manage.py migrate</code>) and the code is up to date.
-            </p>
-            <button onClick={() => fetchAudit()} className="mt-4 px-4 py-2 rounded-lg bg-primary text-white" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Retry</button>
+            {logSource === "admin" && (
+              <p className="text-muted-foreground mt-3" style={{ fontSize: "0.8125rem" }}>
+                Ensure the backend is deployed with the latest migrations (<code style={{ background: "var(--muted)", padding: "1px 6px", borderRadius: 4 }}>python manage.py migrate</code>) and the code is up to date.
+              </p>
+            )}
+            <button onClick={() => logSource === "admin" ? fetchAudit() : fetchUserActivity()} className="mt-4 px-4 py-2 rounded-lg bg-primary text-white" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Retry</button>
           </div>
-        ) : entries.length === 0 ? (
-          <div className="py-20 text-center">
-            <Shield size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-            <p style={{ fontWeight: 700, fontSize: "1rem" }}>No audit events yet</p>
-            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Actions taken by admins will appear here once the backend is deployed and migrations are run.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full" style={{ fontSize: "0.875rem" }}>
-              <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  {["Timestamp", "Admin", "Action", "Target", "Detail", "IP"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-muted-foreground" style={{ fontWeight: 600, fontSize: "0.8125rem", whiteSpace: "nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((e, idx) => {
-                  const colors = ACTION_COLORS[e.action] ?? { bg: "#F3F4F6", text: "#374151" };
-                  const roleColor = ROLE_BADGE_COLORS[e.actor.role] ?? "#68747F";
-                  return (
-                    <tr key={e.id} className={`border-b border-border last:border-0 transition-colors hover:bg-muted/20 ${idx % 2 === 0 ? "" : "bg-muted/5"}`}>
-                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontSize: "0.8125rem" }}>
-                        {fmtTime(e.created_at)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: roleColor + "20" }}>
-                            <span style={{ fontSize: "0.5625rem", fontWeight: 800, color: roleColor }}>
-                              {e.actor.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                            </span>
-                          </div>
-                          <div>
-                            <p style={{ fontWeight: 600, lineHeight: 1.3 }}>{e.actor.name}</p>
-                            <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>{e.actor.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: colors.bg, color: colors.text }}>
-                          {e.action_label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {e.target_label ? (
-                          <div>
-                            <p style={{ fontWeight: 600 }}>{e.target_label}</p>
-                            {e.target_type && <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", textTransform: "capitalize" }}>{e.target_type}</p>}
-                          </div>
-                        ) : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3" style={{ color: "var(--muted-foreground)", maxWidth: 280 }}>
-                        {isMediaUrl(e.detail) ? (
+        ) : logSource === "admin" ? (
+          entries.length === 0 ? (
+            <div className="py-20 text-center">
+              <Shield size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p style={{ fontWeight: 700, fontSize: "1rem" }}>No audit events yet</p>
+              <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Actions taken by admins will appear here once the backend is deployed and migrations are run.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ fontSize: "0.875rem" }}>
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    {["Timestamp", "Admin", "Action", "Target", "Detail", "IP"].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-muted-foreground" style={{ fontWeight: 600, fontSize: "0.8125rem", whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((e, idx) => {
+                    const colors = ACTION_COLORS[e.action] ?? { bg: "#F3F4F6", text: "#374151" };
+                    const roleColor = ROLE_BADGE_COLORS[e.actor.role] ?? "#68747F";
+                    return (
+                      <tr key={e.id} className={`border-b border-border last:border-0 transition-colors hover:bg-muted/20 ${idx % 2 === 0 ? "" : "bg-muted/5"}`}>
+                        <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontSize: "0.8125rem" }}>
+                          {fmtTime(e.created_at)}
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <PhotoThumb url={e.detail} label="Audit photo" />
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: roleColor + "20" }}>
+                              <span style={{ fontSize: "0.5625rem", fontWeight: 800, color: roleColor }}>
+                                {e.actor.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                            <div>
+                              <p style={{ fontWeight: 600, lineHeight: 1.3 }}>{e.actor.name}</p>
+                              <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>{e.actor.email}</p>
+                            </div>
                           </div>
-                        ) : (
-                          <span className="line-clamp-2">{e.detail || "—"}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                        {e.ip_address ?? "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: colors.bg, color: colors.text }}>
+                            {e.action_label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {e.target_label ? (
+                            <div>
+                              <p style={{ fontWeight: 600 }}>{e.target_label}</p>
+                              {e.target_type && <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", textTransform: "capitalize" }}>{e.target_type}</p>}
+                            </div>
+                          ) : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-4 py-3" style={{ color: "var(--muted-foreground)", maxWidth: 280 }}>
+                          {isMediaUrl(e.detail) ? (
+                            <div className="flex items-center gap-2">
+                              <PhotoThumb url={e.detail} label="Audit photo" />
+                            </div>
+                          ) : (
+                            <span className="line-clamp-2">{e.detail || "—"}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap" style={{ color: "var(--muted-foreground)", fontFamily: "monospace", fontSize: "0.75rem" }}>
+                          {e.ip_address ?? "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
+        )
+        ) : (
+          // User Activity view
+          filteredUserRows.length === 0 ? (
+            <div className="py-20 text-center">
+              <Activity size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+              <p style={{ fontWeight: 700, fontSize: "1rem" }}>No user activity yet</p>
+              <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>System notifications and events sent to users will appear here.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {filteredUserRows.map((row, idx) => {
+                const typeColor = row.type === "subscription" ? "#4A8DB8"
+                  : row.type === "moderation" ? "#D41F3A"
+                  : row.type === "auth" ? "#0A6870"
+                  : row.type === "admin" ? "#9B6DAF"
+                  : "#6B9E78";
+                return (
+                  <div key={idx} className={`flex items-start gap-4 px-5 py-4 hover:bg-muted/20 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/5"}`}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: typeColor + "18", color: typeColor }}>
+                      <Users size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>{row.actor}</span>
+                        <span className="px-2 py-0.5 rounded-full capitalize" style={{ fontSize: "0.6875rem", fontWeight: 700, background: typeColor + "18", color: typeColor }}>{row.type}</span>
+                      </div>
+                      <p style={{ fontSize: "0.875rem", marginTop: 2 }}>{row.action}</p>
+                      {row.detail && <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>{row.detail}</p>}
+                    </div>
+                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}>
+                      {fmtTime(row.timestamp)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )
         )}
       </div>
 
-      {/* Pagination */}
-      {pages > 1 && (
+      {/* Pagination — only for admin log */}
+      {logSource === "admin" && pages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>Page {page} of {pages}</span>
           <div className="flex items-center gap-2">

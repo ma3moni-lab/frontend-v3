@@ -871,48 +871,148 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
           )}
 
           {/* ── ACTIVITY ── */}
-          {activeTab === "activity" && (
-            <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              <div className="px-5 py-4 border-b border-border">
-                <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Recent Platform Activity</h4>
-                <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>All actions by this user on the platform</p>
-              </div>
-              {liveActivity === null ? (
-                <div className="flex items-center gap-2 text-muted-foreground py-6 justify-center">
-                  <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-                  <span style={{ fontSize: "0.8125rem" }}>Loading…</span>
+          {activeTab === "activity" && (() => {
+            // Online status: active within last 5 minutes
+            const lastActiveRaw = liveDetail?.last_active ?? "";
+            const lastActiveMs = lastActiveRaw ? new Date(lastActiveRaw).getTime() : 0;
+            const isOnline = lastActiveMs > 0 && (Date.now() - lastActiveMs) < 5 * 60 * 1000;
+            const lastSeenLabel = lastActiveMs > 0
+              ? (() => {
+                  const diff = Math.floor((Date.now() - lastActiveMs) / 1000);
+                  if (diff < 60) return "Just now";
+                  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                  return new Date(lastActiveRaw).toLocaleDateString([], { month: "short", day: "numeric" });
+                })()
+              : "Unknown";
+
+            // Profile gap analysis using backend profile fields
+            const bp = liveDetail?.profile as Record<string, unknown> | undefined;
+            const BACKEND_PROFILE_FIELDS: { label: string; key: string; hint: string }[] = [
+              { key: "full_name",        label: "Full Name",            hint: "Essential for identity and matching" },
+              { key: "gender",           label: "Gender",               hint: "Required for match discovery" },
+              { key: "date_of_birth",    label: "Date of Birth",        hint: "Used for age-based filtering" },
+              { key: "nationality",      label: "Nationality",          hint: "Used in compatibility matching" },
+              { key: "location_city",    label: "City",                 hint: "Location helps with proximity matches" },
+              { key: "bio",              label: "Bio",                  hint: "Helps other members get to know them" },
+              { key: "sect",             label: "Islamic Sect",         hint: "Important for compatibility filters" },
+              { key: "prayer_frequency", label: "Prayer Frequency",     hint: "Used in deen compatibility score" },
+              { key: "education",        label: "Education Level",      hint: "Career section — affects matches" },
+              { key: "profession",       label: "Profession",           hint: "Career section — shown on profile" },
+            ];
+            const missingFields = bp
+              ? BACKEND_PROFILE_FIELDS.filter(f => !bp[f.key])
+              : [];
+
+            return (
+              <>
+                {/* Online / Session Status Card */}
+                <div className="bg-card rounded-2xl border border-border p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Session Status</h4>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full" style={{ background: isOnline ? "#16a34a" : "#94a3b8" }} />
+                      <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: isOnline ? "#16a34a" : "#94a3b8" }}>
+                        {isOnline ? "Online now" : "Offline"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-muted/40 rounded-xl p-3">
+                      <p className="text-muted-foreground" style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Last Seen</p>
+                      <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{lastSeenLabel}</p>
+                    </div>
+                    <div className="bg-muted/40 rounded-xl p-3">
+                      <p className="text-muted-foreground" style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Profile Score</p>
+                      <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--primary)" }}>{minimalProfile.profileCompletion}%</p>
+                    </div>
+                  </div>
                 </div>
-              ) : liveActivity.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8" style={{ fontSize: "0.875rem" }}>No activity on record.</p>
-              ) : (
-                <div className="divide-y divide-border">
-                  {liveActivity.map((act, i) => {
-                    const color = ACTIVITY_COLORS[act.type] ?? "#68747F";
-                    return (
-                      <div key={i} className="flex items-start gap-3 px-5 py-3.5">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: color + "15", color }}>
-                          {act.type === "auth" ? <LogIn size={12} /> :
-                           act.type === "match" ? <Heart size={12} /> :
-                           act.type === "message" ? <MessageSquare size={12} /> :
-                           act.type === "admin" || act.type === "moderation" ? <Shield size={12} /> :
-                           <Activity size={12} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p style={{ fontSize: "0.875rem" }}>{act.action}</p>
-                          <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>
-                            {new Date(act.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          </p>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full capitalize flex-shrink-0" style={{ fontSize: "0.6875rem", fontWeight: 700, background: color + "15", color }}>
-                          {act.type}
-                        </span>
+
+                {/* Profile Gap Analysis */}
+                {bp && (
+                  <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                    <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+                      <div>
+                        <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Profile Gap Analysis</h4>
+                        <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>
+                          {missingFields.length === 0
+                            ? "All key profile fields are complete."
+                            : `${missingFields.length} field${missingFields.length !== 1 ? "s" : ""} missing — use these to personalise notifications`}
+                        </p>
                       </div>
-                    );
-                  })}
+                      <span className="px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: missingFields.length === 0 ? "#dcfce7" : "#fef3c7", color: missingFields.length === 0 ? "#166534" : "#92400e" }}>
+                        {missingFields.length === 0 ? "Complete" : `${missingFields.length} missing`}
+                      </span>
+                    </div>
+                    {missingFields.length === 0 ? (
+                      <div className="px-5 py-6 text-center text-muted-foreground" style={{ fontSize: "0.875rem" }}>
+                        <CheckCircle size={24} className="mx-auto mb-2 text-green-500 opacity-70" />
+                        Profile is fully complete.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {missingFields.map(f => (
+                          <div key={f.key} className="flex items-start gap-3 px-5 py-3.5">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "#fef3c7" }}>
+                              <span style={{ fontSize: "0.625rem", color: "#92400e" }}>!</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{f.label}</p>
+                              <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{f.hint}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Recent Activity Timeline */}
+                <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                  <div className="px-5 py-4 border-b border-border">
+                    <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Recent Platform Activity</h4>
+                    <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>Notifications and events for this user</p>
+                  </div>
+                  {liveActivity === null ? (
+                    <div className="flex items-center gap-2 text-muted-foreground py-6 justify-center">
+                      <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                      <span style={{ fontSize: "0.8125rem" }}>Loading…</span>
+                    </div>
+                  ) : liveActivity.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8" style={{ fontSize: "0.875rem" }}>No activity on record.</p>
+                  ) : (
+                    <div className="divide-y divide-border">
+                      {liveActivity.map((act, i) => {
+                        const color = ACTIVITY_COLORS[act.type] ?? "#68747F";
+                        return (
+                          <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: color + "15", color }}>
+                              {act.type === "auth" ? <LogIn size={12} /> :
+                               act.type === "match" ? <Heart size={12} /> :
+                               act.type === "message" ? <MessageSquare size={12} /> :
+                               act.type === "admin" || act.type === "moderation" ? <Shield size={12} /> :
+                               <Activity size={12} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p style={{ fontSize: "0.875rem" }}>{act.action}</p>
+                              {act.detail && <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{act.detail}</p>}
+                              <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                                {new Date(act.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              </p>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full capitalize flex-shrink-0" style={{ fontSize: "0.6875rem", fontWeight: 700, background: color + "15", color }}>
+                              {act.type}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+              </>
+            );
+          })()}
 
           {/* ── REFERRALS ── */}
           {activeTab === "referrals" && (
