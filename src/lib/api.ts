@@ -599,6 +599,30 @@ export interface AppNotification {
   created_at: string;
 }
 
+export interface NotificationPrefs {
+  push_enabled:    boolean;
+  matches:         boolean;
+  messages:        boolean;
+  interests:       boolean;
+  referrals:       boolean;
+  subscriptions:   boolean;
+  security_alerts: boolean;
+  promotions:      boolean;
+  announcements:   boolean;
+  digest:          boolean;
+  quiet_hours_start: string | null;
+  quiet_hours_end:   string | null;
+}
+
+export interface PushDevice {
+  id:          string;
+  browser:     string;
+  os:          string;
+  device_type: string;
+  created_at:  string;
+  last_used:   string | null;
+}
+
 export const notifications = {
   list: () =>
     get<{ results: AppNotification[]; unread_count: number }>("/api/notifications/"),
@@ -609,11 +633,37 @@ export const notifications = {
   markAllRead: () =>
     patch<void>("/api/notifications/read-all/"),
 
+  deleteOne: (id: string) =>
+    del<void>(`/api/notifications/${id}/delete/`),
+
+  // Legacy stub kept for backward compat
   registerDevice: (registration_token: string, platform: "ios" | "android" | "web") =>
     post<{ id: string }>("/api/notifications/register-device/", { registration_token, platform }),
 
-  removeDevice: (id: string) =>
-    del<void>(`/api/notifications/devices/${id}/`),
+  // Web Push
+  vapidPublicKey: () =>
+    get<{ public_key: string }>("/api/notifications/push/vapid-key/"),
+
+  pushSubscribe: (endpoint: string, p256dh: string, auth: string) =>
+    post<{ id: string; created: boolean }>("/api/notifications/push/subscribe/", { endpoint, p256dh, auth }),
+
+  pushUnsubscribe: (endpoint: string) =>
+    del<void>("/api/notifications/push/unsubscribe/"),
+
+  pushStatus: () =>
+    get<{ push_available: boolean; subscribed: boolean; device_count: number; devices: PushDevice[] }>(
+      "/api/notifications/push/status/"
+    ),
+
+  testPush: () =>
+    post<{ detail: string; sent: number; failed: number; skipped: number }>("/api/notifications/push/test/", {}),
+
+  // Preferences
+  getPrefs: () =>
+    get<NotificationPrefs>("/api/notifications/preferences/"),
+
+  updatePrefs: (data: Partial<NotificationPrefs>) =>
+    patch<NotificationPrefs>("/api/notifications/preferences/", data),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -831,6 +881,21 @@ export interface AdminUserDetail extends AdminUserRecord {
   referrals_made_count: number;
 }
 
+export interface ReportTicketMessage {
+  sender_id:   string;
+  sender_name: string;
+  sender_role: string;
+  body:        string;
+  sent_at:     string;
+}
+
+export interface ReportTicket {
+  id:          string;
+  status:      string;
+  assigned_to: { id: string; name: string } | null;
+  messages:    ReportTicketMessage[];
+}
+
 export interface AdminReport {
   id:                       string;
   reporter:                 { id: string; name: string; email: string };
@@ -842,6 +907,9 @@ export interface AdminReport {
   evidence:                 Array<{ type: string; content: string; time: string }>;
   action_history:           Array<{ action: string; by: string; date: string; type: string }>;
   admin_notes:              string;
+  linked_ticket_id:         string | null;
+  linked_ticket:            ReportTicket | null;
+  appeal_status:            "none" | "pending" | "under_review" | "resolved";
   prior_reports_against_user: number;
   created_at:               string;
 }
@@ -941,8 +1009,17 @@ export const adminApi = {
     return get<{ results: AdminReport[] }>(`/api/admin/reports/?${qs}`);
   },
 
-  updateReport: (id: string, data: { status?: string; admin_notes?: string; action?: string }) =>
+  getReport: (id: string) =>
+    get<AdminReport>(`/api/admin/reports/${id}/`),
+
+  updateReport: (id: string, data: { status?: string; admin_notes?: string; action?: string; admin_message?: string; appeal_status?: string }) =>
     patch<AdminReport>(`/api/admin/reports/${id}/`, data),
+
+  sendReportMessage: (id: string, body: string) =>
+    post<ReportTicket>(`/api/admin/reports/${id}/message/`, { body }),
+
+  assignReportTicket: (id: string, agent_id: string) =>
+    patch<ReportTicket>(`/api/admin/reports/${id}/assign/`, { agent_id }),
 
   // Blacklist
   blacklist: () =>

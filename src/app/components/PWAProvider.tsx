@@ -54,6 +54,16 @@ export function PWAProvider({ children }: PWAProviderProps) {
   // Push notification permission — ask once, 4 s after mount
   useEffect(() => {
     if (!("Notification" in window)) return;
+    // If already granted, silently re-subscribe (handles new installs / cleared storage)
+    if (Notification.permission === "granted") {
+      const alreadySubscribed = localStorage.getItem("ma3_push_subscribed");
+      if (!alreadySubscribed) {
+        // Delay so SW is fully registered first
+        const t = setTimeout(() => registerPushSubscription(), 3000);
+        return () => clearTimeout(t);
+      }
+      return;
+    }
     if (Notification.permission !== "default") return;
     const seen = sessionStorage.getItem("ma3_push_prompted");
     if (seen) return;
@@ -62,10 +72,49 @@ export function PWAProvider({ children }: PWAProviderProps) {
   }, []);
 
   const requestPush = async () => {
-    try { await Notification.requestPermission(); } catch {}
-    sessionStorage.setItem("ma3_push_prompted", "1");
     setShowPushPrompt(false);
+    sessionStorage.setItem("ma3_push_prompted", "1");
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        await registerPushSubscription();
+      }
+    } catch {}
   };
+
+  const registerPushSubscription = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+      const { notifications: notifApi } = await import("../../lib/api");
+      const { public_key } = await notifApi.vapidPublicKey();
+      if (!public_key) return;
+
+      const reg = await navigator.serviceWorker.ready;
+      // Convert URL-safe base64 VAPID public key to Uint8Array
+      const keyBytes = urlBase64ToUint8Array(public_key);
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: keyBytes,
+      });
+      const json = sub.toJSON();
+      const keys = json.keys ?? {};
+      await notifApi.pushSubscribe(
+        json.endpoint ?? sub.endpoint,
+        (keys as Record<string, string>).p256dh ?? "",
+        (keys as Record<string, string>).auth ?? "",
+      );
+      localStorage.setItem("ma3_push_subscribed", "1");
+    } catch {
+      // Silently fail — push is non-critical
+    }
+  };
+
+  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
 
   useEffect(() => {
     restorePreferences();

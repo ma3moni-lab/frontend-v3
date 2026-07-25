@@ -1041,10 +1041,75 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
 export function AppSettingsSection({ onBack }: { onBack: () => void }) {
   const [openDoc, setOpenDoc] = useState<DocKey | null>(null);
   const [showChangePw, setShowChangePw] = useState(false);
-  const [notifs, setNotifs] = useState({ matches: true, messages: true, approvals: true, promos: false, digest: true, push: true });
   const [lang, setLang] = useState(getStoredLanguage);
   const [theme, setTheme] = useState<ThemePref>(getStoredTheme);
   const [saved, setSaved] = useState(false);
+
+  // Notification preferences — synced with backend
+  const [prefs, setPrefs] = useState({
+    push_enabled: true, matches: true, messages: true, interests: true,
+    referrals: true, subscriptions: true, security_alerts: true,
+    promotions: false, announcements: true, digest: true,
+  });
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const [pushStatus, setPushStatus] = useState<{ subscribed: boolean; device_count: number } | null>(null);
+  const [testSent, setTestSent] = useState(false);
+  const [browserPermission, setBrowserPermission] = useState<NotificationPermission>(() =>
+    ("Notification" in window) ? Notification.permission : "denied"
+  );
+
+  // Load prefs and push status from backend
+  useEffect(() => {
+    import("../../../lib/api").then(({ notifications: n }) => {
+      n.getPrefs().then(p => {
+        setPrefs(prev => ({ ...prev, ...p }));
+        setPrefsLoaded(true);
+      }).catch(() => setPrefsLoaded(true));
+      n.pushStatus().then(s => setPushStatus(s)).catch(() => {});
+    });
+  }, []);
+
+  const togglePref = (k: keyof typeof prefs) => {
+    const next = { ...prefs, [k]: !prefs[k] };
+    setPrefs(next);
+    import("../../../lib/api").then(({ notifications: n }) => n.updatePrefs({ [k]: next[k] }).catch(() => {}));
+  };
+
+  const enablePush = async () => {
+    if (!("Notification" in window)) return;
+    const perm = await Notification.requestPermission();
+    setBrowserPermission(perm);
+    if (perm === "granted") {
+      try {
+        const { notifications: n } = await import("../../../lib/api");
+        const { public_key } = await n.vapidPublicKey();
+        if (!public_key) { toast.error("Push not configured on server yet."); return; }
+        const reg = await navigator.serviceWorker.ready;
+        const padding = "=".repeat((4 - (public_key.length % 4)) % 4);
+        const b64 = (public_key + padding).replace(/-/g, "+").replace(/_/g, "/");
+        const raw = window.atob(b64);
+        const keyBytes = Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+        const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes });
+        const j = sub.toJSON();
+        const keys = (j.keys ?? {}) as Record<string, string>;
+        await n.pushSubscribe(j.endpoint ?? "", keys.p256dh ?? "", keys.auth ?? "");
+        localStorage.setItem("ma3_push_subscribed", "1");
+        n.pushStatus().then(s => setPushStatus(s)).catch(() => {});
+        toast.success("Push notifications enabled!");
+      } catch { toast.error("Could not subscribe to push notifications."); }
+    }
+  };
+
+  const sendTestPush = async () => {
+    try {
+      const { notifications: n } = await import("../../../lib/api");
+      const r = await n.testPush();
+      setTestSent(true);
+      if (r.sent > 0) toast.success("Test push sent to your devices!");
+      else toast.error("No active push subscriptions found. Enable push notifications first.");
+      setTimeout(() => setTestSent(false), 3000);
+    } catch { toast.error("Could not send test push."); }
+  };
 
   // Theme + language go through the shared preferences module (single source
   // of truth, also used by PWAProvider on boot) so the swap is reflected
@@ -1060,28 +1125,63 @@ export function AppSettingsSection({ onBack }: { onBack: () => void }) {
     applyLanguagePref(value);
     toast.success(isRTL(value) ? "Right-to-left layout enabled" : "Language updated");
   };
-  const s = () => { setSaved(true); toast.success("Changes saved"); setTimeout(() => setSaved(false), 2500); };
-  const tn = (k: keyof typeof notifs) => setNotifs(p => ({ ...p, [k]: !p[k] }));
+  const s = () => { setSaved(true); toast.success("Settings saved"); setTimeout(() => setSaved(false), 2500); };
 
   // Sub-views that take over the section
   if (openDoc) return <DocView docKey={openDoc} onBack={() => setOpenDoc(null)} />;
   if (showChangePw) return <ChangePasswordView onBack={() => setShowChangePw(false)} />;
 
+  const pushBlocked = browserPermission === "denied";
+
   return (
     <Shell title="Settings" onBack={onBack} onSave={s} saved={saved}>
       <div className="p-5">
-        <Divider title="Notifications" />
+        <Divider title="Push Notifications" />
+
+        {/* Push permission status */}
+        <div className="bg-card rounded-2xl border border-border p-4 mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full" style={{ background: pushStatus?.subscribed ? "#16a34a" : "#94a3b8" }} />
+              <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                {pushBlocked ? "Blocked by browser" : pushStatus?.subscribed ? `Active on ${pushStatus.device_count} device${pushStatus.device_count !== 1 ? "s" : ""}` : "Not enabled"}
+              </span>
+            </div>
+            {!pushBlocked && !pushStatus?.subscribed && (
+              <button onClick={enablePush} className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+                Enable
+              </button>
+            )}
+            {pushStatus?.subscribed && (
+              <button onClick={sendTestPush} disabled={testSent} className="px-3 py-1.5 rounded-lg border border-border hover:bg-muted transition-colors text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                {testSent ? "Sent ✓" : "Test"}
+              </button>
+            )}
+          </div>
+          {pushBlocked && (
+            <p className="text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>
+              Push is blocked in your browser settings. Open browser site settings and allow notifications for this site.
+            </p>
+          )}
+        </div>
+
         <div className="bg-card rounded-2xl border border-border divide-y divide-border mb-6">
           {[
-            { k: "push",      l: "Push Notifications",    d: "Master switch for all push alerts" },
-            { k: "matches",   l: "New Matches",            d: "When a new compatibility match is found" },
-            { k: "messages",  l: "Messages",               d: "When someone sends you a message" },
-            { k: "approvals", l: "Profile Updates",        d: "Photo approvals and account changes" },
-            { k: "digest",    l: "Weekly Summary",         d: "A weekly recap of matches and activity" },
-            { k: "promos",    l: "Promotions & Offers",    d: "Subscription deals and platform news" },
+            { k: "push_enabled",   l: "Push Notifications",  d: "Master switch for all push alerts" },
+            { k: "matches",        l: "New Matches",          d: "When a new compatibility match is found" },
+            { k: "messages",       l: "Messages",             d: "When someone sends you a message" },
+            { k: "interests",      l: "Interests & Likes",    d: "When someone sends you an interest" },
+            { k: "announcements",  l: "Profile Updates",      d: "Photo approvals and account changes" },
+            { k: "digest",         l: "Weekly Summary",       d: "A weekly recap of matches and activity" },
+            { k: "promotions",     l: "Promotions & Offers",  d: "Subscription deals and platform news" },
           ].map(({ k, l, d }) => (
             <div key={k} className="px-4">
-              <Toggle on={notifs[k as keyof typeof notifs]} onChange={() => tn(k as keyof typeof notifs)} label={l} desc={d} />
+              <Toggle
+                on={prefsLoaded ? prefs[k as keyof typeof prefs] : true}
+                onChange={() => togglePref(k as keyof typeof prefs)}
+                label={l}
+                desc={d}
+              />
             </div>
           ))}
         </div>
