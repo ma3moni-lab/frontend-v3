@@ -2062,8 +2062,8 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
         </div>
       )}
 
-      {/* 100% complete celebration */}
-      {profileStrength === 100 && (
+      {/* 100% complete celebration — only when every field is genuinely done */}
+      {profileStrength === 100 && incompleteFields.length === 0 && (
         <div className="mx-4 mt-4 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 flex items-center gap-3">
           <div className="w-7 h-7 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
             <Check size={15} className="text-green-600" />
@@ -4388,6 +4388,19 @@ export function UserApp({ onSignOut }: UserAppProps) {
     });
   }, []);
 
+  // ── Refresh backend profile after every section save ─────────
+  // profileVersion increments on each save; skip the initial 0→1 hydration.
+  useEffect(() => {
+    if (profileVersion === 0) return;
+    import("../../lib/api").then(({ auth }) => {
+      auth.me().then(me => {
+        if (typeof me.profile?.completion_score === "number") setBackendScore(me.profile.completion_score);
+        if (me.profile) setBackendProfileData(me.profile as unknown as Record<string, unknown>);
+        if (me.email) setBackendEmail(me.email);
+      }).catch(() => {});
+    });
+  }, [profileVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Bootstrap: fetch live data on mount ──────────────────────
   useEffect(() => {
     matchesApi.discover().then(res => {
@@ -4601,23 +4614,43 @@ export function UserApp({ onSignOut }: UserAppProps) {
     { key: "profession",       label: "Add your profession",           section: "career-education" },
   ];
 
+  // LocalStorage key aliases for backend field names
+  const BACKEND_TO_LOCAL: Record<string, string> = {
+    full_name: "fullName", date_of_birth: "dob", location_city: "city",
+    sect: "religion", prayer_frequency: "religiosity",
+  };
+
+  // Extra UX fields not tracked by completion_score but important for profile quality
+  const UX_FIELDS: { key: string; label: string; section: SubView; check: (p: Record<string, unknown>) => boolean }[] = [
+    { key: "lifestyle",        label: "Add lifestyle tags",            section: "values-lifestyle", check: p => Array.isArray(p.lifestyle)   && (p.lifestyle as unknown[]).length > 0 },
+    { key: "personality",      label: "Add personality traits",        section: "values-lifestyle", check: p => Array.isArray(p.personality) && (p.personality as unknown[]).length > 0 },
+    { key: "marriageTimeline", label: "Set your marriage timeline",    section: "life-goals",       check: p => !!p.marriageTimeline },
+    { key: "wantsChildren",    label: "Set your children preference",  section: "life-goals",       check: p => !!p.wantsChildren },
+    { key: "goals",            label: "Add your life goals",           section: "life-goals",       check: p => Array.isArray(p.goals)       && (p.goals as unknown[]).length > 0 },
+    { key: "avatar",           label: "Upload a profile photo",        section: "photos",           check: () => !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })() },
+  ];
+
   const incompleteFields = useMemo((): { key: string; label: string; section: SubView }[] => {
-    if (backendProfileData) {
-      // Derive from backend profile — matches what completion_score tracks exactly
-      const missing = BACKEND_PROFILE_FIELDS.filter(f => {
-        const v = backendProfileData[f.key];
-        return !v || (typeof v === "string" && !v.trim());
-      });
-      // If photo is also tracked and avatar not uploaded, append it
-      const hasPhoto = !!(backendProfileData.photo_url || backendProfileData.profile_picture);
-      if (!hasPhoto) {
-        missing.push({ key: "avatar", label: "Upload a profile photo", section: "photos" });
-      }
-      return missing;
-    }
-    // Fallback when backend data not yet loaded
-    if (!profileData) return PROFILE_FIELDS;
-    return PROFILE_FIELDS.filter(f => !f.check(profileData));
+    const missing: { key: string; label: string; section: SubView }[] = [];
+    const lp = profileData ?? {} as Record<string, unknown>;
+    const bp = backendProfileData ?? {} as Record<string, unknown>;
+
+    // ── Core backend fields ─────────────────────────────
+    // Check backend data first; fall back to localStorage with key mapping.
+    BACKEND_PROFILE_FIELDS.forEach(f => {
+      const bVal = bp[f.key];
+      if (bVal && (typeof bVal !== "string" || bVal.trim())) return; // filled in backend
+      const localKey = BACKEND_TO_LOCAL[f.key] ?? f.key;
+      const lVal = lp[localKey];
+      if (!lVal || (typeof lVal === "string" && !lVal.trim())) missing.push(f);
+    });
+
+    // ── Extended UX fields (lifestyle, personality, goals, photo) ──
+    UX_FIELDS.forEach(f => {
+      if (!f.check(lp)) missing.push({ key: f.key, label: f.label, section: f.section });
+    });
+
+    return missing;
   }, [backendProfileData, profileData]);
 
   const upgradePlan = async (plan: UserPlan) => {
