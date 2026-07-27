@@ -459,6 +459,19 @@ function mapApiConversation(c: ApiConversation): ConvItem {
   };
 }
 
+// Deduplicate conversations by partnerId — keep the most recent per partner.
+// Duplicate convs can arise from a race condition where both users click "Message"
+// simultaneously before either side's conversation record is visible.
+function dedupeConvs(convs: ConvItem[]): ConvItem[] {
+  const seen = new Map<string, ConvItem>();
+  for (const c of convs) {
+    const existing = seen.get(c.partnerId);
+    // Keep the one with a later time (more recent activity)
+    if (!existing || c.time > existing.time) seen.set(c.partnerId, c);
+  }
+  return Array.from(seen.values());
+}
+
 function mapApiNotif(n: ApiNotification): NotifItem {
   const targetId = (n.data?.target_id as string | undefined) ?? "";
   return { id: n.id, type: n.type as NotifItem["type"], targetId, text: n.body, time: new Date(n.created_at).toLocaleString(), read: n.read };
@@ -608,7 +621,12 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
   matchesList?: MatchItem[];
 }) {
   const [showJourney, setShowJourney] = useState(false);
-  const activeConvs = useMemo(() => (conversations ?? CONVERSATIONS).filter(c => c.status === "active").slice(0, 2), [conversations]);
+  const activeConvs = useMemo(() => {
+    const all = (conversations ?? CONVERSATIONS).filter(c => c.status === "active");
+    // Deduplicate by partnerId — only show the most recent conversation per partner.
+    const seen = new Set<string>();
+    return all.filter(c => { if (seen.has(c.partnerId)) return false; seen.add(c.partnerId); return true; }).slice(0, 2);
+  }, [conversations]);
   const milestones = useMemo(() => buildMilestones(plan, profileStrength, foundPartner ?? false), [plan, profileStrength, foundPartner]);
   const [homeArticles, setHomeArticles] = useState<import("../../lib/api").BlogArticle[]>([]);
   const [referralBonus, setReferralBonus] = useState<number>(10);
@@ -2160,7 +2178,7 @@ type ChatMsg = {
 
 const nowTime = () => new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
-function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerProfile, onReport, conversations, onGoToProfile }: {
+function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerProfile, onReport, conversations, onGoToProfile, currentUserId }: {
   conversationId: string;
   onBack: () => void;
   plan: "free" | "basic" | "premium";
@@ -2169,6 +2187,7 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
   onReport?: (matchId: string, name: string) => void;
   conversations?: ConvItem[];
   onGoToProfile?: () => void;
+  currentUserId?: string;
 }) {
   const conv = (conversations ?? []).find(c => c.id === conversationId);
   const [input, setInput] = useState("");
@@ -2192,14 +2211,24 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const toChat = (m: { id: string; sender: { id: string }; content: string | null; image_url: string | null; sent_at: string; read_at: string | null }): ChatMsg => ({
-    id:       m.id,
-    from:     m.sender.id === conv?.partnerId ? "them" : "me",
-    text:     m.content ?? "",
-    imageUrl: m.image_url ?? undefined,
-    time:     new Date(m.sent_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-    status:   m.read_at ? "read" : "delivered",
-  });
+  const toChat = (m: { id: string; sender: { id: string }; content: string | null; image_url: string | null; sent_at: string; read_at: string | null }): ChatMsg => {
+    // Direction: sender is the partner if their ID matches conv.partnerId,
+    // OR if we know our own ID and sender isn't us.
+    let from: "me" | "them" = "me";
+    if (conv?.partnerId) {
+      from = m.sender.id === conv.partnerId ? "them" : "me";
+    } else if (currentUserId) {
+      from = m.sender.id === currentUserId ? "me" : "them";
+    }
+    return {
+      id:       m.id,
+      from,
+      text:     m.content ?? "",
+      imageUrl: m.image_url ?? undefined,
+      time:     new Date(m.sent_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      status:   m.read_at ? "read" : "delivered",
+    };
+  };
 
   // Initial load — runs once when chat opens
   useEffect(() => {
@@ -2438,22 +2467,22 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
               )}
               {/* Text */}
               {msg.text && (
-                <div className="px-4 py-2.5">
+                <div className={`px-4 ${isLastInGroup ? "pt-2 pb-0" : "py-2"}`}>
                   <p style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>{msg.text}</p>
                 </div>
               )}
-              {/* Timestamp + tick — only on last message in group */}
+              {/* Timestamp + tick — only on last message in group, tight spacing */}
               {isLastInGroup && (
-                <div className={`px-4 pb-2 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/60" : "text-muted-foreground"}`}>
-                  <span style={{ fontSize: "0.7rem" }}>{msg.time}</span>
+                <div className={`px-3 pb-1.5 pt-0.5 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/55" : "text-muted-foreground"}`}>
+                  <span style={{ fontSize: "0.65rem" }}>{msg.time}</span>
                   {msg.from === "me" && msg.status && (
                     msg.status === "failed"
-                      ? <AlertCircle size={13} className="text-red-400" aria-label="Failed" />
+                      ? <AlertCircle size={12} className="text-red-400" aria-label="Failed" />
                       : msg.status === "read" && readReceipts
-                        ? <CheckCheck size={13} className="text-sky-400" aria-label="Read" />
+                        ? <CheckCheck size={12} className="text-sky-400" aria-label="Read" />
                         : msg.status === "delivered" || msg.status === "read"
-                          ? <CheckCheck size={13} className="text-white/60" aria-label="Delivered" />
-                          : <Check size={13} className="text-white/60" aria-label="Sent" />
+                          ? <CheckCheck size={12} className="text-white/55" aria-label="Delivered" />
+                          : <Check size={12} className="text-white/55" aria-label="Sent" />
                   )}
                 </div>
               )}
@@ -4433,6 +4462,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [backendScore, setBackendScore] = useState<number | null>(null);
   const [backendProfileData, setBackendProfileData] = useState<Record<string, unknown> | null>(null);
   const [backendEmail, setBackendEmail] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   // ── Hydrate localStorage profile from backend on mount ──────
   // Runs once on mount. Fetches /me/ and merges backend profile fields into
@@ -4448,6 +4478,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
         setBackendProfileData(p as unknown as Record<string, unknown>);
         // Store full email (including fake phone emails) for detection
         if (me.email) setBackendEmail(me.email);
+        if (me.id) setCurrentUserId(String(me.id));
         const PROFILE_KEY = "ma3moni_onboarding_progress";
         try {
           const raw = localStorage.getItem(PROFILE_KEY);
@@ -4519,7 +4550,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
     }).catch(() => {});
 
     messagingApi.list().then(res => {
-      setLiveConversations(res.results.map(mapApiConversation));
+      setLiveConversations(dedupeConvs(res.results.map(mapApiConversation)));
     }).catch(() => {});
 
     matchesApi.receivedInterests().then(res => {
@@ -4648,7 +4679,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
     // last-message previews stay current without waiting for the full sync.
     const convPoll = () => {
       messagingApi.list().then(res => {
-        setLiveConversations(res.results.map(mapApiConversation));
+        setLiveConversations(dedupeConvs(res.results.map(mapApiConversation)));
       }).catch(() => {});
     };
     convPoll();
@@ -4777,7 +4808,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
     try {
       const apiConv = await messagingApi.start(partnerId);
       const convItem = mapApiConversation(apiConv);
-      setLiveConversations(prev => [convItem, ...prev.filter(c => c.id !== convItem.id)]);
+      setLiveConversations(prev => dedupeConvs([convItem, ...prev.filter(c => c.id !== convItem.id)]));
       openChat(convItem.id);
     } catch (err: unknown) {
       const detail = (err as { data?: { detail?: string } })?.data?.detail;
@@ -4881,6 +4912,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
               onBack={goBack}
               plan={userPlan}
               conversations={liveConversations}
+              currentUserId={currentUserId}
               onGoToProfile={() => { goBack(); setTab("profile"); }}
               onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })}
               onReport={(matchId, name) => setReportModal({ matchId, name })}
