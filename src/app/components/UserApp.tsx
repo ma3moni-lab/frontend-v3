@@ -459,10 +459,25 @@ function mapApiMatch(m: ApiMatchProfile): MatchItem {
   const ph0 = m.photos[0]?.image_url ?? "";
   const s = m.compatibility_score;
   const bd = m.compatibility_breakdown;
+
+  // Religiosity: prefer numeric field, fall back to deriving from prayer_frequency text
+  const religiosity = m.religiosity ?? (
+    m.prayer_frequency === "5 times daily" ? 5 :
+    m.prayer_frequency === "most prayers"  ? 4 :
+    m.prayer_frequency === "friday only"   ? 3 :
+    m.prayer_frequency === "occasionally"  ? 2 :
+    m.prayer_frequency === "rarely"        ? 1 : 0
+  );
+
+  const smokingMap: Record<string, string> = { none: "Never", occasionally: "Occasionally", regularly: "Regularly" };
+  const drinkMap:   Record<string, string> = { none: "Never", occasionally: "Occasionally", regularly: "Regularly" };
+
   return {
     id: m.id, name: shortName, fullName: m.full_name,
-    age: (m.age && m.age > 0) ? m.age : (calcAge((m as unknown as Record<string,unknown>).date_of_birth as string) ?? 0), city: m.location_city, country: m.location_country,
-    nationality: "", score: s,
+    age: (m.age && m.age > 0) ? m.age : (calcAge(m.date_of_birth) ?? 0),
+    city: m.location_city, country: m.location_country,
+    nationality: m.nationality ?? "",
+    score: s,
     photo: ph0, photos: m.photos.map(ph => ph.image_url),
     highlights: [], bio: m.bio ?? "",
     compatibility: {
@@ -474,11 +489,22 @@ function mapApiMatch(m: ApiMatchProfile): MatchItem {
     },
     dealBreakerWarning: m.deal_breaker_warning ?? false,
     genotypeRisk:       m.genotype_risk ?? null,
-    education: "", institution: "", profession: m.profession ?? "", company: "",
-    height: 0, languages: [], timeline: "", wantsChildren: "",
-    religiosity: 0, familyImportance: "",
-    lifestyle: [], personality: [], goals: [],
-    smoking: "Never", drinking: "Never", diet: "No restriction",
+    profession: m.profession ?? "",
+    company:    m.company ?? "",
+    education:  m.education ?? "",
+    institution: m.institution ?? "",
+    height:     m.height ?? 0,
+    languages:  m.languages ?? [],
+    timeline:   m.marriage_timeline ?? "",
+    wantsChildren: m.wants_children ?? "",
+    religiosity,
+    familyImportance: m.family_importance ?? "",
+    lifestyle:   m.lifestyle ?? [],
+    personality: m.personality_traits ?? [],
+    goals:       m.life_goals ?? [],
+    smoking: smokingMap[m.smoking ?? ""] ?? (m.smoking ?? ""),
+    drinking: drinkMap[m.drinking ?? ""] ?? (m.drinking ?? ""),
+    diet: m.diet ?? "",
   };
 }
 
@@ -2911,7 +2937,17 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
   onReport?: (matchId: string, name: string) => void;
   matchesList?: MatchItem[];
 }) {
-  const match = (matchesList ?? []).find(m => m.id === matchId);
+  const baseMatch = (matchesList ?? []).find(m => m.id === matchId);
+  // Fetch the full detail profile which contains more fields than the list response
+  const [detailMatch, setDetailMatch] = useState<MatchItem | null>(null);
+  useEffect(() => {
+    matchesApi.detail(matchId).then(full => {
+      setDetailMatch(mapApiMatch(full));
+    }).catch(() => {});
+  }, [matchId]);
+  // Use the richer detail data if available, fall back to list data
+  const match = detailMatch ?? baseMatch;
+
   const [activePhoto, setActivePhoto] = useState(0);
   const [localInterest, setLocalInterest] = useState(sentInterest);
   // Private note — Premium only, stored in localStorage per match.
