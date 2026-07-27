@@ -771,7 +771,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
           <button onClick={() => setTab("matches")} className="text-primary hover:text-primary/80 transition-colors" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>See all →</button>
         </div>
         <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-          {(matchesList ?? MATCHES).slice(0, 3).map(m => (
+          {(matchesList ?? MATCHES).filter(m => !(conversations ?? []).some(c => c.partnerId === m.id)).slice(0, 3).map(m => (
             <button key={m.id} onClick={() => onOpenMatch(m.id)}
               className="flex-shrink-0 rounded-2xl overflow-hidden text-left hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-all relative"
               style={{ width: "138px", height: "185px" }}>
