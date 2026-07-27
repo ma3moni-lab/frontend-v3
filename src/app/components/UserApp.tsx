@@ -724,7 +724,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
           <button onClick={() => setTab("messages")} className="text-primary hover:text-primary/80 transition-colors" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>View all →</button>
         </div>
         {activeConvs.length === 0 ? (
-          <div className="bg-card rounded-2xl border border-border p-5 text-center">
+          <div className="bg-card rounded-2xl border border-border p-4 text-center">
             <p className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>No active conversations yet — connect with a match to start.</p>
           </div>
         ) : (
@@ -1368,7 +1368,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
         </button>
 
         {canFilter && showFilters && (
-          <div className="mt-2 rounded-2xl border border-primary/15 bg-card shadow-lg p-5 space-y-5 view-enter">
+          <div className="mt-2 rounded-2xl border border-primary/15 bg-card shadow-lg p-4 space-y-4 view-enter">
 
             {/* Age range */}
             <div>
@@ -1458,7 +1458,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
         )}
       </div>
 
-      <div className="px-4 space-y-5">
+      <div className="px-4 space-y-4">
         {visible.map(m => (
           <div key={m.id}>
             {/* "Best" reason label — shown only in the Best filter (item 9) */}
@@ -2647,7 +2647,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
 
         {/* Score summary — always visible */}
         <div className="rounded-2xl overflow-hidden" style={{ background: sc }}>
-          <div className="p-5 text-white text-center">
+          <div className="p-4 text-white text-center">
             <p style={{ fontSize: "0.8125rem", opacity: 0.8 }}>Overall Compatibility</p>
             <p style={{ fontSize: "3.25rem", fontWeight: 900, lineHeight: 1, marginTop: 4 }}>
               {match.score}<span style={{ fontSize: "1.25rem", opacity: 0.75 }}>%</span>
@@ -2680,7 +2680,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
 
         {/* Why you match highlights */}
         {match.highlights.length > 0 && (
-          <div className="bg-card rounded-2xl border border-border p-5">
+          <div className="bg-card rounded-2xl border border-border p-4">
             <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Why you match</h3>
             <div className="flex flex-wrap gap-2">
               {match.highlights.map(h => (
@@ -2693,7 +2693,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
         )}
 
         {/* 5-pillar compat bars — always visible */}
-        <div className="bg-card rounded-2xl border border-border p-5">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Compatibility Breakdown</h3>
           <div className="space-y-3.5">
             {(["deen","readiness","family","lifestyle","communication"] as const).map(k => (
@@ -2766,13 +2766,13 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
           /* ── FULL PROFILE for premium ── */
           <>
             {/* About / Bio */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>About {match.fullName.split(" ")[0]}</h3>
               <p className="text-muted-foreground" style={{ fontSize: "0.9375rem", lineHeight: 1.75 }}>{match.bio}</p>
             </div>
 
             {/* Quick facts */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Personal Details</h3>
               <div className="grid grid-cols-2 gap-3">
                 {[
@@ -2792,7 +2792,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
             </div>
 
             {/* Career & Education */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Career & Education</h3>
               <div className="space-y-3">
                 {[
@@ -2812,7 +2812,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
             </div>
 
             {/* Values & Lifestyle */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Values & Lifestyle</h3>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 {[
@@ -2836,7 +2836,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
             </div>
 
             {/* Personality */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Personality</h3>
               <div className="flex flex-wrap gap-2">
                 {match.personality.map(t => (
@@ -2846,7 +2846,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
             </div>
 
             {/* Goals & Timeline */}
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Life Goals & Timeline</h3>
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-muted/50 rounded-xl p-3 col-span-2">
@@ -3086,7 +3086,7 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
           </button>
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Payment</h3>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="bg-secondary rounded-2xl p-4 border border-primary/20">
             <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>You selected</p>
             <p style={{ fontWeight: 700, fontSize: "1.125rem", color: "var(--primary)" }}>
@@ -3134,7 +3134,7 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
         </button>
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Choose Your Plan</h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-4">
         <p className="text-muted-foreground mb-6" style={{ fontSize: "0.9375rem" }}>Unlock more matches, features, and better visibility.</p>
         <div className="space-y-3">
           {PLANS.map(plan => {
@@ -3144,7 +3144,7 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
               <button key={plan.id}
                 onClick={() => !isCurrent && setSelected(plan.id)}
                 disabled={isCurrent}
-                className={`w-full text-left rounded-2xl border p-5 transition-all ${
+                className={`w-full text-left rounded-2xl border p-4 transition-all ${
                   isCurrent ? "border-primary/40 bg-primary/5 cursor-default"
                     : isSelected ? "border-primary bg-secondary shadow-md shadow-primary/10"
                       : "border-border bg-card hover:border-primary/30"
@@ -3252,7 +3252,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
         </button>
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Refer & Earn</h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-5">
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Hero */}
         <div className="bg-primary rounded-2xl p-6 text-white text-center mb-6">
           <Gift size={36} className="mx-auto mb-3 opacity-80" />
@@ -3311,7 +3311,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
 
         {/* Monthly activity */}
         {apiStats?.monthly_stats && apiStats.monthly_stats.length > 0 && (
-          <div className="bg-card rounded-2xl border border-border p-5 mb-6">
+          <div className="bg-card rounded-2xl border border-border p-4 mb-4">
             <h3 style={{ fontWeight: 700, fontSize: "0.9375rem" }} className="mb-4">Monthly Referrals</h3>
             <div className="space-y-2">
               {apiStats.monthly_stats.slice(-6).map(m => (
@@ -3328,7 +3328,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
         )}
 
         {/* How it works */}
-        <div className="bg-card rounded-2xl border border-border p-5">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "0.9375rem" }} className="mb-4">How It Works</h3>
           {[
             { step: "1", text: "Share your code with friends looking for a partner" },
@@ -3391,7 +3391,7 @@ function NotificationsView({ onBack, items = [], onMarkAllRead, onDeepLink, onRe
           </button>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {Object.entries(grouped).map(([type, items]) => (
           <div key={type}>
             <div className="flex items-center gap-2 mb-2">
@@ -4138,7 +4138,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
           {saved ? <span className="flex items-center gap-1"><Check size={12} />Saved</span> : "Save"}
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* ── Locked fields notice ─────────────────────────────── */}
         <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2.5">
           <Lock size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -4891,7 +4891,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
                 <button onClick={goBack} aria-label="Go back" className="p-1 text-muted-foreground hover:text-foreground transition-colors mr-3"><ChevronLeft size={22} /></button>
                 <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Profile Photos</h3>
               </div>
-              <div className="flex-1 overflow-y-auto p-5">
+              <div className="flex-1 overflow-y-auto p-4">
                 <p className="text-muted-foreground mb-4" style={{ fontSize: "0.875rem" }}>
                   Profiles with photos receive <strong>3× more matches</strong>. Upload up to 6 photos.
                 </p>

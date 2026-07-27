@@ -123,7 +123,7 @@ function Toggle({ on, onChange, label, desc }: { on: boolean; onChange: (v: bool
 }
 
 const Divider = ({ title }: { title: string }) => (
-  <p className="text-muted-foreground mt-6 mb-3" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</p>
+  <p className="text-muted-foreground mt-3 mb-2" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{title}</p>
 );
 
 // ═══════════════════════════════════════════════════════
@@ -154,7 +154,7 @@ export function CareerEducationSection({ onBack, onSaved }: { onBack: () => void
 
   return (
     <Shell title="Career & Education" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5 space-y-5">
+      <div className="p-4 space-y-4">
         <Divider title="Career" />
         <div><FL>Job Title</FL><TI value={f.jobTitle} onChange={v => u("jobTitle", v)} placeholder="Software Engineer" /></div>
         <div><FL>Company / Organisation</FL><TI value={f.company} onChange={v => u("company", v)} placeholder="Company name" /></div>
@@ -263,7 +263,7 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
 
   return (
     <Shell title="Values & Lifestyle" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5 space-y-5">
+      <div className="p-4 space-y-4">
         <Divider title="Faith & Values" />
 
         {/* Religion */}
@@ -415,7 +415,7 @@ export function LifeGoalsSection({ onBack, onSaved }: { onBack: () => void; onSa
 
   return (
     <Shell title="Life Goals & Timeline" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5 space-y-6">
+      <div className="p-4 space-y-4">
         <Divider title="Marriage Timeline" />
         <div className="space-y-2">
           {[
@@ -529,7 +529,7 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
 
   return (
     <Shell title="Partner Preferences" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5 space-y-6">
+      <div className="p-4 space-y-4">
         <Divider title="Age Range" />
         <div className="space-y-3">
           {(["Min", "Max"] as const).map((lbl, i) => {
@@ -904,7 +904,7 @@ function DocView({ docKey, onBack }: { docKey: DocKey; onBack: () => void }) {
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>{DOC_TITLES[docKey]}</h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {blocks.map((b, i) => {
           if (b.type === "h") return <p key={i} style={{ fontWeight: 700, fontSize: "0.9375rem" }} className="pt-1">{b.text}</p>;
           if (b.type === "p") return <p key={i} className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.7 }}>{b.text}</p>;
@@ -1019,7 +1019,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Change Password</h3>
         <div style={{ width: 32 }} />
       </div>
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
           <FL>Current Password</FL>
           <div className="relative">
@@ -1313,7 +1313,7 @@ export function FoundPartnerSection({ onBack, onComplete }: { onBack: () => void
         <button onClick={() => setStep("intro")} className="p-1 text-muted-foreground hover:text-foreground"><ChevronLeft size={22} /></button>
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Tell Us Your Story</h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div>
           <FL opt>Your partner's first name</FL>
           <TI value={f.partnerName} onChange={v => setF(p => ({ ...p, partnerName: v }))} placeholder="e.g. Aisha" />
@@ -1429,7 +1429,7 @@ export function DeactivateSection({ onBack, onSignOut }: { onBack: () => void; o
       </div>
 
       {step === "menu" && (
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <p className="text-muted-foreground mb-2" style={{ fontSize: "0.9375rem" }}>Choose what you'd like to do with your account.</p>
           {[
             { key: "pause", color: "#4A8DB8", icon: <PauseCircle size={20} />, title: "Pause Profile", desc: "Hide your profile temporarily. Account and data preserved — reactivate anytime." },
@@ -1452,7 +1452,7 @@ export function DeactivateSection({ onBack, onSignOut }: { onBack: () => void; o
       )}
 
       {step === "pause" && (
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
             <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#1d4ed8" }}>Your profile will be hidden</p>
             <p className="text-blue-700 mt-1" style={{ fontSize: "0.875rem" }}>No new matches or messages — but data is fully preserved. Come back anytime.</p>
@@ -1474,7 +1474,7 @@ export function DeactivateSection({ onBack, onSignOut }: { onBack: () => void; o
       )}
 
       {step === "deactivate" && (
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 text-amber-800 mb-1">
               <AlertTriangle size={15} />
@@ -1500,7 +1500,7 @@ export function DeactivateSection({ onBack, onSignOut }: { onBack: () => void; o
       )}
 
       {step === "delete" && (
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 text-red-800 mb-1">
               <AlertTriangle size={15} />
