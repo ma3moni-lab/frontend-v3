@@ -5,6 +5,7 @@ import { RegisterPage } from "./RegisterPage";
 import { Onboarding } from "./Onboarding";
 import { UserApp } from "./UserApp";
 import { MaintenancePage } from "./MaintenancePage";
+import { SuspendedView } from "./SuspendedView";
 import {
   auth as apiAuth, setUserTokens, clearTokens, adminApi, restoreUserToken, ApiError,
 } from "../../lib/api";
@@ -17,7 +18,7 @@ const PLAN_KEY            = "ma3moni_user_plan";
 const ONBOARDING_KEY      = "ma3moni_onboarding_complete";
 const LAST_VIEW_KEY       = "ma3moni_last_view";
 
-type UserView = "landing" | "login" | "register" | "onboarding" | "app";
+type UserView = "landing" | "login" | "register" | "onboarding" | "app" | "suspended";
 
 /** Silently detect approximate location from IP and store it for admin monitoring. */
 async function detectAndStoreLocation(): Promise<void> {
@@ -34,6 +35,9 @@ async function detectAndStoreLocation(): Promise<void> {
     }
   } catch {}
 }
+
+const SUSPENSION_REASON_KEY = "ma3moni_suspension_reason";
+const SUSPENSION_AT_KEY     = "ma3moni_suspended_at";
 
 export function UserRoot() {
   // ── Maintenance mode ──────────────────────────────────────────
@@ -85,6 +89,16 @@ export function UserRoot() {
     return "landing";
   });
 
+  const [suspensionReason, setSuspensionReason] = useState<string>(() => {
+    try { return localStorage.getItem(SUSPENSION_REASON_KEY) ?? ""; } catch { return ""; }
+  });
+  const [suspensionAt, setSuspensionAt] = useState<string | undefined>(() => {
+    try { return localStorage.getItem(SUSPENSION_AT_KEY) ?? undefined; } catch { return undefined; }
+  });
+  const [suspensionEmail, setSuspensionEmail] = useState<string>(() => {
+    try { return localStorage.getItem("ma3moni_login_email") ?? ""; } catch { return ""; }
+  });
+
   // Persist current view so user continues from same place on refresh
   useEffect(() => {
     if (view === "app" || view === "onboarding") {
@@ -98,6 +112,16 @@ export function UserRoot() {
       try { localStorage.removeItem(SESSION_KEY); } catch {}
     }
   }, [view]);
+
+  // ── Suspension handler ────────────────────────────────────────
+  const onSuspended = (reason: string, suspAt?: string, email?: string) => {
+    try { localStorage.setItem(SUSPENSION_REASON_KEY, reason); } catch {}
+    if (suspAt) { try { localStorage.setItem(SUSPENSION_AT_KEY, suspAt); } catch {} }
+    setSuspensionReason(reason);
+    setSuspensionAt(suspAt);
+    if (email) setSuspensionEmail(email);
+    setView("suspended");
+  };
 
   // ── Sign out ──────────────────────────────────────────────────
   const signOut = async () => {
@@ -118,8 +142,12 @@ export function UserRoot() {
       "ma3moni_conv_cache",
       "ma3moni_avatar_photo",
       "ma3moni_detected_location",
+      SUSPENSION_REASON_KEY,
+      SUSPENSION_AT_KEY,
     ];
     USER_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    setSuspensionReason("");
+    setSuspensionAt(undefined);
     setView("landing");
   };
 
@@ -154,6 +182,14 @@ export function UserRoot() {
       apiAuth.me().then(me => {
         // Sync plan in case it was upgraded
         try { localStorage.setItem(PLAN_KEY, me.plan); } catch {}
+        // If backend has since suspended the account, redirect immediately
+        if (me.account_status === "suspended") {
+          onSuspended(
+            me.suspension_reason ?? "Your account has been suspended.",
+            me.suspended_at,
+            me.email,
+          );
+        }
       }).catch((err: unknown) => {
         // 401 = session dead (stale tokens from another backend, etc.)
         if (err && typeof err === "object" && "status" in err && (err as { status: number }).status === 401) {
@@ -181,6 +217,7 @@ export function UserRoot() {
       {view === "login" && (
         <LoginPage
           onSuccess={afterLogin}
+          onSuspended={onSuspended}
           onRegister={() => setView("register")}
           onBack={() => setView("landing")}
         />
@@ -203,6 +240,15 @@ export function UserRoot() {
 
       {view === "app" && (
         <UserApp onSignOut={signOut} />
+      )}
+
+      {view === "suspended" && (
+        <SuspendedView
+          reason={suspensionReason}
+          suspendedAt={suspensionAt}
+          userEmail={suspensionEmail || undefined}
+          onSignOut={signOut}
+        />
       )}
     </div>
   );

@@ -169,13 +169,16 @@ export interface ProfilePhoto {
 }
 
 export interface MeResponse {
-  id:         string;
-  email:      string;
-  phone?:     string;
-  role:       DjangoRole;
-  plan:       UserPlan;
-  profile:    Profile;
-  photos:     ProfilePhoto[];
+  id:                  string;
+  email:               string;
+  phone?:              string;
+  role:                DjangoRole;
+  plan:                UserPlan;
+  profile:             Profile;
+  photos:              ProfilePhoto[];
+  account_status?:     "active" | "suspended" | "pending" | "deactivated";
+  suspension_reason?:  string;
+  suspended_at?:       string;
 }
 
 // ── API error ─────────────────────────────────────────────────
@@ -296,10 +299,17 @@ const upload = <T>(path: string, form: FormData)       => request<T>("POST", pat
 // ═══════════════════════════════════════════════════════════════
 // AUTH — /api/auth/
 // ═══════════════════════════════════════════════════════════════
+/** Returned by the backend when a suspended user tries to log in. */
+export interface SuspensionInfo {
+  account_status:    "suspended";
+  suspension_reason: string;   // admin-written reason shown to the user
+  suspended_at?:     string;   // ISO timestamp, optional
+}
+
 export interface LoginResponse {
   access:  string;
   refresh: string;
-  user: AuthUser & { phone?: string; profile_complete: boolean };
+  user: AuthUser & { phone?: string; profile_complete: boolean; account_status?: string; suspension_reason?: string };
 }
 
 export interface RegisterResponse {
@@ -381,6 +391,23 @@ export const auth = {
 
   adminForgotPassword: (email: string) =>
     post<{ detail: string }>("/api/auth/admin-forgot-password/", { email }),
+
+  /**
+   * Submit a suspension appeal.  Tries the dedicated appeal endpoint first;
+   * falls back to creating a support ticket so the appeal always reaches staff.
+   */
+  submitAppeal: async (reason: string): Promise<void> => {
+    try {
+      await post<void>("/api/auth/appeal/", { reason });
+    } catch {
+      // Fallback: open a support ticket so the appeal always reaches admins
+      await post<SupportTicket>("/api/support/tickets/", {
+        subject: "Account Suspension Appeal",
+        category: "suspension_appeal",
+        description: reason,
+      });
+    }
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════

@@ -6,6 +6,7 @@ export type UserPlan = "free" | "basic" | "premium";
 
 interface LoginPageProps {
   onSuccess: (plan: UserPlan, profileComplete: boolean) => void;
+  onSuspended: (reason: string, suspendedAt?: string, email?: string) => void;
   onRegister: () => void;
   onBack: () => void;
 }
@@ -63,7 +64,7 @@ function ForgotPanel({ initialId, onBack }: { initialId: string; onBack: () => v
 }
 
 // ── Main login page ─────────────────────────────────────────────
-export function LoginPage({ onSuccess, onRegister, onBack }: LoginPageProps) {
+export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginPageProps) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword]     = useState("");
   const [showPw, setShowPw]         = useState(false);
@@ -84,14 +85,41 @@ export function LoginPage({ onSuccess, onRegister, onBack }: LoginPageProps) {
       setUserTokens(res.access, res.refresh);
       try { localStorage.setItem("ma3moni_login_email", res.user.email); } catch {}
       setLoading(false);
+      // Check if account is suspended even when login succeeds (backend allows login)
+      if (res.user.account_status === "suspended") {
+        onSuspended(
+          res.user.suspension_reason ?? "Your account has been suspended.",
+          undefined,
+          res.user.email,
+        );
+        return;
+      }
       onSuccess(res.user.plan as UserPlan, res.user.profile_complete ?? false);
     } catch (err) {
       clearTimeout(t);
       setLoading(false);
       setSlow(false);
-      if (err instanceof ApiError && err.status === 401) {
-        setError("Incorrect email/phone or password. Please try again.");
-      } else if (err instanceof TypeError) {
+      // Backend may 403 suspended users — detect that case and route to SuspendedView
+      if (err instanceof ApiError && (err.status === 403 || err.status === 401)) {
+        const data = err.data as Record<string, unknown> | undefined;
+        const status = data?.account_status as string | undefined;
+        const reason = data?.suspension_reason as string | undefined;
+        const suspendedAt = data?.suspended_at as string | undefined;
+        if (status === "suspended" || reason) {
+          // We don't have tokens here, but we can still show the suspended screen
+          onSuspended(
+            reason ?? "Your account has been suspended by our moderation team.",
+            suspendedAt,
+            identifier.trim().includes("@") ? identifier.trim() : undefined,
+          );
+          return;
+        }
+        if (err.status === 401) {
+          setError("Incorrect email/phone or password. Please try again.");
+          return;
+        }
+      }
+      if (err instanceof TypeError) {
         setError("Cannot reach the server. Check your internet connection.");
       } else {
         setError("Something went wrong. Please try again.");
