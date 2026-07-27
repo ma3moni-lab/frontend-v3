@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Mail, Shield } from "lucide-react";
-import { auth as apiAuth, setUserTokens, ApiError } from "../../lib/api";
+import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Mail, Shield, Gift, CheckCircle2 } from "lucide-react";
+import { auth as apiAuth, setUserTokens, ApiError, referrals as referralsApi } from "../../lib/api";
 import type { UserPlan } from "./LoginPage";
+
+const PENDING_REF_KEY = "ma3moni_pending_ref";
 
 interface RegisterPageProps {
   onVerified: (plan: UserPlan, profileComplete: boolean, identifier: string) => void;
@@ -158,6 +160,11 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
   const [otpIdentifier, setOtpId] = useState("");
+  // Referral code — pre-filled from URL param or localStorage, editable by user
+  const [referralCode, setReferralCode] = useState<string>(() => {
+    try { return localStorage.getItem(PENDING_REF_KEY) ?? ""; } catch { return ""; }
+  });
+  const [refStatus, setRefStatus] = useState<"idle" | "valid" | "invalid">("idle");
 
   const identifier = mode === "email" ? email.toLowerCase().trim() : phone.trim();
 
@@ -216,9 +223,18 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
     return (
       <OtpScreen
         identifier={otpIdentifier}
-        onVerified={(_access, _refresh, plan, profileComplete) =>
-          onVerified(plan, profileComplete, otpIdentifier)
-        }
+        onVerified={async (_access, _refresh, plan, profileComplete) => {
+          // Apply referral code now that tokens are set (best-effort, never blocks flow)
+          const code = referralCode.trim().toUpperCase();
+          if (code) {
+            try {
+              await referralsApi.apply(code);
+            } catch {}
+            // Always clear — even if apply failed (invalid code, already used, own code, etc.)
+            try { localStorage.removeItem(PENDING_REF_KEY); } catch {}
+          }
+          onVerified(plan, profileComplete, otpIdentifier);
+        }}
         onBack={() => setOtpId("")}
       />
     );
@@ -325,6 +341,50 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
                 {showCf ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+
+          {/* Referral code — optional */}
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+              Referral code <span className="text-muted-foreground" style={{ fontWeight: 400 }}>(optional)</span>
+            </label>
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <Gift size={15} />
+              </div>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={e => {
+                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 12);
+                  setReferralCode(val);
+                  setRefStatus("idle");
+                  try { if (val) localStorage.setItem(PENDING_REF_KEY, val); else localStorage.removeItem(PENDING_REF_KEY); } catch {}
+                }}
+                placeholder="MA3-XXXXXX"
+                autoComplete="off"
+                className="w-full pl-10 pr-10 py-3.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                style={{
+                  fontSize: "0.9375rem", letterSpacing: "0.06em",
+                  borderColor: refStatus === "valid" ? "var(--primary)" : refStatus === "invalid" ? "var(--destructive)" : undefined,
+                }}
+              />
+              {refStatus === "valid" && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primary">
+                  <CheckCircle2 size={16} />
+                </div>
+              )}
+            </div>
+            {referralCode && refStatus === "idle" && (
+              <p className="mt-1 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                Referral code will be applied after account verification.
+              </p>
+            )}
+            {refStatus === "valid" && (
+              <p className="mt-1 text-primary" style={{ fontSize: "0.75rem", fontWeight: 600 }}>
+                Referral code will earn you both a bonus!
+              </p>
+            )}
           </div>
 
           {error && (

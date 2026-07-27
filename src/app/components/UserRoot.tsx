@@ -38,8 +38,24 @@ async function detectAndStoreLocation(): Promise<void> {
 
 const SUSPENSION_REASON_KEY = "ma3moni_suspension_reason";
 const SUSPENSION_AT_KEY     = "ma3moni_suspended_at";
+const PENDING_REF_KEY       = "ma3moni_pending_ref";
 
 export function UserRoot() {
+  // ── Capture ?ref= URL param on first load ─────────────────────
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get("ref");
+      if (ref) {
+        localStorage.setItem(PENDING_REF_KEY, ref.toUpperCase().trim());
+        // Remove from URL without triggering a reload
+        const url = new URL(window.location.href);
+        url.searchParams.delete("ref");
+        window.history.replaceState({}, "", url.toString());
+      }
+    } catch {}
+  }, []);
+
   // ── Maintenance mode ──────────────────────────────────────────
   const [maintenance, setMaintenance] = useState(() => {
     try { return localStorage.getItem(MAINTENANCE_KEY) === "true"; } catch { return false; }
@@ -144,6 +160,7 @@ export function UserRoot() {
       "ma3moni_detected_location",
       SUSPENSION_REASON_KEY,
       SUSPENSION_AT_KEY,
+      PENDING_REF_KEY,
     ];
     USER_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     setSuspensionReason("");
