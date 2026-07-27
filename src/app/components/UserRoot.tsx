@@ -115,6 +115,7 @@ export function UserRoot() {
       "ma3moni_pending_plan",
       "ma3moni_pending_reference",
       "ma3_uid",
+      "ma3moni_conv_cache",
     ];
     USER_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     setView("landing");

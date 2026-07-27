@@ -2171,10 +2171,13 @@ type ChatMsg = {
   id: string;
   from: "me" | "them";
   text: string;
-  imageUrl?: string;   // present for image messages
+  imageUrl?: string;
   time: string;
   dateKey?: string;    // YYYY-MM-DD for date separators
   status?: "sent" | "delivered" | "read" | "failed";
+  replyToId?: string;
+  replyToText?: string;
+  replyToFrom?: "me" | "them";
 };
 
 const nowTime = () => new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -2198,6 +2201,11 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
   const [showSuggestions, setShowSuggestions] = useState(messages.length < 2);
   const [typing, setTyping] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  // Reply / highlight state
+  const [replyTo, setReplyTo] = useState<ChatMsg | null>(null);
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ msgId: string; x: number; y: number } | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const imgInputRef = useRef<HTMLInputElement>(null);
 
@@ -2324,8 +2332,10 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     if (!text.trim() && !imageUrl) return;
     const msgId = `m${Date.now()}`;
     optimisticIds.current.add(msgId);
-    setMessages(prev => [...prev, { id: msgId, from: "me", text, imageUrl, time: nowTime(), dateKey: new Date().toISOString().slice(0, 10), status: "sent" }]);
+    const replyRef = replyTo ? { replyToId: replyTo.id, replyToText: replyTo.text, replyToFrom: replyTo.from } : undefined;
+    setMessages(prev => [...prev, { id: msgId, from: "me", text, imageUrl, time: nowTime(), dateKey: new Date().toISOString().slice(0, 10), status: "sent", ...replyRef }]);
     setInput("");
+    setReplyTo(null);
     setShowSuggestions(false);
     scrollToBottom();
 
@@ -2388,6 +2398,45 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
             <X size={20} className="text-white" />
           </button>
           <img src={lightboxSrc} alt="Full size" className="max-w-full max-h-full rounded-2xl object-contain" style={{ maxHeight: "88vh" }} />
+        </div>
+      )}
+
+      {/* Context menu (long-press) */}
+      {contextMenu && (
+        <div
+          className="fixed inset-0 z-[150]"
+          onClick={() => { setContextMenu(null); setHighlightedMsgId(null); }}>
+          <div
+            className="absolute bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
+            style={{ left: contextMenu.x, top: contextMenu.y, minWidth: 150 }}
+            onClick={e => e.stopPropagation()}>
+            {/* Reply */}
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-foreground"
+              style={{ fontSize: "0.9rem" }}
+              onClick={() => {
+                const msg = messages.find(m => m.id === contextMenu.msgId);
+                if (msg) setReplyTo(msg);
+                setContextMenu(null);
+                setHighlightedMsgId(null);
+              }}>
+              <ChevronLeft size={16} className="rotate-180 text-primary" />
+              Reply
+            </button>
+            {/* Copy */}
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-foreground border-t border-border"
+              style={{ fontSize: "0.9rem" }}
+              onClick={() => {
+                const msg = messages.find(m => m.id === contextMenu.msgId);
+                if (msg?.text) navigator.clipboard.writeText(msg.text).then(() => toast.success("Copied!")).catch(() => {});
+                setContextMenu(null);
+                setHighlightedMsgId(null);
+              }}>
+              <Copy size={16} className="text-muted-foreground" />
+              Copy
+            </button>
+          </div>
         </div>
       )}
 
@@ -2503,9 +2552,24 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
             const isFirstInGroup = !prev || prev.from !== msg.from;
             const isLastInGroup  = !next || next.from !== msg.from;
             const showDateSep    = !!msg.dateKey && (!prev || prev.dateKey !== msg.dateKey);
+            const isHighlighted  = highlightedMsgId === msg.id;
             const bubbleRadius = msg.from === "me"
               ? `rounded-2xl ${isFirstInGroup ? "" : "rounded-tr-md"} ${isLastInGroup ? "rounded-br-sm" : "rounded-br-md"}`
               : `rounded-2xl ${isFirstInGroup ? "" : "rounded-tl-md"} ${isLastInGroup ? "rounded-bl-sm" : "rounded-bl-md"}`;
+
+            const startLongPress = (e: React.TouchEvent | React.MouseEvent) => {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const x = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+              const y = "touches" in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+              longPressTimer.current = setTimeout(() => {
+                setHighlightedMsgId(msg.id);
+                setContextMenu({ msgId: msg.id, x: Math.min(x, window.innerWidth - 160), y: Math.max(y - rect.height - 8, 60) });
+              }, 500);
+            };
+            const cancelLongPress = () => {
+              if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+            };
+
             return (
               <div key={msg.id}>
                 {/* Date separator chip */}
@@ -2518,8 +2582,24 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
                     <div className="flex-1 h-px bg-border" />
                   </div>
                 )}
-                <div className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"} ${isLastInGroup ? "mb-1" : "mb-0.5"}`}>
+                <div
+                  className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"} ${isLastInGroup ? "mb-1" : "mb-0.5"} transition-colors duration-150 ${isHighlighted ? "bg-primary/8 rounded-lg" : ""}`}
+                  onTouchStart={startLongPress}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onMouseDown={startLongPress}
+                  onMouseUp={cancelLongPress}
+                  onMouseLeave={cancelLongPress}>
                   <div className={`max-w-[75%] overflow-hidden ${bubbleRadius} ${msg.from === "me" ? "bg-primary text-white" : "bg-card border border-border"}`}>
+                    {/* Reply quote strip */}
+                    {msg.replyToText && (
+                      <div className={`mx-2 mt-2 px-3 py-1.5 rounded-xl border-l-4 ${msg.from === "me" ? "bg-white/15 border-white/50" : "bg-muted border-primary/40"}`}>
+                        <p style={{ fontSize: "0.7rem", fontWeight: 700, opacity: 0.8, marginBottom: 2 }}>
+                          {msg.replyToFrom === "me" ? "You" : conv.partnerName}
+                        </p>
+                        <p className="line-clamp-2" style={{ fontSize: "0.75rem", opacity: 0.75 }}>{msg.replyToText}</p>
+                      </div>
+                    )}
                     {/* Image bubble with loading skeleton */}
                     {msg.imageUrl && (
                       <button onClick={() => setLightboxSrc(msg.imageUrl!)} className="block w-full relative" aria-label="View image"
@@ -2533,25 +2613,23 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
                     )}
                     {/* Text */}
                     {msg.text && (
-                      <div className={`px-4 ${isLastInGroup ? "pt-2 pb-0" : "py-2"}`}>
+                      <div className="px-4 pt-2 pb-0">
                         <p style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>{msg.text}</p>
                       </div>
                     )}
-                    {/* Timestamp + tick — only on last message in group */}
-                    {isLastInGroup && (
-                      <div className={`px-3 pb-1.5 pt-0.5 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/55" : "text-muted-foreground"}`}>
-                        <span style={{ fontSize: "0.65rem" }}>{msg.time}</span>
-                        {msg.from === "me" && msg.status && (
-                          msg.status === "failed"
-                            ? <AlertCircle size={12} className="text-red-400" aria-label="Failed" />
-                            : msg.status === "read" && readReceipts
-                              ? <CheckCheck size={12} className="text-sky-400" aria-label="Read" />
-                              : msg.status === "delivered" || msg.status === "read"
-                                ? <CheckCheck size={12} className="text-white/55" aria-label="Delivered" />
-                                : <Check size={12} className="text-white/55" aria-label="Sent" />
-                        )}
-                      </div>
-                    )}
+                    {/* Timestamp + tick — shown on every message */}
+                    <div className={`px-3 pb-1.5 pt-0.5 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/55" : "text-muted-foreground"}`}>
+                      <span style={{ fontSize: "0.65rem" }}>{msg.time}</span>
+                      {msg.from === "me" && isLastInGroup && msg.status && (
+                        msg.status === "failed"
+                          ? <AlertCircle size={12} className="text-red-400" aria-label="Failed" />
+                          : msg.status === "read" && readReceipts
+                            ? <CheckCheck size={12} className="text-sky-400" aria-label="Read" />
+                            : msg.status === "delivered" || msg.status === "read"
+                              ? <CheckCheck size={12} className="text-white/55" aria-label="Delivered" />
+                              : <Check size={12} className="text-white/55" aria-label="Sent" />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2585,6 +2663,24 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Reply preview bar */}
+      {replyTo && (
+        <div className="px-4 py-2 border-t border-border bg-secondary flex items-center gap-3">
+          <div className="flex-1 min-w-0 border-l-4 border-primary pl-3">
+            <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--primary)", marginBottom: 2 }}>
+              Replying to {replyTo.from === "me" ? "yourself" : conv.partnerName}
+            </p>
+            <p className="truncate text-muted-foreground" style={{ fontSize: "0.8rem" }}>{replyTo.text || "📷 Photo"}</p>
+          </div>
+          <button
+            onClick={() => setReplyTo(null)}
+            className="flex-shrink-0 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground hover:bg-border transition-colors"
+            aria-label="Cancel reply">
+            <X size={14} />
+          </button>
         </div>
       )}
 
@@ -4103,16 +4199,30 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
   const pf = profileData ?? {};
   const fullName = (pf.fullName as string) ?? "";
   const parts = fullName.trim().split(" ");
+
+  // Auto-detect nationality from ipapi stored location or localStorage
+  const detectedCountry = (() => {
+    try {
+      const loc = localStorage.getItem("ma3moni_detected_location") ?? "";
+      // "City, Country" format — take the last part
+      const parts = loc.split(",").map(s => s.trim());
+      const country = parts[parts.length - 1] ?? "";
+      // Match against our known list
+      return COUNTRIES_LIST.find(c => c.toLowerCase() === country.toLowerCase()) ?? country;
+    } catch { return ""; }
+  })();
+
   const [form, setForm] = useState({
-    firstName: parts[0] ?? "",
-    lastName:  parts.slice(1).join(" ") ?? "",
-    gender:    (pf.gender    as string) ?? "",
-    dob:       (pf.dob       as string) ?? "",
-    city:      (pf.city      as string) ?? "",
-    country:   (pf.country   as string) ?? "",
-    bio:       (pf.bio       as string) ?? "",
-    phone:     (pf.phone     as string) ?? "",
-    email:     "",  // real email for phone users to fill in
+    firstName:   parts[0] ?? "",
+    lastName:    parts.slice(1).join(" ") ?? "",
+    gender:      (pf.gender      as string) ?? "",
+    dob:         (pf.dob         as string) ?? "",
+    city:        (pf.city        as string) ?? "",
+    country:     (pf.country     as string) ?? "",
+    nationality: (pf.nationality as string) ?? detectedCountry,
+    bio:         (pf.bio         as string) ?? "",
+    phone:       (pf.phone       as string) ?? "",
+    email:       "",  // real email for phone users to fill in
   });
   const [saved, setSaved] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(() => {
@@ -4133,7 +4243,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
       // Only update the editable fields — name and gender are locked
       localStorage.setItem("ma3moni_onboarding_progress", JSON.stringify({
         step: 8,
-        form: { ...existing, dob: form.dob, city: form.city, country: form.country, bio: form.bio, phone: form.phone },
+        form: { ...existing, dob: form.dob, city: form.city, country: form.country, nationality: form.nationality, bio: form.bio, phone: form.phone },
       }));
     } catch {}
     // Persist editable fields to backend — name/gender remain as-is
@@ -4142,6 +4252,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
       const patch: Record<string, unknown> = {
         location_city:    form.city.trim() || undefined,
         location_country: form.country.trim() || undefined,
+        nationality:      form.nationality.trim() || undefined,
         bio:              form.bio.trim() || undefined,
       };
       if (form.dob) patch.date_of_birth = form.dob;
@@ -4300,6 +4411,34 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
           <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Date of Birth</label>
           <input type="date" value={form.dob} onChange={e => u("dob", e.target.value)} className={inputCls} style={{ fontSize: "0.9375rem" }} />
         </div>
+
+        {/* Nationality dropdown */}
+        <div>
+          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Nationality</label>
+          <div className="relative">
+            <select
+              value={form.nationality}
+              onChange={e => u("nationality", e.target.value)}
+              className={`${inputCls} appearance-none pr-10`}
+              style={{ fontSize: "0.9375rem" }}>
+              <option value="">Select nationality…</option>
+              {COUNTRIES_LIST.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <ChevronRight size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none rotate-90" />
+          </div>
+          {detectedCountry && !form.nationality && (
+            <button
+              type="button"
+              onClick={() => u("nationality", detectedCountry)}
+              className="mt-1.5 text-primary underline"
+              style={{ fontSize: "0.75rem" }}>
+              Use detected country: {detectedCountry}
+            </button>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>City</label>
@@ -4307,7 +4446,19 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
           </div>
           <div>
             <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Country</label>
-            <input value={form.country} onChange={e => u("country", e.target.value)} placeholder="Country" className={inputCls} style={{ fontSize: "0.9375rem" }} />
+            <div className="relative">
+              <select
+                value={form.country}
+                onChange={e => u("country", e.target.value)}
+                className={`${inputCls} appearance-none pr-10`}
+                style={{ fontSize: "0.9375rem" }}>
+                <option value="">Select country…</option>
+                {COUNTRIES_LIST.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <ChevronRight size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none rotate-90" />
+            </div>
           </div>
         </div>
         <div>
@@ -4421,9 +4572,17 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const _initGender = (() => { try { const r = localStorage.getItem("ma3moni_onboarding_progress"); return r ? (JSON.parse(r) as { form: Record<string,string> }).form?.gender ?? "" : ""; } catch { return ""; } })();
   const _initMocks  = genderAwareMocks(_initGender);
 
+  const CONV_CACHE_KEY = "ma3moni_conv_cache";
+
   // undefined = not yet loaded (shows mock data); [] = loaded but empty; [...] = real data
   const [liveMatches,       setLiveMatches]       = useState<MatchItem[] | undefined>(undefined);
-  const [liveConversations, setLiveConversations] = useState<ConvItem[]>([]);
+  // Boot conversations from localStorage cache so the list renders instantly on launch
+  const [liveConversations, setLiveConversations] = useState<ConvItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(CONV_CACHE_KEY);
+      return raw ? (JSON.parse(raw) as ConvItem[]) : [];
+    } catch { return []; }
+  });
   const [liveInterests,     setLiveInterests]     = useState<InterestItem[]>([]);
 
 
@@ -4539,7 +4698,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
     }).catch(() => {});
 
     messagingApi.list().then(res => {
-      setLiveConversations(dedupeConvs(res.results.map(mapApiConversation)));
+      const convs = dedupeConvs(res.results.map(mapApiConversation));
+      setLiveConversations(convs);
+      try { localStorage.setItem(CONV_CACHE_KEY, JSON.stringify(convs)); } catch {}
     }).catch(() => {});
 
     matchesApi.receivedInterests().then(res => {
@@ -4668,7 +4829,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
     // last-message previews stay current without waiting for the full sync.
     const convPoll = () => {
       messagingApi.list().then(res => {
-        setLiveConversations(dedupeConvs(res.results.map(mapApiConversation)));
+        const convs = dedupeConvs(res.results.map(mapApiConversation));
+        setLiveConversations(convs);
+        try { localStorage.setItem(CONV_CACHE_KEY, JSON.stringify(convs)); } catch {}
       }).catch(() => {});
     };
     convPoll();
