@@ -2173,6 +2173,7 @@ type ChatMsg = {
   text: string;
   imageUrl?: string;   // present for image messages
   time: string;
+  dateKey?: string;    // YYYY-MM-DD for date separators
   status?: "sent" | "delivered" | "read" | "failed";
 };
 
@@ -2220,12 +2221,14 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     } else if (currentUserId) {
       from = m.sender.id === currentUserId ? "me" : "them";
     }
+    const sent = new Date(m.sent_at);
     return {
       id:       m.id,
       from,
       text:     m.content ?? "",
       imageUrl: m.image_url ?? undefined,
-      time:     new Date(m.sent_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      time:     sent.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+      dateKey:  sent.toISOString().slice(0, 10),
       status:   m.read_at ? "read" : "delivered",
     };
   };
@@ -2277,7 +2280,7 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     if (!text.trim() && !imageUrl) return;
     const msgId = `m${Date.now()}`;
     optimisticIds.current.add(msgId);
-    setMessages(prev => [...prev, { id: msgId, from: "me", text, imageUrl, time: nowTime(), status: "sent" }]);
+    setMessages(prev => [...prev, { id: msgId, from: "me", text, imageUrl, time: nowTime(), dateKey: new Date().toISOString().slice(0, 10), status: "sent" }]);
     setInput("");
     setShowSuggestions(false);
     scrollToBottom();
@@ -2308,7 +2311,7 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     // Show local preview immediately for instant feedback
     const localUrl = URL.createObjectURL(file);
     const id = `m${Date.now()}`;
-    setMessages(prev => [...prev, { id, from: "me", text: "", imageUrl: localUrl, time: nowTime(), status: "sent" }]);
+    setMessages(prev => [...prev, { id, from: "me", text: "", imageUrl: localUrl, time: nowTime(), dateKey: new Date().toISOString().slice(0, 10), status: "sent" }]);
     setShowSuggestions(false);
     scrollToBottom();
 
@@ -2345,9 +2348,9 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
-        <button onClick={onBack} aria-label="Go back" className="text-muted-foreground hover:text-foreground transition-colors">
-          <ChevronLeft size={22} />
+      <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border bg-card">
+        <button onClick={onBack} aria-label="Go back" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+          <ChevronLeft size={20} />
         </button>
 
         {/* Avatar — tappable to view partner profile */}
@@ -2356,7 +2359,7 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
           disabled={!onViewPartnerProfile}
           aria-label={`View ${conv.partnerName}'s profile`}
           className="flex-shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 transition-opacity hover:opacity-80 active:opacity-60 disabled:cursor-default">
-          <Avatar color={conv.avatar.color} initials={conv.avatar.initials} size={36} photo={conv.photo} />
+          <Avatar color={conv.avatar.color} initials={conv.avatar.initials} size={30} photo={conv.photo} />
         </button>
 
         <div className="flex-1 min-w-0">
@@ -2364,38 +2367,39 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
           <button
             onClick={() => onViewPartnerProfile?.(conv.partnerId)}
             disabled={!onViewPartnerProfile}
-            className="text-left disabled:cursor-default hover:text-primary transition-colors">
-            <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{conv.partnerName}</p>
+            className="text-left disabled:cursor-default hover:text-primary transition-colors leading-none">
+            <p style={{ fontWeight: 700, fontSize: "0.8125rem" }}>{conv.partnerName}</p>
           </button>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 mt-0.5">
             {typing ? (
-              <span className="text-primary" style={{ fontSize: "0.75rem", fontWeight: 600 }}>typing…</span>
+              <span className="text-primary" style={{ fontSize: "0.6875rem", fontWeight: 600 }}>typing…</span>
             ) : (
               <>
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                <span className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>Active now</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-muted-foreground" style={{ fontSize: "0.6875rem" }}>Active now</span>
               </>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* Icon-only action buttons */}
+        <div className="flex items-center gap-0.5 flex-shrink-0">
           {onReport && (
             <button
               onClick={() => onReport(conv.partnerId, conv.partnerName)}
               aria-label="Report user"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors"
-              style={{ fontSize: "0.75rem", fontWeight: 600 }}>
-              <Flag size={14} /> Report
+              title="Report"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors">
+              <Flag size={15} />
             </button>
           )}
           {onRequestBlock && (
             <button
               onClick={() => onRequestBlock(conv.partnerId, conv.partnerName)}
               aria-label="Block user"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors"
-              style={{ fontSize: "0.75rem", fontWeight: 600 }}>
-              <UserX size={14} /> Block
+              title="Block"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors">
+              <UserX size={15} />
             </button>
           )}
         </div>
@@ -2441,55 +2445,75 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
           </div>
         )}
 
-        {messages.map((msg, idx) => {
-          const prev = messages[idx - 1];
-          const next = messages[idx + 1];
-          // Grouping: is this the first/last in a consecutive run from the same sender?
-          const isFirstInGroup = !prev || prev.from !== msg.from;
-          const isLastInGroup  = !next || next.from !== msg.from;
-          // Corner rounding: flat corners on the "inner" side for grouped bubbles
-          const bubbleRadius = msg.from === "me"
-            ? `rounded-2xl ${isFirstInGroup ? "" : "rounded-tr-md"} ${isLastInGroup ? "rounded-br-sm" : "rounded-br-md"}`
-            : `rounded-2xl ${isFirstInGroup ? "" : "rounded-tl-md"} ${isLastInGroup ? "rounded-bl-sm" : "rounded-bl-md"}`;
-          return (
-          <div key={msg.id} className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"} ${isLastInGroup ? "mb-1" : "mb-0.5"}`}>
-            <div className={`max-w-[75%] overflow-hidden ${bubbleRadius} ${msg.from === "me" ? "bg-primary text-white" : "bg-card border border-border"}`}>
-              {/* Image bubble with loading skeleton */}
-              {msg.imageUrl && (
-                <button onClick={() => setLightboxSrc(msg.imageUrl!)} className="block w-full relative" aria-label="View image"
-                  style={{ maxWidth: 220, minHeight: 80 }}>
-                  <div className="absolute inset-0 bg-muted animate-pulse" />
-                  <img src={msg.imageUrl} alt="Shared image" loading="lazy" decoding="async"
-                    className="w-full object-cover relative z-10"
-                    style={{ maxWidth: 220, maxHeight: 220 }}
-                    onLoad={e => { (e.target as HTMLElement).previousElementSibling?.classList.remove("animate-pulse"); }} />
-                </button>
-              )}
-              {/* Text */}
-              {msg.text && (
-                <div className={`px-4 ${isLastInGroup ? "pt-2 pb-0" : "py-2"}`}>
-                  <p style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>{msg.text}</p>
+        {(() => {
+          const todayKey     = new Date().toISOString().slice(0, 10);
+          const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+          const getDateLabel = (dk: string) => {
+            if (dk === todayKey)     return "Today";
+            if (dk === yesterdayKey) return "Yesterday";
+            return new Date(dk).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+          };
+          return messages.map((msg, idx) => {
+            const prev = messages[idx - 1];
+            const next = messages[idx + 1];
+            const isFirstInGroup = !prev || prev.from !== msg.from;
+            const isLastInGroup  = !next || next.from !== msg.from;
+            const showDateSep    = !!msg.dateKey && (!prev || prev.dateKey !== msg.dateKey);
+            const bubbleRadius = msg.from === "me"
+              ? `rounded-2xl ${isFirstInGroup ? "" : "rounded-tr-md"} ${isLastInGroup ? "rounded-br-sm" : "rounded-br-md"}`
+              : `rounded-2xl ${isFirstInGroup ? "" : "rounded-tl-md"} ${isLastInGroup ? "rounded-bl-sm" : "rounded-bl-md"}`;
+            return (
+              <div key={msg.id}>
+                {/* Date separator chip */}
+                {showDateSep && (
+                  <div className="flex items-center gap-2 my-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 600 }}>
+                      {getDateLabel(msg.dateKey!)}
+                    </span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
+                <div className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"} ${isLastInGroup ? "mb-1" : "mb-0.5"}`}>
+                  <div className={`max-w-[75%] overflow-hidden ${bubbleRadius} ${msg.from === "me" ? "bg-primary text-white" : "bg-card border border-border"}`}>
+                    {/* Image bubble with loading skeleton */}
+                    {msg.imageUrl && (
+                      <button onClick={() => setLightboxSrc(msg.imageUrl!)} className="block w-full relative" aria-label="View image"
+                        style={{ maxWidth: 220, minHeight: 80 }}>
+                        <div className="absolute inset-0 bg-muted animate-pulse" />
+                        <img src={msg.imageUrl} alt="Shared image" loading="lazy" decoding="async"
+                          className="w-full object-cover relative z-10"
+                          style={{ maxWidth: 220, maxHeight: 220 }}
+                          onLoad={e => { (e.target as HTMLElement).previousElementSibling?.classList.remove("animate-pulse"); }} />
+                      </button>
+                    )}
+                    {/* Text */}
+                    {msg.text && (
+                      <div className={`px-4 ${isLastInGroup ? "pt-2 pb-0" : "py-2"}`}>
+                        <p style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>{msg.text}</p>
+                      </div>
+                    )}
+                    {/* Timestamp + tick — only on last message in group */}
+                    {isLastInGroup && (
+                      <div className={`px-3 pb-1.5 pt-0.5 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/55" : "text-muted-foreground"}`}>
+                        <span style={{ fontSize: "0.65rem" }}>{msg.time}</span>
+                        {msg.from === "me" && msg.status && (
+                          msg.status === "failed"
+                            ? <AlertCircle size={12} className="text-red-400" aria-label="Failed" />
+                            : msg.status === "read" && readReceipts
+                              ? <CheckCheck size={12} className="text-sky-400" aria-label="Read" />
+                              : msg.status === "delivered" || msg.status === "read"
+                                ? <CheckCheck size={12} className="text-white/55" aria-label="Delivered" />
+                                : <Check size={12} className="text-white/55" aria-label="Sent" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              {/* Timestamp + tick — only on last message in group, tight spacing */}
-              {isLastInGroup && (
-                <div className={`px-3 pb-1.5 pt-0.5 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/55" : "text-muted-foreground"}`}>
-                  <span style={{ fontSize: "0.65rem" }}>{msg.time}</span>
-                  {msg.from === "me" && msg.status && (
-                    msg.status === "failed"
-                      ? <AlertCircle size={12} className="text-red-400" aria-label="Failed" />
-                      : msg.status === "read" && readReceipts
-                        ? <CheckCheck size={12} className="text-sky-400" aria-label="Read" />
-                        : msg.status === "delivered" || msg.status === "read"
-                          ? <CheckCheck size={12} className="text-white/55" aria-label="Delivered" />
-                          : <Check size={12} className="text-white/55" aria-label="Sent" />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          );
-        })}
+              </div>
+            );
+          });
+        })()}
 
         {/* Typing bubble */}
         {typing && (
