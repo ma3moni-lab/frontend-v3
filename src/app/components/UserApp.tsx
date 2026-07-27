@@ -2133,68 +2133,80 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
       {/* Photos — placeholder slots, no hardcoded stock images */}
       <ProfilePhotoGrid />
 
-      {/* ── Profile Summary Card (mirrors onboarding completion view) ── */}
+      {/* ── Full Profile Summary Card — every editable section, tap to edit ── */}
       {(() => {
-        const religiosityLabel = ["", "Light", "Moderate", "Practising", "Devout", "Very Devout"][Number(pf.religiosity) ?? 0] ?? "";
+        const religiosityLabel = ["", "Light", "Moderate", "Practising", "Devout", "Very Devout"][Number(pf.religiosity) || 0] ?? "";
         const timelineLabels: Record<string, string> = {
           "6months": "Within 6 months", "6-12months": "6–12 months",
           "1-2years": "1–2 years", "2plus": "No rush (2+ years)",
         };
         const timelineLabel = timelineLabels[pf.marriageTimeline as string] ?? (pf.marriageTimeline as string) ?? "";
         const eduLabels: Record<string, string> = { "high-school": "High School", bachelors: "Bachelor's", masters: "Master's", phd: "PhD", other: "Other" };
+        const eduLabel = eduLabels[pf.education as string] ?? (pf.education as string) ?? "";
         const chips = [
           pf.gender === "male" ? "Man" : pf.gender === "female" ? "Woman" : "",
           pf.nationality as string,
           [pf.city, pf.country].filter(Boolean).join(", "),
-          eduLabels[pf.education as string] ?? pf.education as string,
+          eduLabel,
           religiosityLabel ? `${religiosityLabel} practice` : "",
           timelineLabel ? `Marriage: ${timelineLabel}` : "",
         ].filter(Boolean);
 
-        const lifestyle = (pf.lifestyle ?? pf.interests ?? []) as string[];
-        const personality = (pf.personality ?? pf.personalityTraits ?? []) as string[];
-        const lifeGoals = (pf.lifeGoals ?? pf.goals ?? []) as string[];
-        const familyVal = pf.familyImportance === "high" ? "Very Important" : pf.familyImportance === "medium" ? "Important" : pf.familyImportance ? "Values independence" : "";
-        const careerLabel = pf.careerAmbition === "high" ? "Highly Ambitious" : pf.careerAmbition === "balanced" ? "Balanced" : pf.careerAmbition === "low" ? "Family-First" : (pf.careerAmbition as string) ?? "";
+        const lifestyle    = (pf.lifestyle ?? pf.interests ?? []) as string[];
+        const personality  = (pf.personality ?? pf.personalityTraits ?? []) as string[];
+        const lifeGoals    = (pf.lifeGoals ?? pf.goals ?? []) as string[];
+        const familyVal    = pf.familyImportance === "high" ? "Very Important" : pf.familyImportance === "medium" ? "Important" : pf.familyImportance ? "Values independence" : "";
+        const careerLabel  = pf.careerAmbition === "high" ? "Highly Ambitious" : pf.careerAmbition === "balanced" ? "Balanced" : pf.careerAmbition === "low" ? "Family-First" : (pf.careerAmbition as string) ?? "";
         const partnerAgeRange = (pf.prefAgeMin && pf.prefAgeMax) ? `${pf.prefAgeMin}–${pf.prefAgeMax} years` : "";
         const partnerLocLabel = pf.partnerLocation === "same-city" ? "Same City" : pf.partnerLocation === "same-country" ? "Same Country" : pf.partnerLocation === "worldwide" ? "Worldwide" : (pf.partnerLocation as string) ?? "";
 
-        const sections = [
+        // All editable sections — each row is tappable to jump to its edit screen
+        const sections: { title: string; view: SubView; rows: { label: string; val: string }[] }[] = [
           {
-            title: "Background",
-            view: "edit-profile" as SubView,
+            title: "Personal Info",
+            view: "edit-profile",
             rows: [
-              { label: "Nationality", val: pf.nationality as string },
-              { label: "Ethnicity",   val: pf.ethnicity as string },
+              { label: "Full Name",   val: pf.fullName as string ?? "" },
+              { label: "Date of Birth", val: ownAge ? `${ownAge} years old` : (pf.dob as string) ?? "" },
+              { label: "Nationality", val: pf.nationality as string ?? "" },
+              { label: "Ethnicity",   val: pf.ethnicity as string ?? "" },
               { label: "Lives in",    val: [pf.city, pf.country].filter(Boolean).join(", ") },
-              { label: "Profession",  val: pf.profession as string },
               ...(pf.bloodGroup ? [{ label: "Blood Group", val: pf.bloodGroup as string }] : []),
               ...(pf.genotype   ? [{ label: "Genotype",    val: pf.genotype as string }] : []),
+              ...(pf.bio ? [{ label: "About me", val: (pf.bio as string).slice(0, 80) + ((pf.bio as string).length > 80 ? "…" : "") }] : []),
+            ],
+          },
+          {
+            title: "Career & Education",
+            view: "career-education",
+            rows: [
+              { label: "Profession", val: pf.profession as string ?? "" },
+              { label: "Education",  val: eduLabel },
             ],
           },
           {
             title: "Faith & Values",
-            view: "values-lifestyle" as SubView,
+            view: "values-lifestyle",
             rows: [
-              { label: "Religion",          val: pf.religion ? (pf.religion as string).charAt(0).toUpperCase() + (pf.religion as string).slice(1) : (pf.sect as string) ?? "" },
+              { label: "Religion",           val: pf.religion ? (pf.religion as string).charAt(0).toUpperCase() + (pf.religion as string).slice(1) : (pf.sect as string) ?? "" },
               { label: "Spiritual Practice", val: religiosityLabel },
-              { label: "Family",            val: familyVal },
-              ...(lifestyle.length ? [{ label: "Lifestyle",   val: lifestyle.join(", ") }] : []),
+              { label: "Family",             val: familyVal },
+              ...(lifestyle.length   ? [{ label: "Lifestyle",   val: lifestyle.join(", ") }]   : []),
               ...(personality.length ? [{ label: "Personality", val: personality.join(", ") }] : []),
             ],
           },
           {
             title: "Goals & Timeline",
-            view: "life-goals" as SubView,
+            view: "life-goals",
             rows: [
-              { label: "Marriage", val: timelineLabel },
-              { label: "Career",   val: careerLabel },
+              { label: "Marriage",   val: timelineLabel },
+              { label: "Career",     val: careerLabel },
               ...(lifeGoals.length ? [{ label: "Life Goals", val: lifeGoals.join(", ") }] : []),
             ],
           },
           {
             title: "Partner Preferences",
-            view: "partner-prefs" as SubView,
+            view: "partner-prefs",
             rows: [
               { label: "Age Range", val: partnerAgeRange },
               { label: "Location",  val: partnerLocLabel },
@@ -2202,46 +2214,48 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
           },
         ];
 
-        const hasAnyData = chips.length > 0 || sections.some(s => s.rows.some(r => r.val));
-        if (!hasAnyData) return null;
-
         return (
           <div className="px-4 mt-5">
             <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-              {/* Name & chips */}
-              <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h3 style={{ fontWeight: 800, fontSize: "1.1rem" }}>{displayName}</h3>
-                  {chips.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {chips.map(c => (
-                        <span key={c} className="px-2.5 py-1 rounded-full bg-secondary border border-primary/15 text-foreground" style={{ fontSize: "0.72rem", fontWeight: 600 }}>{c}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {/* Name + chips header */}
+              <div className="px-5 py-4 border-b border-border">
+                <h3 style={{ fontWeight: 800, fontSize: "1.125rem" }}>{displayName}</h3>
+                {chips.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {chips.map(c => (
+                      <span key={c} className="px-2.5 py-1 rounded-full bg-secondary border border-primary/15 text-foreground" style={{ fontSize: "0.72rem", fontWeight: 600 }}>{c}</span>
+                    ))}
+                  </div>
+                )}
               </div>
-              {/* Data sections */}
+
+              {/* Editable sections — each is a tappable button */}
               {sections.map(section => {
                 const filledRows = section.rows.filter(r => r.val);
-                if (filledRows.length === 0) return null;
                 return (
                   <button
                     key={section.title}
                     onClick={() => setSubView(section.view)}
-                    className="w-full px-5 py-4 border-b border-border last:border-0 text-left hover:bg-muted/40 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
+                    className="w-full px-5 py-4 border-b border-border last:border-0 text-left hover:bg-muted/40 active:bg-muted/60 transition-colors">
+                    <div className="flex items-center justify-between mb-2.5">
                       <p className="text-muted-foreground" style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{section.title}</p>
-                      <Edit2 size={12} className="text-primary opacity-60 flex-shrink-0" />
+                      <div className="flex items-center gap-1 text-primary" style={{ fontSize: "0.72rem", fontWeight: 600 }}>
+                        <Edit2 size={11} />
+                        <span>Edit</span>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      {filledRows.map(r => (
-                        <div key={r.label} className="flex items-start justify-between gap-3">
-                          <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
-                          <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
-                        </div>
-                      ))}
-                    </div>
+                    {filledRows.length > 0 ? (
+                      <div className="space-y-2">
+                        {filledRows.map(r => (
+                          <div key={r.label} className="flex items-start justify-between gap-3">
+                            <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                            <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-primary/70" style={{ fontSize: "0.8125rem", fontWeight: 500 }}>Tap to add →</p>
+                    )}
                   </button>
                 );
               })}
@@ -2249,22 +2263,6 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
           </div>
         );
       })()}
-
-      {/* Profile Detail sections */}
-      <div className="px-4 mt-5 space-y-2">
-        <p className="text-muted-foreground mb-3" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Edit Profile Sections</p>
-        {PROFILE_ROWS.map(({ icon, label, sub, view, color }) => (
-          <button key={label} onClick={() => setSubView(view)}
-            className="w-full flex items-center gap-3 bg-card rounded-xl border border-border p-4 hover:border-primary/20 hover:shadow-sm transition-all text-left">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: color + "18", color }}>{icon}</div>
-            <div className="flex-1 min-w-0">
-              <p style={{ fontWeight: 600, fontSize: "0.9rem" }}>{label}</p>
-              <p className="text-muted-foreground truncate" style={{ fontSize: "0.8125rem" }}>{sub}</p>
-            </div>
-            <ChevronRight size={15} className="text-muted-foreground flex-shrink-0" />
-          </button>
-        ))}
-      </div>
 
       {/* Found a Partner CTA */}
       <div className="px-4 mt-4">
@@ -2940,7 +2938,7 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
 
   // Build chips for the summary header (same pattern as onboarding summary)
   const chips = [
-    `${match.age} yrs`,
+    match.age > 0 ? `${match.age} yrs` : "",
     match.city && match.country ? `${match.city}, ${match.country}` : match.city || match.country || "",
     label,
     spiritualPractice,
@@ -2986,10 +2984,21 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
 
       {/* ── Main photo + thumbnails ── */}
       <div className="flex-shrink-0 bg-card border-b border-border">
-        {/* Main photo */}
-        <div className="relative w-full" style={{ height: 280 }}>
-          <img src={match.photos[activePhoto] || ""} alt={match.fullName}
-            className="w-full h-full object-cover object-top" decoding="async" />
+        {/* Main photo — aspect-ratio container so the full image is visible without cropping */}
+        <div className="relative w-full bg-black/5" style={{ aspectRatio: "4/5", maxHeight: "72vw" }}>
+          {match.photos[activePhoto] ? (
+            <img
+              src={match.photos[activePhoto]}
+              alt={match.fullName}
+              className="w-full h-full"
+              style={{ objectFit: "contain", objectPosition: "center" }}
+              decoding="async"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <User size={56} className="text-muted-foreground/30" />
+            </div>
+          )}
           {isLocked && activePhoto > 0 && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
               <Lock size={28} className="text-white/80" />
@@ -3001,13 +3010,14 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
           <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {match.photos.map((ph, i) => (
               <button key={i}
-                onClick={() => !isLocked || i === 0 ? setActivePhoto(i) : undefined}
+                onClick={() => (!isLocked || i === 0) ? setActivePhoto(i) : undefined}
                 className="rounded-lg overflow-hidden flex-shrink-0 transition-all relative"
-                style={{ width: 52, height: 60, opacity: activePhoto === i ? 1 : 0.5,
+                style={{ width: 52, height: 60, opacity: activePhoto === i ? 1 : 0.55,
                   outline: activePhoto === i ? "2px solid var(--primary)" : "none", outlineOffset: 2 }}>
                 <img src={ph} alt="" loading="lazy" decoding="async"
-                  className="w-full h-full object-cover object-top"
-                  style={{ filter: isLocked && i > 0 ? "blur(4px)" : "none" }} />
+                  className="w-full h-full"
+                  style={{ objectFit: "cover", objectPosition: "center top",
+                    filter: isLocked && i > 0 ? "blur(4px)" : "none" }} />
                 {isLocked && i > 0 && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                     <Lock size={11} className="text-white/70" />
@@ -3044,60 +3054,56 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
             </div>
           )}
 
-          {/* Background section — always visible */}
-          <div className="px-5 py-4 border-b border-border">
-            <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Background</p>
-            <div className="space-y-2">
-              {[
-                { label: "Age",         val: `${match.age} years` },
+            {/* Sections — same visual pattern as own profile card */}
+          {[
+            {
+              title: "Background",
+              rows: [
+                { label: "Age",         val: match.age > 0 ? `${match.age} years` : "" },
                 { label: "Lives in",    val: [match.city, match.country].filter(Boolean).join(", ") },
                 { label: "Nationality", val: match.nationality },
                 { label: "Profession",  val: match.profession },
                 ...(match.height ? [{ label: "Height", val: `${match.height} cm` }] : []),
-              ].filter(r => r.val).map(r => (
-                <div key={r.label} className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
-                  <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Faith & Values — always visible */}
-          <div className="px-5 py-4 border-b border-border">
-            <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Faith & Values</p>
-            <div className="space-y-2">
-              {[
-                { label: "Religion",           val: religionLabel || "" },
+              ],
+            },
+            {
+              title: "Faith & Values",
+              rows: [
+                { label: "Religion",           val: religionLabel },
                 { label: "Spiritual Practice", val: spiritualPractice },
-                { label: "Family",             val: match.familyImportance },
-                ...(match.lifestyle?.length ? [{ label: "Lifestyle", val: match.lifestyle.join(", ") }] : []),
+                { label: "Family",             val: match.familyImportance ?? "" },
+                ...(match.lifestyle?.length  ? [{ label: "Lifestyle",   val: match.lifestyle.join(", ") }]  : []),
                 ...(match.personality?.length ? [{ label: "Personality", val: match.personality.join(", ") }] : []),
-              ].filter(r => r.val).map(r => (
-                <div key={r.label} className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
-                  <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Goals & Timeline — always visible */}
-          <div className="px-5 py-4">
-            <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Goals & Timeline</p>
-            <div className="space-y-2">
-              {[
-                { label: "Marriage Timeline", val: match.timeline },
-                { label: "Children",          val: match.wantsChildren },
+              ],
+            },
+            {
+              title: "Goals & Timeline",
+              rows: [
+                { label: "Marriage Timeline", val: match.timeline ?? "" },
+                { label: "Children",          val: match.wantsChildren ?? "" },
                 ...(match.goals?.length ? [{ label: "Life Goals", val: match.goals.join(", ") }] : []),
-              ].filter(r => r.val).map(r => (
-                <div key={r.label} className="flex items-start justify-between gap-3">
-                  <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
-                  <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+              ],
+            },
+          ].map(section => {
+            const filled = section.rows.filter(r => r.val);
+            if (!filled.length) return null;
+            return (
+              <div key={section.title} className="px-5 py-4 border-b border-border">
+                <p className="text-muted-foreground mb-3" style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{section.title}</p>
+                <div className="space-y-2">
+                  {filled.map(r => (
+                    <div key={r.label} className="flex items-start justify-between gap-3">
+                      <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                      <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            );
+          })}
+
+          {/* Spacer when last section has border-b */}
+          <div className="h-0.5" />
         </div>
 
         {/* Compatibility breakdown — always visible */}
@@ -3155,48 +3161,54 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
             </div>
           </div>
         ) : (
-          /* Extra details for paid plans */
+          /* Extra details for paid plans — same section-row style */
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-            {/* Bio */}
-            {match.bio && (
-              <div className="px-5 py-4 border-b border-border">
-                <p className="text-muted-foreground mb-2" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>About {match.fullName.split(" ")[0]}</p>
-                <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.7 }}>{match.bio}</p>
-              </div>
-            )}
-            {/* Career */}
-            <div className="px-5 py-4 border-b border-border">
-              <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Career & Education</p>
-              <div className="space-y-2">
-                {[
-                  { label: "Profession",  val: [match.profession, match.company].filter(Boolean).join(" · ") },
-                  { label: "Education",   val: match.education },
-                  { label: "Institution", val: match.institution },
-                  { label: "Languages",   val: match.languages?.join(", ") },
-                ].filter(r => r.val).map(r => (
-                  <div key={r.label} className="flex items-start justify-between gap-3">
-                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
-                    <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Health */}
-            <div className="px-5 py-4">
-              <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Health & Habits</p>
-              <div className="space-y-2">
-                {[
-                  { label: "Smoking", val: match.smoking },
-                  { label: "Drinks",  val: match.drinking },
-                  { label: "Diet",    val: match.diet },
-                ].filter(r => r.val).map(r => (
-                  <div key={r.label} className="flex items-start justify-between gap-3">
-                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
-                    <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {[
+              ...(match.bio ? [{
+                title: `About ${match.fullName.split(" ")[0]}`,
+                isBio: true,
+                rows: [{ label: "", val: match.bio }],
+              }] : []),
+              {
+                title: "Career & Education",
+                isBio: false,
+                rows: [
+                  { label: "Profession",  val: [match.profession, match.company].filter(Boolean).join(" · ") ?? "" },
+                  { label: "Education",   val: match.education ?? "" },
+                  { label: "Institution", val: match.institution ?? "" },
+                  { label: "Languages",   val: match.languages?.join(", ") ?? "" },
+                ],
+              },
+              {
+                title: "Health & Habits",
+                isBio: false,
+                rows: [
+                  { label: "Smoking", val: match.smoking ?? "" },
+                  { label: "Drinks",  val: match.drinking ?? "" },
+                  { label: "Diet",    val: match.diet ?? "" },
+                ],
+              },
+            ].map((section, si, arr) => {
+              const filled = section.rows.filter(r => r.val);
+              if (!filled.length) return null;
+              return (
+                <div key={section.title} className={`px-5 py-4 ${si < arr.length - 1 ? "border-b border-border" : ""}`}>
+                  <p className="text-muted-foreground mb-3" style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{section.title}</p>
+                  {section.isBio ? (
+                    <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.7 }}>{filled[0].val}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {filled.map(r => (
+                        <div key={r.label} className="flex items-start justify-between gap-3">
+                          <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                          <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
