@@ -4717,11 +4717,15 @@ export function UserApp({ onSignOut }: UserAppProps) {
   }, [profileData, backendScore]);
 
   const incompleteFields = useMemo((): { key: string; label: string; section: SubView }[] => {
-    const missing: { key: string; label: string; section: SubView }[] = [];
     const lp = profileData ?? {} as Record<string, unknown>;
     const bp = backendProfileData ?? {} as Record<string, unknown>;
 
-    // Core backend fields — check backend data first, fall back to localStorage.
+    // If backend confirms 100% completion, trust it — no items to show.
+    if (backendScore === 100) return [];
+
+    const missing: { key: string; label: string; section: SubView }[] = [];
+
+    // Core backend fields — backend data is authoritative, localStorage is fallback.
     BACKEND_COMPLETION_FIELDS.forEach(f => {
       const bVal = bp[f.key];
       if (bVal && (typeof bVal !== "string" || bVal.trim())) return;
@@ -4730,13 +4734,26 @@ export function UserApp({ onSignOut }: UserAppProps) {
       if (!lVal || (typeof lVal === "string" && !lVal.trim())) missing.push(f);
     });
 
-    // Extended UX fields (lifestyle, personality, goals, photo).
+    // Extended UX fields — check localStorage and backend equivalents.
+    const hasPhotoLocally  = !!(() => { try { return localStorage.getItem(AVATAR_KEY); } catch { return null; } })();
+    const hasPhotoBackend  = Array.isArray((bp as Record<string,unknown>).photos)
+      ? ((bp as Record<string,unknown>).photos as unknown[]).length > 0
+      : false;
+    const hasPhoto = hasPhotoLocally || hasPhotoBackend;
+
     UX_COMPLETION_FIELDS.forEach(f => {
+      if (f.key === "avatar") {
+        if (!hasPhoto) missing.push({ key: f.key, label: f.label, section: f.section });
+        return;
+      }
+      // Check backend data for UX fields that map to backend profile fields
+      const backendKey = Object.entries(BACKEND_TO_LOCAL_KEY).find(([, lk]) => lk === f.key)?.[0];
+      if (backendKey && bp[backendKey] && (typeof bp[backendKey] !== "string" || (bp[backendKey] as string).trim())) return;
       if (!f.check(lp)) missing.push({ key: f.key, label: f.label, section: f.section });
     });
 
     return missing;
-  }, [backendProfileData, profileData]);
+  }, [backendProfileData, profileData, backendScore]);
 
   const upgradePlan = async (plan: UserPlan) => {
     try {

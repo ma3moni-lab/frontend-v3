@@ -321,8 +321,10 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
               </div>
             </div>
 
-            {/* Body */}
-            <ContentRenderer content={article.content} />
+            {/* Body — .blog-body restores paragraph spacing scoped to article prose */}
+            <div className="blog-body">
+              <ContentRenderer content={article.content} />
+            </div>
 
             {/* Votes — sticky on mobile at the bottom */}
             <div className="mt-10 pt-8 border-t border-border">

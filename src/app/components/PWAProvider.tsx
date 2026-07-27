@@ -51,20 +51,18 @@ export function PWAProvider({ children }: PWAProviderProps) {
   const [swState, setSwState]             = useState<"idle" | "updating">("idle");
   const [showPushPrompt, setShowPushPrompt] = useState(false);
 
-  // Push notification permission — ask once, 4 s after mount
+  // Push notification permission — ask once per session, re-subscribe if already granted.
   useEffect(() => {
     if (!("Notification" in window)) return;
-    // If already granted, silently re-subscribe (handles new installs / cleared storage)
     if (Notification.permission === "granted") {
-      const alreadySubscribed = localStorage.getItem("ma3_push_subscribed");
-      if (!alreadySubscribed) {
-        // Delay so SW is fully registered first
-        const t = setTimeout(() => registerPushSubscription(), 3000);
-        return () => clearTimeout(t);
-      }
-      return;
+      // Always re-subscribe after login or page load so the backend subscription
+      // is always linked to the current user. The backend uses update_or_create
+      // (idempotent), so calling this repeatedly is safe.
+      const t = setTimeout(() => registerPushSubscription(), 3000);
+      return () => clearTimeout(t);
     }
     if (Notification.permission !== "default") return;
+    // Only prompt once per browser session so we don't harass the user.
     const seen = sessionStorage.getItem("ma3_push_prompted");
     if (seen) return;
     const t = setTimeout(() => setShowPushPrompt(true), 4000);
@@ -89,23 +87,34 @@ export function PWAProvider({ children }: PWAProviderProps) {
       const { public_key } = await notifApi.vapidPublicKey();
       if (!public_key) return;
 
+      // Wait for the service worker to be fully active before subscribing.
       const reg = await navigator.serviceWorker.ready;
+
       // Convert URL-safe base64 VAPID public key to Uint8Array
       const keyBytes = urlBase64ToUint8Array(public_key);
+
+      // Subscribe (or return existing subscription — browser deduplicates).
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: keyBytes,
       });
+
       const json = sub.toJSON();
-      const keys = json.keys ?? {};
-      await notifApi.pushSubscribe(
-        json.endpoint ?? sub.endpoint,
-        (keys as Record<string, string>).p256dh ?? "",
-        (keys as Record<string, string>).auth ?? "",
-      );
-      localStorage.setItem("ma3_push_subscribed", "1");
-    } catch {
-      // Silently fail — push is non-critical
+      const keys = (json.keys ?? {}) as Record<string, string>;
+      const endpoint = json.endpoint ?? sub.endpoint;
+      const p256dh   = keys.p256dh ?? "";
+      const auth     = keys.auth ?? "";
+
+      if (!endpoint || !p256dh || !auth) return;
+
+      // Register with backend — uses update_or_create so safe to call repeatedly.
+      // This ensures the subscription is always linked to the currently logged-in user.
+      await notifApi.pushSubscribe(endpoint, p256dh, auth);
+      // Mark subscribed in session only (not localStorage) so it re-runs after login.
+      sessionStorage.setItem("ma3_push_subscribed_session", "1");
+    } catch (err) {
+      // Log for debugging but don't surface to user — push is non-critical.
+      if (import.meta.env.DEV) console.warn("[PWA] Push subscription failed:", err);
     }
   };
 

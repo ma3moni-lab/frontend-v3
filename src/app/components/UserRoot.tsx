@@ -102,9 +102,20 @@ export function UserRoot() {
   // ── Sign out ──────────────────────────────────────────────────
   const signOut = async () => {
     clearTokens();
-    try { localStorage.removeItem(SESSION_KEY); } catch {}
-    try { localStorage.removeItem(PLAN_KEY); } catch {}
-    // Intentionally keep ONBOARDING_KEY — user already completed onboarding; signing out doesn't undo it.
+    // Clear ALL user-specific cache so a different user logging in on the same
+    // device never sees another user's profile data, photos, or push state.
+    const USER_KEYS = [
+      SESSION_KEY,
+      PLAN_KEY,
+      ONBOARDING_KEY,
+      "ma3moni_onboarding_progress",
+      "ma3moni_found_partner",
+      "ma3_push_subscribed",
+      "ma3moni_avatar",
+      "ma3moni_pending_plan",
+      "ma3moni_pending_reference",
+    ];
+    USER_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     setView("landing");
   };
 
