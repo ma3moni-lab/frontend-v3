@@ -126,7 +126,7 @@ export function PaymentsSectionV2() {
           { icon: <Users size={18} />, label: "Paying Subscribers", value: (USER_COUNTS.basic + USER_COUNTS.premium).toLocaleString(), color: "#4A8DB8" },
           { icon: <TrendingUp size={18} />, label: "Revenue Growth", value: "+7.2%", color: "#6B9E78" },
         ].map(({ icon, label, value, color }) => (
-          <div key={label} className="bg-card rounded-2xl border border-border p-5">
+          <div key={label} className="bg-card rounded-2xl border border-border p-4">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: color + "18", color }}>
               {icon}
             </div>
@@ -141,7 +141,7 @@ export function PaymentsSectionV2() {
         <h2 style={{ fontWeight: 700, fontSize: "1.0625rem", marginBottom: "1.25rem" }}>Subscription Plans</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Free */}
-          <div className="rounded-xl border border-border p-5">
+          <div className="rounded-xl border border-border p-4">
             <div className="flex items-center justify-between mb-3">
               <span style={{ fontWeight: 700 }}>Free</span>
               <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>$0 / month</span>
@@ -152,7 +152,7 @@ export function PaymentsSectionV2() {
 
           {/* Basic */}
           {(["basic", "premium"] as const).map(plan => (
-            <div key={plan} className="rounded-xl border border-primary/25 bg-secondary/30 p-5">
+            <div key={plan} className="rounded-xl border border-primary/25 bg-secondary/30 p-4">
               <div className="flex items-center justify-between mb-1">
                 <span style={{ fontWeight: 700, textTransform: "capitalize" }}>{plan}</span>
                 {savedPlan === plan && (
@@ -205,14 +205,14 @@ export function PaymentsSectionV2() {
       {/* ── Payment Providers ── */}
       <div className="bg-card rounded-2xl border border-border p-6 mb-6">
         <h2 style={{ fontWeight: 700, fontSize: "1.0625rem", marginBottom: "1.25rem" }}>Payment Providers</h2>
-        <div className="space-y-5">
+        <div className="space-y-4">
           {(Object.entries(PROVIDER_FIELDS) as [ProviderKey, typeof PROVIDER_FIELDS[ProviderKey]][]).map(([key, meta]) => {
             const cfg = providers[key];
             const activeKeys = cfg.mode === "test" ? meta.testKeys : meta.liveKeys;
             const modeData = cfg.mode === "test" ? cfg.testKeys : cfg.liveKeys;
 
             return (
-              <div key={key} className={`rounded-xl border p-5 transition-all ${cfg.enabled ? "border-primary/20 bg-background" : "border-border opacity-60"}`}>
+              <div key={key} className={`rounded-xl border p-4 transition-all ${cfg.enabled ? "border-primary/20 bg-background" : "border-border opacity-60"}`}>
                 {/* Provider header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">

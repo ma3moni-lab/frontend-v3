@@ -2183,31 +2183,71 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
 
   const readReceipts = plan !== "free";
   const canSendImages = plan === "premium"; // only Premium can send images
+  // Track optimistic message IDs so polling doesn't overwrite them before confirmation
+  const optimisticIds = useRef<Set<string>>(new Set());
 
   const scrollToBottom = (instant = false) =>
     requestAnimationFrame(() =>
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: instant ? "instant" : "smooth" })
     );
 
-  // Load real messages from backend when chat opens
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const toChat = (m: { id: string; sender: { id: string }; content: string | null; image_url: string | null; sent_at: string; read_at: string | null }): ChatMsg => ({
+    id:       m.id,
+    from:     m.sender.id === conv?.partnerId ? "them" : "me",
+    text:     m.content ?? "",
+    imageUrl: m.image_url ?? undefined,
+    time:     new Date(m.sent_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+    status:   m.read_at ? "read" : "delivered",
+  });
+
+  // Initial load — runs once when chat opens
   useEffect(() => {
     messagingApi.messages(conversationId).then(res => {
-      if (res.results.length) {
-        setMessages(res.results.map(m => ({
-          id:       m.id,
-          from:     m.sender.id === conv?.partnerId ? "them" : "me",
-          text:     m.content ?? "",
-          imageUrl: m.image_url ?? undefined,
-          time:     new Date(m.sent_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
-          status:   m.read_at ? "read" : "delivered",
-        } as ChatMsg)));
-      }
+      const loaded = res.results.map(toChat);
+      setMessages(loaded);
+      if (loaded.length > 0) setShowSuggestions(false);
     }).catch(() => {}).finally(() => scrollToBottom(true));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  // Poll for new messages every 5 s while chat is open
+  useEffect(() => {
+    const poll = () => {
+      messagingApi.messages(conversationId).then(res => {
+        const fromBackend = res.results.map(toChat);
+        if (fromBackend.length === 0) return;
+        setMessages(prev => {
+          const backendIds = new Set(fromBackend.map(m => m.id));
+          // Keep optimistic messages not yet confirmed by backend
+          const stillOptimistic = prev.filter(m => optimisticIds.current.has(m.id) && !backendIds.has(m.id));
+          // Preserve read status for our sent messages
+          const merged = fromBackend.map(bm => {
+            const existing = prev.find(pm => pm.id === bm.id);
+            if (existing && existing.from === "me" && existing.status === "read") {
+              return { ...bm, status: "read" as const };
+            }
+            return bm;
+          });
+          const result = [...merged, ...stillOptimistic];
+          // Auto-scroll only if new partner messages arrived
+          const prevThemCount = prev.filter(m => m.from === "them").length;
+          const newThemCount  = fromBackend.filter(m => m.from === "them").length;
+          if (newThemCount > prevThemCount) scrollToBottom();
+          if (result.length > 0) setShowSuggestions(false);
+          return result;
+        });
+      }).catch(() => {});
+    };
+    const id = setInterval(poll, 5_000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   const send = (text: string, imageUrl?: string) => {
     if (!text.trim() && !imageUrl) return;
     const msgId = `m${Date.now()}`;
+    optimisticIds.current.add(msgId);
     setMessages(prev => [...prev, { id: msgId, from: "me", text, imageUrl, time: nowTime(), status: "sent" }]);
     setInput("");
     setShowSuggestions(false);
@@ -2216,10 +2256,10 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     if (text.trim()) {
       messagingApi.send(conversationId, text)
         .then(() => {
+          // Mark delivered; polling will promote to "read" when recipient opens
           setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: "delivered" } : m));
-          if (readReceipts) {
-            setTimeout(() => setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: "read" } : m)), 800);
-          }
+          // Remove from optimistic set — backend now owns it
+          optimisticIds.current.delete(msgId);
         })
         .catch(() => {
           setMessages(prev => prev.map(m => m.id === msgId ? { ...m, status: "failed" } : m));
@@ -2372,16 +2412,26 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
           </div>
         )}
 
-        {messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[75%] rounded-2xl overflow-hidden ${msg.from === "me" ? "bg-primary text-white rounded-br-sm" : "bg-card border border-border rounded-bl-sm"}`}>
+        {messages.map((msg, idx) => {
+          const prev = messages[idx - 1];
+          const next = messages[idx + 1];
+          // Grouping: is this the first/last in a consecutive run from the same sender?
+          const isFirstInGroup = !prev || prev.from !== msg.from;
+          const isLastInGroup  = !next || next.from !== msg.from;
+          // Corner rounding: flat corners on the "inner" side for grouped bubbles
+          const bubbleRadius = msg.from === "me"
+            ? `rounded-2xl ${isFirstInGroup ? "" : "rounded-tr-md"} ${isLastInGroup ? "rounded-br-sm" : "rounded-br-md"}`
+            : `rounded-2xl ${isFirstInGroup ? "" : "rounded-tl-md"} ${isLastInGroup ? "rounded-bl-sm" : "rounded-bl-md"}`;
+          return (
+          <div key={msg.id} className={`flex ${msg.from === "me" ? "justify-end" : "justify-start"} ${isLastInGroup ? "mb-1" : "mb-0.5"}`}>
+            <div className={`max-w-[75%] overflow-hidden ${bubbleRadius} ${msg.from === "me" ? "bg-primary text-white" : "bg-card border border-border"}`}>
               {/* Image bubble with loading skeleton */}
               {msg.imageUrl && (
                 <button onClick={() => setLightboxSrc(msg.imageUrl!)} className="block w-full relative" aria-label="View image"
                   style={{ maxWidth: 220, minHeight: 80 }}>
-                  <div className="absolute inset-0 bg-muted rounded-t-2xl animate-pulse" />
+                  <div className="absolute inset-0 bg-muted animate-pulse" />
                   <img src={msg.imageUrl} alt="Shared image" loading="lazy" decoding="async"
-                    className="w-full object-cover rounded-t-2xl relative z-10"
+                    className="w-full object-cover relative z-10"
                     style={{ maxWidth: 220, maxHeight: 220 }}
                     onLoad={e => { (e.target as HTMLElement).previousElementSibling?.classList.remove("animate-pulse"); }} />
                 </button>
@@ -2392,22 +2442,25 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
                   <p style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>{msg.text}</p>
                 </div>
               )}
-              {/* Timestamp + tick */}
-              <div className={`px-4 pb-2 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/60" : "text-muted-foreground"}`}>
-                <span style={{ fontSize: "0.7rem" }}>{msg.time}</span>
-                {msg.from === "me" && msg.status && (
-                  msg.status === "failed"
-                    ? <AlertCircle size={13} className="text-red-400" aria-label="Failed" />
-                    : msg.status === "read" && readReceipts
-                      ? <CheckCheck size={13} className="text-sky-300" aria-label="Read" />
-                      : msg.status === "delivered" || msg.status === "read"
-                        ? <CheckCheck size={13} aria-label="Delivered" />
-                        : <Check size={13} aria-label="Sent" />
-                )}
-              </div>
+              {/* Timestamp + tick — only on last message in group */}
+              {isLastInGroup && (
+                <div className={`px-4 pb-2 flex items-center gap-1 ${msg.from === "me" ? "justify-end text-white/60" : "text-muted-foreground"}`}>
+                  <span style={{ fontSize: "0.7rem" }}>{msg.time}</span>
+                  {msg.from === "me" && msg.status && (
+                    msg.status === "failed"
+                      ? <AlertCircle size={13} className="text-red-400" aria-label="Failed" />
+                      : msg.status === "read" && readReceipts
+                        ? <CheckCheck size={13} className="text-sky-400" aria-label="Read" />
+                        : msg.status === "delivered" || msg.status === "read"
+                          ? <CheckCheck size={13} className="text-white/60" aria-label="Delivered" />
+                          : <Check size={13} className="text-white/60" aria-label="Sent" />
+                  )}
+                </div>
+              )}
             </div>
           </div>
-        ))}
+          );
+        })}
 
         {/* Typing bubble */}
         {typing && (
@@ -4589,8 +4642,19 @@ export function UserApp({ onSignOut }: UserAppProps) {
     };
 
     sync(); // run immediately on mount
-    const id = setInterval(sync, 30_000);
-    return () => clearInterval(id);
+    const syncId = setInterval(sync, 30_000);
+
+    // Refresh conversation list every 10s independently so unread counts and
+    // last-message previews stay current without waiting for the full sync.
+    const convPoll = () => {
+      messagingApi.list().then(res => {
+        setLiveConversations(res.results.map(mapApiConversation));
+      }).catch(() => {});
+    };
+    convPoll();
+    const convId = setInterval(convPoll, 10_000);
+
+    return () => { clearInterval(syncId); clearInterval(convId); };
   }, []);
 
   // Friendly name per demo account — shown when no onboarding data exists yet.
@@ -4926,9 +4990,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
                   <div className="relative">
                     {icon}
                     {key === "messages" && totalUnread > 0 && (
-                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-accent rounded-full flex items-center justify-center">
-                        <span style={{ fontSize: "0.55rem", fontWeight: 700, color: "white" }}>{totalUnread}</span>
-                      </span>
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
                     )}
                   </div>
                 </div>
