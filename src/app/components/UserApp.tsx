@@ -2212,14 +2212,21 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const toChat = (m: { id: string; sender: { id: string }; content: string | null; image_url: string | null; sent_at: string; read_at: string | null }): ChatMsg => {
-    // Direction: sender is the partner if their ID matches conv.partnerId,
-    // OR if we know our own ID and sender isn't us.
+  const toChat = (m: { id: string; sender: { id: string | number }; content: string | null; image_url: string | null; sent_at: string; read_at: string | null }): ChatMsg => {
+    // Normalize sender ID to string — Django may return numeric IDs
+    const senderId = String(m.sender.id);
+    // Resolve our own user ID: prop → localStorage cache → unknown
+    const myId = currentUserId || (() => { try { return localStorage.getItem("ma3_uid") ?? ""; } catch { return ""; } })();
+    // Resolve partner ID from the conversation record
+    const partnerId = conv?.partnerId ? String(conv.partnerId) : "";
+
     let from: "me" | "them" = "me";
-    if (conv?.partnerId) {
-      from = m.sender.id === conv.partnerId ? "them" : "me";
-    } else if (currentUserId) {
-      from = m.sender.id === currentUserId ? "me" : "them";
+    if (partnerId) {
+      // If we know who the partner is, anyone who isn't the partner sent it as "me"
+      from = senderId === partnerId ? "them" : "me";
+    } else if (myId) {
+      // Fallback: if we know ourselves, identify by matching our own ID
+      from = senderId === myId ? "me" : "them";
     }
     const sent = new Date(m.sent_at);
     return {
@@ -2242,6 +2249,43 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
     }).catch(() => {}).finally(() => scrollToBottom(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+
+  // Re-process directions when currentUserId becomes available after initial load
+  useEffect(() => {
+    if (!currentUserId || messages.length === 0) return;
+    const myId = String(currentUserId);
+    const partnerId = conv?.partnerId ? String(conv.partnerId) : "";
+    setMessages(prev => prev.map(msg => {
+      // Only re-derive direction for messages that might have been tagged wrong
+      // We detect "wrong" by checking if ALL messages are "me" (the failure mode)
+      return msg;
+    }));
+    // Force re-fetch to get correct directions from server truth
+    messagingApi.messages(conversationId).then(res => {
+      if (res.results.length === 0) return;
+      const myId2 = myId;
+      const pid = partnerId;
+      const reprocessed = res.results.map(m => {
+        const senderId = String(m.sender.id);
+        let from: "me" | "them" = "me";
+        if (pid) { from = senderId === pid ? "them" : "me"; }
+        else if (myId2) { from = senderId === myId2 ? "me" : "them"; }
+        const sent = new Date(m.sent_at);
+        return {
+          id: m.id, from, text: m.content ?? "", imageUrl: m.image_url ?? undefined,
+          time: sent.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),
+          dateKey: sent.toISOString().slice(0, 10),
+          status: (m.read_at ? "read" : "delivered") as "read" | "delivered",
+        };
+      });
+      setMessages(prev => {
+        const backendIds = new Set(reprocessed.map(m => m.id));
+        const optimistic = prev.filter(m => optimisticIds.current.has(m.id) && !backendIds.has(m.id));
+        return [...reprocessed, ...optimistic];
+      });
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUserId]);
 
   // Poll for new messages every 5 s while chat is open
   useEffect(() => {
@@ -2633,13 +2677,21 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
   const detailScrollRef = useRef<HTMLDivElement>(null);
   const [showTopBtn, setShowTopBtn] = useState(false);
 
+  // Build chips for the summary header (same pattern as onboarding summary)
+  const chips = [
+    `${match.age} yrs`,
+    match.city && match.country ? `${match.city}, ${match.country}` : match.city || match.country || "",
+    label,
+    spiritualPractice,
+  ].filter(Boolean);
+
   return (
     <div
       ref={detailScrollRef}
       className="flex flex-col h-full bg-background overflow-y-auto"
       onScroll={e => setShowTopBtn((e.target as HTMLElement).scrollTop > 400)}>
 
-      {/* Floating back-to-top button (appears after scrolling 400px) */}
+      {/* Back-to-top */}
       {showTopBtn && (
         <button
           onClick={() => detailScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
@@ -2650,373 +2702,290 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
         </button>
       )}
 
-      {/* ── Hero photo ── */}
-      <div className="relative flex-shrink-0" style={{ height: "420px" }}>
-        <img src={match.photos[activePhoto]} alt={match.fullName} decoding="async" className="w-full h-full object-cover object-top" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(8,16,28,0.9) 0%, rgba(8,16,28,0.35) 50%, transparent 100%)" }} />
-
-        {/* Back */}
-        <button onClick={onBack} aria-label="Go back" className="overlay-nav-btn absolute top-4 left-4 w-10 h-10 rounded-full flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+      {/* ── Top nav bar ── */}
+      <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border flex-shrink-0">
+        <button onClick={onBack} aria-label="Go back" className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft size={20} />
+          <span style={{ fontSize: "0.875rem" }}>Back</span>
         </button>
-
-        {/* Badges */}
-        <div className="absolute top-4 right-4 flex flex-col gap-1.5 items-end">
-          <div className="rounded-2xl flex flex-col items-center justify-center shadow-lg" style={{ background: sc, padding: "8px 12px", minWidth: 60 }}>
-            <span style={{ fontSize: "1.5rem", fontWeight: 900, color: "white", lineHeight: 1 }}>{match.score}</span>
-            <span style={{ fontSize: "0.475rem", fontWeight: 800, color: "white", opacity: 0.8, letterSpacing: "0.06em", marginTop: 1 }}>MATCH %</span>
+        <div className="flex items-center gap-2">
+          {/* Match score badge */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: sc }}>
+            <span style={{ fontSize: "0.875rem", fontWeight: 900, color: "white" }}>{match.score}%</span>
+            <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "white", opacity: 0.85 }}>{label}</span>
           </div>
-          <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: "rgba(197,115,63,0.9)", backdropFilter: "blur(6px)" }}>
-            <Star size={10} className="text-white" />
-            <span style={{ fontSize: "0.625rem", fontWeight: 700, color: "white" }}>Premium</span>
-          </div>
-        </div>
-
-        {/* Name overlay */}
-        <div className="absolute bottom-0 left-0 right-0 p-5">
-          <h2 style={{ fontWeight: 900, fontSize: "1.875rem", color: "white", letterSpacing: "-0.025em", lineHeight: 1.05 }}>
-            {match.fullName}
-          </h2>
-          <p style={{ fontSize: "1rem", color: "white", opacity: 0.75, marginTop: 4 }}>{match.age} · {match.city}, {match.country}</p>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)" }}>
-              <Shield size={10} className="text-white" />
-              <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: "white" }}>Verified</span>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)" }}>
-              <Heart size={10} className="text-white" />
-              <span style={{ fontSize: "0.6875rem", fontWeight: 600, color: "white" }}>{label}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Photo gallery strip + actions ── */}
-      <div className="flex flex-col bg-card border-b border-border">
-        {/* Photo thumbnails row */}
-        <div className="flex gap-1.5 px-4 pt-3 pb-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          {match.photos.map((ph, i) => (
-            <button key={i}
-              onClick={() => isLocked ? undefined : setActivePhoto(i)}
-              aria-disabled={isLocked}
-              className="rounded-xl overflow-hidden flex-shrink-0 transition-all relative"
-              style={{ width: 64, height: 72, opacity: activePhoto === i ? 1 : 0.55, outline: !isLocked && activePhoto === i ? `2px solid var(--primary)` : "none", outlineOffset: 2 }}>
-              <img src={ph} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-top"
-                style={{ filter: isLocked && i > 0 ? "blur(6px)" : "none" }} />
-              {isLocked && i > 0 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-xl">
-                  <Lock size={14} className="text-white/80" />
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-        {/* Action buttons row */}
-        <div className="flex items-center gap-2 px-4 pb-3">
           {onReport && (
-            <button
-              onClick={() => onReport(match.id, match.fullName.split(" ")[0])}
-              aria-label="Report this profile"
-              className="flex items-center gap-1 px-3 py-2 rounded-xl text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors border border-border"
-              style={{ fontSize: "0.75rem", fontWeight: 600 }}>
-              <Flag size={13} /> Report
-            </button>
-          )}
-          <div className="flex-1" />
-          {isAlreadyChatting ? (
-            <button onClick={() => onMessage(match.id)}
-              className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-all"
-              style={{ fontSize: "0.875rem", fontWeight: 700 }}>
-              <MessageCircle size={14} /> Open Chat
-            </button>
-          ) : plan !== "free" ? (
-            <button onClick={() => onMessage(match.id)}
-              className="flex items-center gap-1.5 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl hover:bg-primary/90 transition-all"
-              style={{ fontSize: "0.875rem", fontWeight: 700 }}>
-              <Send size={14} /> Message
-            </button>
-          ) : (
-            <button
-              onClick={() => { if (!localInterest) { setLocalInterest(true); onInterest?.(match.id, match.fullName.split(" ")[0]); } }}
-              disabled={localInterest}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl transition-all ${localInterest ? "bg-green-100 text-green-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
-              style={{ fontSize: "0.875rem", fontWeight: 700 }}>
-              <Heart size={14} fill={localInterest ? "currentColor" : "none"} />
-              {localInterest ? "Interested ✓" : "Show Interest"}
+            <button onClick={() => onReport(match.id, match.fullName.split(" ")[0])} title="Report" aria-label="Report"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors">
+              <Flag size={15} />
             </button>
           )}
         </div>
       </div>
 
-      {/* ── Profile content ── */}
-      <div className="p-4 space-y-4">
-
-        {/* Score summary — always visible */}
-        <div className="rounded-2xl overflow-hidden" style={{ background: sc }}>
-          <div className="p-4 text-white text-center">
-            <p style={{ fontSize: "0.8125rem", opacity: 0.8 }}>Overall Compatibility</p>
-            <p style={{ fontSize: "3.25rem", fontWeight: 900, lineHeight: 1, marginTop: 4 }}>
-              {match.score}<span style={{ fontSize: "1.25rem", opacity: 0.75 }}>%</span>
-            </p>
-            <p style={{ fontSize: "0.875rem", opacity: 0.7, marginTop: 4 }}>{label}</p>
-          </div>
-          {/* Mini 5-pillar bars inside the score card */}
-          <div className="px-5 pb-4 grid grid-cols-5 gap-2">
-            {(["deen","readiness","family","lifestyle","communication"] as const).map(k => {
-              const meta = COMPAT_META[k];
-              const v = match.compatibility[k];
-              return (
-                <div key={k} className="flex flex-col items-center gap-1" title={`${meta.label}: ${v}%`}>
-                  <span style={{ fontSize: "0.875rem" }}>{meta.icon}</span>
-                  <div className="w-full h-1 rounded-full bg-white/25 overflow-hidden">
-                    <div className="h-full rounded-full bg-white/80" style={{ width: `${v}%` }} />
-                  </div>
-                  <span style={{ fontSize: "0.55rem", color: "white", opacity: 0.75, fontWeight: 700 }}>{v}%</span>
-                </div>
-              );
-            })}
-          </div>
+      {/* ── Main photo + thumbnails ── */}
+      <div className="flex-shrink-0 bg-card border-b border-border">
+        {/* Main photo */}
+        <div className="relative w-full" style={{ height: 280 }}>
+          <img src={match.photos[activePhoto] || ""} alt={match.fullName}
+            className="w-full h-full object-cover object-top" decoding="async" />
+          {isLocked && activePhoto > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+              <Lock size={28} className="text-white/80" />
+            </div>
+          )}
         </div>
-
-        {/* Deal-breaker / genotype warnings — always visible if flagged */}
-        {match.dealBreakerWarning && <DealBreakerBadge />}
-        {match.genotypeRisk && !["safe", "carrier"].includes(match.genotypeRisk) && (
-          <GenotypeWarningBadge risk={match.genotypeRisk} />
+        {/* Thumbnail strip */}
+        {match.photos.length > 1 && (
+          <div className="flex gap-1.5 px-4 py-2.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {match.photos.map((ph, i) => (
+              <button key={i}
+                onClick={() => !isLocked || i === 0 ? setActivePhoto(i) : undefined}
+                className="rounded-lg overflow-hidden flex-shrink-0 transition-all relative"
+                style={{ width: 52, height: 60, opacity: activePhoto === i ? 1 : 0.5,
+                  outline: activePhoto === i ? "2px solid var(--primary)" : "none", outlineOffset: 2 }}>
+                <img src={ph} alt="" loading="lazy" decoding="async"
+                  className="w-full h-full object-cover object-top"
+                  style={{ filter: isLocked && i > 0 ? "blur(4px)" : "none" }} />
+                {isLocked && i > 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <Lock size={11} className="text-white/70" />
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
         )}
+      </div>
 
-        {/* Why you match highlights */}
-        {match.highlights.length > 0 && (
-          <div className="bg-card rounded-2xl border border-border p-4">
-            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Why you match</h3>
-            <div className="flex flex-wrap gap-2">
-              {match.highlights.map(h => (
-                <span key={h} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ fontSize: "0.8125rem", fontWeight: 700, background: sc + "18", color: sc }}>
-                  <Check size={12} />{h}
-                </span>
+      {/* ── Profile summary (onboarding-summary style) ── */}
+      <div className="px-4 py-5 space-y-4">
+
+        {/* Name + chips header card */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-border">
+            <h2 style={{ fontWeight: 800, fontSize: "1.25rem" }}>{match.fullName}</h2>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {chips.map(c => (
+                <span key={c} className="px-2.5 py-1 rounded-full bg-secondary border border-primary/15"
+                  style={{ fontSize: "0.75rem", fontWeight: 600 }}>{c}</span>
               ))}
             </div>
           </div>
-        )}
 
-        {/* 5-pillar compat bars — always visible */}
-        <div className="bg-card rounded-2xl border border-border p-4">
-          <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Compatibility Breakdown</h3>
-          <div className="space-y-3.5">
+          {/* Warnings row (if any) */}
+          {(match.dealBreakerWarning || (match.genotypeRisk && !["safe","carrier"].includes(match.genotypeRisk))) && (
+            <div className="px-5 py-3 border-b border-border space-y-2">
+              {match.dealBreakerWarning && <DealBreakerBadge />}
+              {match.genotypeRisk && !["safe","carrier"].includes(match.genotypeRisk) && (
+                <GenotypeWarningBadge risk={match.genotypeRisk} />
+              )}
+            </div>
+          )}
+
+          {/* Background section — always visible */}
+          <div className="px-5 py-4 border-b border-border">
+            <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Background</p>
+            <div className="space-y-2">
+              {[
+                { label: "Age",         val: `${match.age} years` },
+                { label: "Lives in",    val: [match.city, match.country].filter(Boolean).join(", ") },
+                { label: "Nationality", val: match.nationality },
+                { label: "Profession",  val: match.profession },
+                ...(match.height ? [{ label: "Height", val: `${match.height} cm` }] : []),
+              ].filter(r => r.val).map(r => (
+                <div key={r.label} className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                  <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Faith & Values — always visible */}
+          <div className="px-5 py-4 border-b border-border">
+            <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Faith & Values</p>
+            <div className="space-y-2">
+              {[
+                { label: "Religion",           val: religionLabel || "" },
+                { label: "Spiritual Practice", val: spiritualPractice },
+                { label: "Family",             val: match.familyImportance },
+                ...(match.lifestyle?.length ? [{ label: "Lifestyle", val: match.lifestyle.join(", ") }] : []),
+                ...(match.personality?.length ? [{ label: "Personality", val: match.personality.join(", ") }] : []),
+              ].filter(r => r.val).map(r => (
+                <div key={r.label} className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                  <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Goals & Timeline — always visible */}
+          <div className="px-5 py-4">
+            <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Goals & Timeline</p>
+            <div className="space-y-2">
+              {[
+                { label: "Marriage Timeline", val: match.timeline },
+                { label: "Children",          val: match.wantsChildren },
+                ...(match.goals?.length ? [{ label: "Life Goals", val: match.goals.join(", ") }] : []),
+              ].filter(r => r.val).map(r => (
+                <div key={r.label} className="flex items-start justify-between gap-3">
+                  <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                  <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Compatibility breakdown — always visible */}
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Compatibility</p>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background: sc + "22" }}>
+              <span style={{ fontSize: "1rem", fontWeight: 900, color: sc }}>{match.score}%</span>
+            </div>
+          </div>
+          <div className="px-5 py-4 space-y-3">
             {(["deen","readiness","family","lifestyle","communication"] as const).map(k => (
               <CompatBar key={k} dimKey={k} value={match.compatibility[k]} />
             ))}
           </div>
+          {match.highlights.length > 0 && (
+            <div className="px-5 pb-4 flex flex-wrap gap-2">
+              {match.highlights.map(h => (
+                <span key={h} className="flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 600, background: sc + "18", color: sc }}>
+                  <Check size={11} />{h}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* Locked: extra details upgrade wall */}
         {isLocked ? (
-          /* ── UPGRADE WALL for free / basic plans ── */
-          <div className="rounded-3xl overflow-hidden border border-primary/20" style={{ background: "var(--card)" }}>
-            {/* Blurred preview of what's hidden */}
+          <div className="rounded-2xl border border-primary/20 bg-card overflow-hidden shadow-sm">
             <div className="relative px-5 pt-5 pb-2 select-none" style={{ userSelect: "none" }}>
-              <div className="space-y-3" style={{ filter: "blur(5px)", pointerEvents: "none" }}>
-                {[
-                  ["Age", `${match.age} years`],
-                  ["Nationality", match.nationality],
-                  ["Religion", religionLabel || spiritualPractice],
-                  ["Profession", match.profession],
-                  ["Marriage Timeline", match.timeline],
-                ].map(([l, v]) => (
-                  <div key={l} className="flex items-center justify-between py-2 border-b border-border/50">
-                    <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>{l}</span>
-                    <span style={{ fontWeight: 600, fontSize: "0.875rem" }}>{v}</span>
+              <div className="space-y-2.5" style={{ filter: "blur(5px)", pointerEvents: "none" }}>
+                {[["Bio","A thoughtful person who values..."],["Education","Masters degree"],["Smoking","Non-smoker"],["Drinks","Never"]].map(([l,v]) => (
+                  <div key={l} className="flex items-center justify-between py-1.5 border-b border-border/50">
+                    <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{l}</span>
+                    <span style={{ fontWeight: 600, fontSize: "0.8125rem" }}>{v}</span>
                   </div>
                 ))}
               </div>
-              {/* Lock overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center" style={{ background: "linear-gradient(to bottom, transparent 0%, var(--card) 40%)" }}>
-                <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 mb-3">
-                  <Star size={24} className="text-primary-foreground" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6" style={{ background: "linear-gradient(to bottom, transparent 0%, var(--card) 35%)" }}>
+                <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30 mb-3">
+                  <Star size={20} className="text-primary-foreground" />
                 </div>
-                <p style={{ fontWeight: 800, fontSize: "1.0625rem", textAlign: "center" }}>
-                  Unlock Full Profile
-                </p>
-                <p className="text-muted-foreground mt-1.5 text-center px-6" style={{ fontSize: "0.875rem" }}>
-                  Subscribe to a Basic or Premium plan to see this match's full profile, biography, and message them directly.
+                <p style={{ fontWeight: 800, fontSize: "1rem", textAlign: "center" }}>Unlock Full Profile</p>
+                <p className="text-muted-foreground mt-1 text-center" style={{ fontSize: "0.8125rem" }}>
+                  Subscribe to see the full bio, career, and message directly.
                 </p>
               </div>
             </div>
-
-            {/* What's inside teasers */}
-            <div className="px-5 pb-5 pt-2">
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {["Full Bio", "Career & Education", "Values & Lifestyle", "Life Goals", "Personality traits", "Direct Messaging"].map(f => (
-                  <div key={f} className="flex items-center gap-2 bg-muted/50 rounded-xl px-3 py-2.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary/40 flex-shrink-0" />
-                    <span className="text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>{f}</span>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={onUpgrade}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.98]"
-                style={{ fontWeight: 700, fontSize: "1rem" }}>
-                <Star size={17} />
-                View Plans
-              </button>
-
-              <button
-                onClick={onUpgrade}
-                className="w-full mt-2 py-3.5 rounded-2xl border border-border text-foreground hover:bg-muted transition-all"
-                style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
-                Start with Basic — $19/mo
+            <div className="px-5 pb-5 pt-3 space-y-2">
+              <button onClick={onUpgrade}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-[0.98]"
+                style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
+                <Star size={16} /> View Plans
               </button>
             </div>
           </div>
         ) : (
-          /* ── FULL PROFILE for premium ── */
-          <>
-            {/* About / Bio */}
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>About {match.fullName.split(" ")[0]}</h3>
-              <p className="text-muted-foreground" style={{ fontSize: "0.9375rem", lineHeight: 1.75 }}>{match.bio}</p>
-            </div>
-
-            {/* Quick facts */}
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Personal Details</h3>
-              <div className="grid grid-cols-2 gap-3">
+          /* Extra details for paid plans */
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+            {/* Bio */}
+            {match.bio && (
+              <div className="px-5 py-4 border-b border-border">
+                <p className="text-muted-foreground mb-2" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>About {match.fullName.split(" ")[0]}</p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.7 }}>{match.bio}</p>
+              </div>
+            )}
+            {/* Career */}
+            <div className="px-5 py-4 border-b border-border">
+              <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Career & Education</p>
+              <div className="space-y-2">
                 {[
-                  { label: "Age",         value: `${match.age} years` },
-                  { label: "Height",      value: `${match.height} cm` },
-                  { label: "Nationality", value: match.nationality },
-                  { label: "City",        value: `${match.city}, ${match.country}` },
-                  { label: "Languages",   value: match.languages.join(", ") },
-                  { label: "Religion",    value: religionLabel || spiritualPractice },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-muted/50 rounded-xl p-3">
-                    <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</p>
-                    <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{value}</p>
+                  { label: "Profession",  val: [match.profession, match.company].filter(Boolean).join(" · ") },
+                  { label: "Education",   val: match.education },
+                  { label: "Institution", val: match.institution },
+                  { label: "Languages",   val: match.languages?.join(", ") },
+                ].filter(r => r.val).map(r => (
+                  <div key={r.label} className="flex items-start justify-between gap-3">
+                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                    <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Career & Education */}
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Career & Education</h3>
-              <div className="space-y-3">
+            {/* Health */}
+            <div className="px-5 py-4">
+              <p className="text-muted-foreground mb-3" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Health & Habits</p>
+              <div className="space-y-2">
                 {[
-                  { icon: <Briefcase size={14} />, label: "Profession", value: `${match.profession} · ${match.company}` },
-                  { icon: <BookOpen size={14} />, label: "Education", value: `${match.education}` },
-                  { icon: <BookOpen size={14} />, label: "Institution", value: match.institution },
-                ].map(({ icon, label, value }) => (
-                  <div key={label} className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-secondary flex items-center justify-center flex-shrink-0 text-primary mt-0.5">{icon}</div>
-                    <div>
-                      <p className="text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>{label}</p>
-                      <p style={{ fontSize: "0.875rem", fontWeight: 500 }}>{value}</p>
-                    </div>
+                  { label: "Smoking", val: match.smoking },
+                  { label: "Drinks",  val: match.drinking },
+                  { label: "Diet",    val: match.diet },
+                ].filter(r => r.val).map(r => (
+                  <div key={r.label} className="flex items-start justify-between gap-3">
+                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                    <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Values & Lifestyle */}
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Values & Lifestyle</h3>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {[
-                  { label: "Spiritual Practice", value: spiritualPractice },
-                  { label: "Family",      value: match.familyImportance },
-                  { label: "Smoking",     value: match.smoking },
-                  { label: "Drinks",      value: match.drinking },
-                  { label: "Diet",        value: match.diet },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-muted/50 rounded-xl p-3">
-                    <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</p>
-                    <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {match.lifestyle.map(t => (
-                  <span key={t} className="px-3 py-1 rounded-full bg-secondary text-secondary-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Personality */}
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Personality</h3>
-              <div className="flex flex-wrap gap-2">
-                {match.personality.map(t => (
-                  <span key={t} className="px-3 py-1.5 rounded-full border border-primary/25 bg-primary/8 text-primary" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{t}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Goals & Timeline */}
-            <div className="bg-card rounded-2xl border border-border p-4">
-              <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "1rem" }}>Life Goals & Timeline</h3>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-muted/50 rounded-xl p-3 col-span-2">
-                  <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Marriage Timeline</p>
-                  <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--primary)" }}>{match.timeline}</p>
-                </div>
-                <div className="bg-muted/50 rounded-xl p-3 col-span-2">
-                  <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>Children</p>
-                  <p style={{ fontWeight: 600, fontSize: "0.875rem" }}>{match.wantsChildren}</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {match.goals.map(g => (
-                  <span key={g} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary" style={{ fontSize: "0.75rem", fontWeight: 600 }}>
-                    <Check size={11} className="text-primary" />{g}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* CTA */}
-            {isAlreadyChatting ? (
+        {/* CTA */}
+        <div className="space-y-2.5">
+          {isAlreadyChatting ? (
+            <button onClick={() => onMessage(match.id)}
+              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
+              style={{ fontWeight: 700, fontSize: "1rem" }}>
+              <MessageCircle size={17} /> Continue Conversation
+            </button>
+          ) : plan === "free" ? (
+            <button
+              onClick={() => { if (!localInterest) { setLocalInterest(true); onInterest?.(match.id, match.fullName.split(" ")[0]); } }}
+              disabled={localInterest}
+              className={`w-full flex items-center justify-center gap-2 py-4 rounded-2xl transition-all active:scale-[0.98] ${localInterest ? "bg-green-100 text-green-700" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+              style={{ fontWeight: 700, fontSize: "1rem" }}>
+              <Heart size={17} fill={localInterest ? "currentColor" : "none"} />
+              {localInterest ? "Interest Sent ✓" : "Show Interest"}
+            </button>
+          ) : (
+            <>
               <button onClick={() => onMessage(match.id)}
                 className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
                 style={{ fontWeight: 700, fontSize: "1rem" }}>
-                <MessageCircle size={17} /> Continue Conversation
+                <Send size={17} /> Message {match.fullName.split(" ")[0]}
               </button>
-            ) : plan === "premium" ? (
-              // Premium: full message + "Send Introduction" templated opener
-              <div className="space-y-3">
-                <button onClick={() => onMessage(match.id)}
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
-                  style={{ fontWeight: 700, fontSize: "1rem" }}>
-                  <Send size={17} /> Send a Message to {match.fullName.split(" ")[0]}
-                </button>
+              {plan === "premium" && (
                 <button
                   onClick={() => {
                     const senderName = (displayName ?? "").replace(/\s*\(.*\)/, "").trim() || "a fellow member";
-                    const intro = `Hi ${match.fullName.split(" ")[0]}, my name is ${senderName}. I came across your profile and was genuinely impressed by your values and goals — I think we could have a meaningful conversation. I'd love to connect if you're open to it.`;
+                    const intro = `Hi ${match.fullName.split(" ")[0]}, my name is ${senderName}. I came across your profile and was genuinely impressed by your values and goals. I'd love to connect if you're open to it.`;
                     toast("Introduction copied! Paste it as your first message.", { duration: 4000 });
                     navigator.clipboard?.writeText(intro).catch(() => {});
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-primary/30 text-primary hover:bg-primary/5 transition-all"
                   style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
-                  <Star size={15} /> Use Introduction Template
+                  <Star size={15} /> Copy Introduction Template
                 </button>
-              </div>
-            ) : (
-              <button onClick={() => onMessage(match.id)}
-                className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
-                style={{ fontWeight: 700, fontSize: "1rem" }}>
-                <Send size={17} /> Send a Message to {match.fullName.split(" ")[0]}
-              </button>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
+        </div>
 
-        {/* Private notes — Premium only (item 14) */}
+        {/* Private note — Premium only */}
         {plan === "premium" && (
-          <div className="mx-4 mb-4 rounded-2xl border border-border bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             <button
               onClick={() => setNoteOpen(s => !s)}
-              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/40 transition-colors"
-            >
+              className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-muted/40 transition-colors">
               <div className="flex items-center gap-2">
                 <Edit2 size={15} className="text-primary" />
                 <span style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Private note</span>
@@ -3032,25 +3001,17 @@ function MatchDetailView({ matchId, plan, onBack, onUpgrade, onMessage, isAlread
                   Only you can see this — jot down context, reminders, or impressions.
                 </p>
                 <textarea
-                  value={note}
-                  onChange={e => setNote(e.target.value)}
-                  rows={4}
+                  value={note} onChange={e => setNote(e.target.value)} rows={4}
                   placeholder={`Notes about ${match.fullName.split(" ")[0]}…`}
                   className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                  style={{ fontSize: "0.9rem" }}
-                  autoFocus
-                />
+                  style={{ fontSize: "0.9rem" }} autoFocus />
                 <div className="flex gap-2">
                   <button onClick={() => setNoteOpen(false)}
                     className="flex-1 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors"
-                    style={{ fontSize: "0.875rem" }}>
-                    Cancel
-                  </button>
+                    style={{ fontSize: "0.875rem" }}>Cancel</button>
                   <button onClick={saveNote}
                     className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                    style={{ fontSize: "0.875rem", fontWeight: 700 }}>
-                    Save Note
-                  </button>
+                    style={{ fontSize: "0.875rem", fontWeight: 700 }}>Save Note</button>
                 </div>
               </div>
             )}
@@ -4502,7 +4463,11 @@ export function UserApp({ onSignOut }: UserAppProps) {
         setBackendProfileData(p as unknown as Record<string, unknown>);
         // Store full email (including fake phone emails) for detection
         if (me.email) setBackendEmail(me.email);
-        if (me.id) setCurrentUserId(String(me.id));
+        if (me.id) {
+          const uid = String(me.id);
+          setCurrentUserId(uid);
+          try { localStorage.setItem("ma3_uid", uid); } catch {}
+        }
         const PROFILE_KEY = "ma3moni_onboarding_progress";
         try {
           const raw = localStorage.getItem(PROFILE_KEY);
