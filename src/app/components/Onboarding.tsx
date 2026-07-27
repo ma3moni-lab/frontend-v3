@@ -338,6 +338,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
           career_ambition_level: form.careerAmbition || undefined,
           personality_traits:   form.personality.length ? form.personality : undefined,
           interests:            form.lifestyle.length ? form.lifestyle : undefined,
+          life_goals:           form.lifeGoals.length ? form.lifeGoals : undefined,
           pref_age_min:         form.partnerAgeMin || undefined,
           pref_age_max:         form.partnerAgeMax || undefined,
           pref_location:        form.partnerLocation || undefined,
@@ -524,7 +525,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Let's start with you</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Your basic info helps us build your profile.</p>
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <FieldLabel>First Name</FieldLabel>
@@ -586,7 +587,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Your background</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Shared context helps build stronger connections.</p>
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div>
                   <FieldLabel>Nationality</FieldLabel>
                   <SelectInput
@@ -636,7 +637,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Your values</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Shared values are the foundation of a lasting partnership.</p>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
                   <FieldLabel>Religious Affiliation</FieldLabel>
                   <select
@@ -702,7 +703,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>How you connect</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Communication compatibility matters as much as shared values.</p>
-              <div className="space-y-7">
+              <div className="space-y-4">
                 <div>
                   <FieldLabel>Communication Style</FieldLabel>
                   <CardSelect
@@ -735,7 +736,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Your goals</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Aligned goals create a shared future.</p>
-              <div className="space-y-7">
+              <div className="space-y-4">
                 <div>
                   <FieldLabel>Life Goals (select all that apply)</FieldLabel>
                   <div className="mt-3">
@@ -790,7 +791,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <div>
               <h2 style={{ fontWeight: 800, fontSize: "1.625rem", letterSpacing: "-0.02em" }}>Partner preferences</h2>
               <p className="text-muted-foreground mt-2 mb-8" style={{ fontSize: "0.9375rem" }}>Tell us what matters most to you in a partner.</p>
-              <div className="space-y-8">
+              <div className="space-y-4">
                 <div>
                   <FieldLabel>Age Range</FieldLabel>
                   <div className="mt-4 flex items-center gap-4">

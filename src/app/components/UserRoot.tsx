@@ -116,6 +116,8 @@ export function UserRoot() {
       "ma3moni_pending_reference",
       "ma3_uid",
       "ma3moni_conv_cache",
+      "ma3moni_avatar_photo",
+      "ma3moni_detected_location",
     ];
     USER_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     setView("landing");

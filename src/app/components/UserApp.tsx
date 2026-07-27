@@ -64,6 +64,19 @@ type SubView =
 const p = (id: string, w = 600, h = 750) =>
   `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&auto=format`;
 
+/** Calculate age from a DOB string (YYYY-MM-DD or YYYY) — returns null if unknown/zero */
+function calcAge(dob: string | null | undefined): number | null {
+  if (!dob) return null;
+  const year = parseInt(dob.slice(0, 4), 10);
+  if (!year || year < 1900 || year > new Date().getFullYear()) return null;
+  const birthDate = new Date(dob.length > 4 ? dob : `${year}-01-01`);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  if (today.getMonth() < birthDate.getMonth() ||
+      (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) age--;
+  return age > 0 && age < 120 ? age : null;
+}
+
 /**
  * Normalise a media URL returned from the Django backend:
  *  - Relative /media/... → prepend djangoBase
@@ -424,7 +437,7 @@ function mapApiMatch(m: ApiMatchProfile): MatchItem {
   const bd = m.compatibility_breakdown;
   return {
     id: m.id, name: shortName, fullName: m.full_name,
-    age: m.age ?? 0, city: m.location_city, country: m.location_country,
+    age: (m.age && m.age > 0) ? m.age : (calcAge((m as unknown as Record<string,unknown>).date_of_birth as string) ?? 0), city: m.location_city, country: m.location_country,
     nationality: "", score: s,
     photo: ph0, photos: m.photos.map(ph => ph.image_url),
     highlights: [], bio: m.bio ?? "",
@@ -1061,7 +1074,7 @@ function MatchCard({ m, onPass, onView, sc, plan = "free", sentInterest = false,
           <div className="flex items-center gap-3 mt-1.5">
             <div className="flex items-center gap-1"><MapPin size={12} className="text-white/60" /><span style={{ fontSize: "0.875rem", color: "white", opacity: 0.8 }}>{m.city}, {m.country}</span></div>
             <span style={{ fontSize: "0.875rem", color: "white", opacity: 0.65 }}>·</span>
-            <span style={{ fontSize: "0.875rem", color: "white", opacity: 0.8 }}>{m.age} yrs</span>
+            {m.age > 0 && <span style={{ fontSize: "0.875rem", color: "white", opacity: 0.8 }}>{m.age} yrs</span>}
           </div>
           <div className="flex items-center gap-2 mt-2">
             <Briefcase size={12} className="text-white/60" />
@@ -1895,7 +1908,8 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
   const pf = profileData ?? {} as Record<string, unknown>;
   const firstName   = displayName.split(" ")[0];
   // #4 — derive sub-row descriptions from actual onboarding data
-  const personalSub = [pf.fullName as string, pf.age ? `${pf.age}` : "", pf.city as string].filter(Boolean).join(" · ") || "Add personal info";
+  const ownAge = calcAge((pf.dob as string) ?? (pf.birthYear ? `${pf.birthYear}` : null));
+  const personalSub = [pf.fullName as string, ownAge ? `${ownAge} yrs` : "", pf.city as string].filter(Boolean).join(" · ") || "Add personal info";
   const careerSub   = [pf.profession as string, pf.education as string].filter(Boolean).join(" · ") || "Add career & education";
   const valuesSub   = [(pf.religion || pf.sect) as string, pf.religiosity ? `Practice ${pf.religiosity}/5` : "", pf.smoking as string].filter(Boolean).join(" · ") || "Add values & lifestyle";
   const goalsSub    = [pf.marriageTimeline as string, pf.wantsChildren as string].filter(Boolean).join(" · ") || "Add life goals";
@@ -2095,9 +2109,126 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
       {/* Photos — placeholder slots, no hardcoded stock images */}
       <ProfilePhotoGrid />
 
+      {/* ── Profile Summary Card (mirrors onboarding completion view) ── */}
+      {(() => {
+        const religiosityLabel = ["", "Light", "Moderate", "Practising", "Devout", "Very Devout"][Number(pf.religiosity) ?? 0] ?? "";
+        const timelineLabels: Record<string, string> = {
+          "6months": "Within 6 months", "6-12months": "6–12 months",
+          "1-2years": "1–2 years", "2plus": "No rush (2+ years)",
+        };
+        const timelineLabel = timelineLabels[pf.marriageTimeline as string] ?? (pf.marriageTimeline as string) ?? "";
+        const eduLabels: Record<string, string> = { "high-school": "High School", bachelors: "Bachelor's", masters: "Master's", phd: "PhD", other: "Other" };
+        const chips = [
+          pf.gender === "male" ? "Man" : pf.gender === "female" ? "Woman" : "",
+          pf.nationality as string,
+          [pf.city, pf.country].filter(Boolean).join(", "),
+          eduLabels[pf.education as string] ?? pf.education as string,
+          religiosityLabel ? `${religiosityLabel} practice` : "",
+          timelineLabel ? `Marriage: ${timelineLabel}` : "",
+        ].filter(Boolean);
+
+        const lifestyle = (pf.lifestyle ?? pf.interests ?? []) as string[];
+        const personality = (pf.personality ?? pf.personalityTraits ?? []) as string[];
+        const lifeGoals = (pf.lifeGoals ?? pf.goals ?? []) as string[];
+        const familyVal = pf.familyImportance === "high" ? "Very Important" : pf.familyImportance === "medium" ? "Important" : pf.familyImportance ? "Values independence" : "";
+        const careerLabel = pf.careerAmbition === "high" ? "Highly Ambitious" : pf.careerAmbition === "balanced" ? "Balanced" : pf.careerAmbition === "low" ? "Family-First" : (pf.careerAmbition as string) ?? "";
+        const partnerAgeRange = (pf.prefAgeMin && pf.prefAgeMax) ? `${pf.prefAgeMin}–${pf.prefAgeMax} years` : "";
+        const partnerLocLabel = pf.partnerLocation === "same-city" ? "Same City" : pf.partnerLocation === "same-country" ? "Same Country" : pf.partnerLocation === "worldwide" ? "Worldwide" : (pf.partnerLocation as string) ?? "";
+
+        const sections = [
+          {
+            title: "Background",
+            view: "edit-profile" as SubView,
+            rows: [
+              { label: "Nationality", val: pf.nationality as string },
+              { label: "Ethnicity",   val: pf.ethnicity as string },
+              { label: "Lives in",    val: [pf.city, pf.country].filter(Boolean).join(", ") },
+              { label: "Profession",  val: pf.profession as string },
+              ...(pf.bloodGroup ? [{ label: "Blood Group", val: pf.bloodGroup as string }] : []),
+              ...(pf.genotype   ? [{ label: "Genotype",    val: pf.genotype as string }] : []),
+            ],
+          },
+          {
+            title: "Faith & Values",
+            view: "values-lifestyle" as SubView,
+            rows: [
+              { label: "Religion",          val: pf.religion ? (pf.religion as string).charAt(0).toUpperCase() + (pf.religion as string).slice(1) : (pf.sect as string) ?? "" },
+              { label: "Spiritual Practice", val: religiosityLabel },
+              { label: "Family",            val: familyVal },
+              ...(lifestyle.length ? [{ label: "Lifestyle",   val: lifestyle.join(", ") }] : []),
+              ...(personality.length ? [{ label: "Personality", val: personality.join(", ") }] : []),
+            ],
+          },
+          {
+            title: "Goals & Timeline",
+            view: "life-goals" as SubView,
+            rows: [
+              { label: "Marriage", val: timelineLabel },
+              { label: "Career",   val: careerLabel },
+              ...(lifeGoals.length ? [{ label: "Life Goals", val: lifeGoals.join(", ") }] : []),
+            ],
+          },
+          {
+            title: "Partner Preferences",
+            view: "partner-prefs" as SubView,
+            rows: [
+              { label: "Age Range", val: partnerAgeRange },
+              { label: "Location",  val: partnerLocLabel },
+            ],
+          },
+        ];
+
+        const hasAnyData = chips.length > 0 || sections.some(s => s.rows.some(r => r.val));
+        if (!hasAnyData) return null;
+
+        return (
+          <div className="px-4 mt-5">
+            <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+              {/* Name & chips */}
+              <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 style={{ fontWeight: 800, fontSize: "1.1rem" }}>{displayName}</h3>
+                  {chips.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {chips.map(c => (
+                        <span key={c} className="px-2.5 py-1 rounded-full bg-secondary border border-primary/15 text-foreground" style={{ fontSize: "0.72rem", fontWeight: 600 }}>{c}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Data sections */}
+              {sections.map(section => {
+                const filledRows = section.rows.filter(r => r.val);
+                if (filledRows.length === 0) return null;
+                return (
+                  <button
+                    key={section.title}
+                    onClick={() => setSubView(section.view)}
+                    className="w-full px-5 py-4 border-b border-border last:border-0 text-left hover:bg-muted/40 transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-muted-foreground" style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{section.title}</p>
+                      <Edit2 size={12} className="text-primary opacity-60 flex-shrink-0" />
+                    </div>
+                    <div className="space-y-2">
+                      {filledRows.map(r => (
+                        <div key={r.label} className="flex items-start justify-between gap-3">
+                          <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.8125rem" }}>{r.label}</span>
+                          <span className="text-right" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{r.val}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Profile Detail sections */}
-      <div className="px-4 mt-6 space-y-2">
-        <p className="text-muted-foreground mb-3" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Profile Details</p>
+      <div className="px-4 mt-5 space-y-2">
+        <p className="text-muted-foreground mb-3" style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Edit Profile Sections</p>
         {PROFILE_ROWS.map(({ icon, label, sub, view, color }) => (
           <button key={label} onClick={() => setSubView(view)}
             className="w-full flex items-center gap-3 bg-card rounded-xl border border-border p-4 hover:border-primary/20 hover:shadow-sm transition-all text-left">
@@ -2289,7 +2420,12 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
       setMessages(prev => {
         const backendIds = new Set(reprocessed.map(m => m.id));
         const optimistic = prev.filter(m => optimisticIds.current.has(m.id) && !backendIds.has(m.id));
-        return [...reprocessed, ...optimistic];
+        // Carry over client-side reply data that was lost in re-fetch
+        const withReply = reprocessed.map(bm => {
+          const ex = prev.find(pm => pm.id === bm.id);
+          return { ...bm, replyToId: ex?.replyToId, replyToText: ex?.replyToText, replyToFrom: ex?.replyToFrom };
+        });
+        return [...withReply, ...optimistic];
       });
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2308,10 +2444,15 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
           // Preserve read status for our sent messages
           const merged = fromBackend.map(bm => {
             const existing = prev.find(pm => pm.id === bm.id);
-            if (existing && existing.from === "me" && existing.status === "read") {
-              return { ...bm, status: "read" as const };
-            }
-            return bm;
+            return {
+              ...bm,
+              // Preserve promoted read status from local state
+              ...(existing?.from === "me" && existing?.status === "read" ? { status: "read" as const } : {}),
+              // Preserve client-side reply data — backend doesn't store these yet
+              replyToId:   existing?.replyToId,
+              replyToText: existing?.replyToText,
+              replyToFrom: existing?.replyToFrom,
+            };
           });
           const result = [...merged, ...stillOptimistic];
           // Auto-scroll only if new partner messages arrived
