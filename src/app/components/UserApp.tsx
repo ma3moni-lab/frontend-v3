@@ -2347,7 +2347,7 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
         </div>
       )}
 
-      {/* Header */}
+      {/* Header — v2 */}
       <div className="flex items-center gap-2.5 px-3 py-2.5 border-b border-border bg-card">
         <button onClick={onBack} aria-label="Go back" className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
           <ChevronLeft size={20} />
