@@ -869,8 +869,10 @@ export interface SupportTicket {
   category:    string;
   status:      "open" | "in_progress" | "escalated" | "resolved" | "closed";
   priority:    "low" | "medium" | "high" | "urgent";
+  evidence:    string[];   // base64-encoded images or URLs submitted with the ticket
   created_at:  string;
   updated_at:  string;
+  user?:       { id: string; name: string; email: string };
   messages:    Array<{ sender: { id: string; full_name: string }; body: string; sent_at: string }>;
 }
 
@@ -887,8 +889,8 @@ export const moderation = {
   blocks: () =>
     get<{ results: Array<{ id: string; blocked: MatchProfile; blocked_at: string }> }>("/api/blocks/"),
 
-  createTicket: (subject: string, category: string, description: string) =>
-    post<SupportTicket>("/api/support/tickets/", { subject, category, description }),
+  createTicket: (subject: string, category: string, description: string, evidence?: string[]) =>
+    post<SupportTicket>("/api/support/tickets/", { subject, category, description, evidence: evidence ?? [] }),
 
   myTickets: () =>
     get<{ results: SupportTicket[] }>("/api/support/tickets/"),
@@ -1033,6 +1035,11 @@ export const adminApi = {
 
   deleteUser: (id: string) =>
     del<void>(`/api/admin/users/${id}/delete/`),
+
+  bulkDeleteUsers: (user_ids: string[]) =>
+    post<{ deleted: string[]; errors: Array<{ id: string; error: string }> }>(
+      "/api/admin/users/bulk-delete/", { user_ids }
+    ),
 
   grantSubscription: (id: string, plan: UserPlan, days: number) =>
     post<{ detail: string; plan: string }>(`/api/admin/users/${id}/grant-subscription/`, { plan, days }),

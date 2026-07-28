@@ -86,7 +86,7 @@ function PushNotifModal({ targets, onClose }: PushNotifModalProps) {
           </div>
           <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><X size={18} /></button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4">
           {/* Recipients */}
           <div>
             <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Recipients</label>
@@ -342,7 +342,7 @@ function GrantSubModal({ user, onClose, onGranted }: GrantSubModalProps) {
           <h3 style={{ fontWeight: 700, fontSize: "1.125rem" }}>Grant Free Subscription</h3>
           <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground"><X size={18} /></button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4">
           <div className="flex items-center gap-3 p-3 bg-secondary rounded-xl border border-primary/15">
             <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
               <span style={{ fontSize: "0.8125rem", fontWeight: 800, color: "var(--primary)" }}>
@@ -518,6 +518,8 @@ export function UsersSectionV2() {
   const [detailUser, setDetailUser] = useState<typeof USERS[0] | null>(null);
   const [showPushModal, setShowPushModal] = useState(false);
   const [showGrantModal, setShowGrantModal] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showResetPwModal, setShowResetPwModal] = useState(false);
   const [suspendModal, setSuspendModal] = useState<string | null>(null);
   const [suspendReason, setSuspendReason] = useState("");
@@ -674,6 +676,13 @@ export function UsersSectionV2() {
               style={{ fontSize: "0.8125rem", fontWeight: 600 }}
             >
               <Bell size={13} /> Send Notification
+            </button>
+            <button
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition-colors"
+              style={{ fontSize: "0.8125rem", fontWeight: 600 }}
+            >
+              <Trash2 size={13} /> Delete Selected
             </button>
             <button onClick={() => setSelected([])} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <X size={15} />
@@ -916,6 +925,60 @@ export function UsersSectionV2() {
       {showResetPwModal && detailUser && (
         <ResetPasswordModal user={detailUser} onClose={() => setShowResetPwModal(false)} />
       )}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h3 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Delete {selected.length} user{selected.length !== 1 ? "s" : ""}?</h3>
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-muted-foreground mb-5" style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
+              All account data, messages, and matches for the selected user{selected.length !== 1 ? "s" : ""} will be permanently removed from the platform.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 py-3 rounded-xl border border-border hover:bg-muted transition-colors"
+                style={{ fontSize: "0.9rem" }}>
+                Cancel
+              </button>
+              <button
+                disabled={bulkDeleting}
+                onClick={async () => {
+                  setBulkDeleting(true);
+                  try {
+                    const result = await adminApi.bulkDeleteUsers(selected);
+                    const deletedIds = new Set(result.deleted ?? []);
+                    setLiveUsers(prev => prev.filter(u => !deletedIds.has(u.id)));
+                    setSelected([]);
+                    setShowBulkDeleteConfirm(false);
+                    toast.success(`Deleted ${result.deleted?.length ?? 0} user${(result.deleted?.length ?? 0) !== 1 ? "s" : ""} successfully.`);
+                    if ((result.errors ?? []).length) {
+                      toast.error(`${result.errors!.length} deletion${result.errors!.length !== 1 ? "s" : ""} failed — check console.`);
+                    }
+                  } catch {
+                    toast.error("Bulk delete failed — please try again.");
+                  } finally {
+                    setBulkDeleting(false);
+                  }
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-destructive text-white rounded-xl hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+                style={{ fontSize: "0.9rem", fontWeight: 700 }}>
+                {bulkDeleting
+                  ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  : <Trash2 size={14} />}
+                {bulkDeleting ? "Deleting…" : "Delete Forever"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {suspendModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl p-6">

@@ -13,13 +13,14 @@ import {
   type Conversation as ApiConversation,
   type AppNotification as ApiNotification,
   type ReferralStats,
+  type SupportTicket,
 } from "../../lib/api";
 import {
   Home, Heart, MessageCircle, User, Bell, ChevronLeft,
   Settings, Star, Shield, Send, ArrowRight, Copy, Check,
   LogOut, Camera, Edit2, CreditCard, Gift, X, AlertCircle,
   MapPin, Briefcase, BookOpen, ChevronRight, MoreHorizontal,
-  PartyPopper, UserX, Clock, SlidersHorizontal, Lock, CheckCheck, Search, ImagePlus, CheckCircle, Flag, Mail
+  PartyPopper, UserX, Clock, SlidersHorizontal, Lock, CheckCheck, Search, ImagePlus, CheckCircle, Flag, Mail, MessageSquare
 } from "lucide-react";
 import {
   CareerEducationSection,
@@ -32,7 +33,7 @@ import {
   DeactivateSection,
 } from "./user/ProfileSections";
 import { BlogDetail } from "./BlogDetail";
-import { SupportCenterView } from "./user/SupportCenterView";
+import { SupportCenterView, getUnreadTickets, markTicketRead } from "./user/SupportCenterView";
 
 interface UserAppProps {
   onSignOut: () => void;
@@ -3832,14 +3833,15 @@ function ReportModal({ name, onConfirm, onCancel }: {
   onConfirm: (reason: string, category: string, details: string, evidence?: { type: string; content: string; time: string }[]) => void;
   onCancel: () => void;
 }) {
-  const [selected,  setSelected]  = useState("");
-  const [details,   setDetails]   = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [images,    setImages]    = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [selected,    setSelected]    = useState("");
+  const [otherNature, setOtherNature] = useState("");
+  const [details,     setDetails]     = useState("");
+  const [submitted,   setSubmitted]   = useState(false);
+  const [images,      setImages]      = useState<string[]>([]);
+  const [uploading,   setUploading]   = useState(false);
   const imgRef = useRef<HTMLInputElement>(null);
 
-  const canSubmit = !!selected;
+  const canSubmit = !!selected && (selected !== "other" || otherNature.trim().length >= 3);
   const MAX_IMAGES = 3;
 
   const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -3911,6 +3913,20 @@ function ReportModal({ name, onConfirm, onCancel }: {
             </button>
           ))}
 
+          {/* "Other" — specify the nature */}
+          {selected === "other" && (
+            <div className="pt-1">
+              <input
+                value={otherNature}
+                onChange={e => setOtherNature(e.target.value)}
+                placeholder="Please specify the nature of this report…"
+                className="w-full px-4 py-3 rounded-2xl border border-red-200 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
+                style={{ fontSize: "0.875rem" }}
+                autoFocus
+              />
+            </div>
+          )}
+
           {/* Details + evidence — shown after reason picked */}
           {selected && (
             <div className="space-y-3 pt-1">
@@ -3981,8 +3997,11 @@ function ReportModal({ name, onConfirm, onCancel }: {
           <button
             disabled={!canSubmit}
             onClick={() => {
-              const reason = REPORT_REASONS.find(r => r.value === selected)?.label ?? selected;
-              const now    = new Date().toLocaleString();
+              const baseLabel = REPORT_REASONS.find(r => r.value === selected)?.label ?? selected;
+              const reason    = selected === "other" && otherNature.trim()
+                ? `Other — ${otherNature.trim()}`
+                : baseLabel;
+              const now      = new Date().toLocaleString();
               const evidence = images.map(img => ({ type: "image", content: img, time: now }));
               onConfirm(reason, selected, details, evidence.length ? evidence : undefined);
               setSubmitted(true);
@@ -4813,6 +4832,10 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [blockModal, setBlockModal] = useState<{ matchId: string; name: string } | null>(null);
   const [reportModal, setReportModal] = useState<{ matchId: string; name: string } | null>(null);
 
+  // ── Unread support ticket blocking banner ────────────────────
+  const [unreadSupportTicket, setUnreadSupportTicket] = useState<SupportTicket | null>(null);
+  const [openSupportTicketId, setOpenSupportTicketId] = useState<string | undefined>(undefined);
+
   // Profile version + backend state — declared here so any useEffect dependency
   // array that references them doesn't hit the temporal dead zone.
   const [profileVersion, setProfileVersion] = useState(0);
@@ -4927,6 +4950,20 @@ export function UserApp({ onSignOut }: UserAppProps) {
     moderationApi.blocks().then(res => { setBlocked(res.results.map(b => b.blocked.id)); }).catch(() => {});
     notifsApi.list().then(res => { if (res.results.length) setNotifItems(res.results.map(mapApiNotif)); }).catch(() => {});
   }, []);
+
+  // ── Poll support tickets every 60s for unread admin messages ─
+  useEffect(() => {
+    const uid = (() => { try { return localStorage.getItem("ma3_uid") ?? ""; } catch { return ""; } })();
+    const check = () => {
+      moderationApi.myTickets().then(res => {
+        const unread = getUnreadTickets(res.results as Parameters<typeof getUnreadTickets>[0], uid);
+        setUnreadSupportTicket(unread.length ? unread[0] as SupportTicket : null);
+      }).catch(() => {});
+    };
+    check();
+    const interval = setInterval(check, 60_000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Actions wired to API ──────────────────────────────────────
   const submitReport = useCallback(async (
@@ -5259,6 +5296,45 @@ export function UserApp({ onSignOut }: UserAppProps) {
           </div>
         )}
 
+        {/* ── Blocking support-action banner ──────────────────── */}
+        {unreadSupportTicket && (
+          <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+            <div className="bg-background w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-amber-200">
+              <div className="bg-amber-500 px-6 py-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <AlertCircle size={20} className="text-white" />
+                </div>
+                <div className="text-white">
+                  <p style={{ fontWeight: 800, fontSize: "1rem" }}>Support Action Required</p>
+                  <p style={{ fontSize: "0.75rem", opacity: 0.85 }}>Our team has responded to your ticket</p>
+                </div>
+              </div>
+              <div className="px-6 py-5 space-y-3">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                  <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "#92400e" }}>
+                    {unreadSupportTicket.subject}
+                  </p>
+                  <p className="text-amber-700 mt-1" style={{ fontSize: "0.8125rem" }}>
+                    Ma3moni Support has sent you a message that requires your attention. You must read and acknowledge it before continuing.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setOpenSupportTicketId(unreadSupportTicket.id);
+                    setSubView("support-center");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-amber-500 text-white rounded-2xl hover:bg-amber-600 transition-colors"
+                  style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
+                  <MessageSquare size={16} /> Open Support Ticket
+                </button>
+                <p className="text-center text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                  This overlay will clear once you've read the ticket.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Global block-with-reason modal */}
         {blockModal && (
           <BlockModal
@@ -5383,7 +5459,17 @@ export function UserApp({ onSignOut }: UserAppProps) {
           {subView === "partner-prefs"     && <PartnerPrefsSection      onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
           {subView === "privacy-safety"    && <PrivacySafetySection onBack={goBack} plan={userPlan} onUpgrade={() => setSubView("subscription")} />}
           {subView === "app-settings"      && <AppSettingsSection onBack={goBack} />}
-          {subView === "support-center"    && <SupportCenterView onBack={goBack} />}
+          {subView === "support-center"    && <SupportCenterView
+            onBack={() => { setOpenSupportTicketId(undefined); goBack(); }}
+            initialTicketId={openSupportTicketId}
+            onTicketRead={(id, count) => {
+              markTicketRead(id, count);
+              // Re-check if the unread ticket has been read; clear banner if so
+              if (unreadSupportTicket?.id === id) {
+                setUnreadSupportTicket(null);
+              }
+            }}
+          />}
           {subView === "found-partner"     && <FoundPartnerSection onBack={goBack} onComplete={() => { setFoundPartner(true); try { localStorage.setItem("ma3moni_found_partner","true"); } catch {} goBack(); }} />}
           {subView === "deactivate"        && <DeactivateSection onBack={goBack} onSignOut={onSignOut} />}
         </div>
