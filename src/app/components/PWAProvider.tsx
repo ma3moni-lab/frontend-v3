@@ -82,22 +82,34 @@ export function PWAProvider({ children }: PWAProviderProps) {
 
   const registerPushSubscription = async () => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    // Bail out early if permission is not granted — avoids unnecessary API calls
+    if (Notification.permission !== "granted") return;
     try {
       const { notifications: notifApi } = await import("../../lib/api");
       const { public_key } = await notifApi.vapidPublicKey();
       if (!public_key) return;
 
       // Wait for the service worker to be fully active before subscribing.
+      // On mobile the SW can take longer to become ready after install.
       const reg = await navigator.serviceWorker.ready;
 
       // Convert URL-safe base64 VAPID public key to Uint8Array
       const keyBytes = urlBase64ToUint8Array(public_key);
 
-      // Subscribe (or return existing subscription — browser deduplicates).
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: keyBytes,
-      });
+      // Check if there's an existing subscription — if the applicationServerKey
+      // differs (VAPID key rotation), unsubscribe first so re-subscribe works.
+      let sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        // Re-use the existing subscription — don't unsubscribe unnecessarily
+        // (browser deduplicates subscriptions with the same key)
+      } else {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: keyBytes,
+        });
+      }
+
+      if (!sub) return;
 
       const json = sub.toJSON();
       const keys = (json.keys ?? {}) as Record<string, string>;
@@ -110,10 +122,19 @@ export function PWAProvider({ children }: PWAProviderProps) {
       // Register with backend — uses update_or_create so safe to call repeatedly.
       // This ensures the subscription is always linked to the currently logged-in user.
       await notifApi.pushSubscribe(endpoint, p256dh, auth);
-      // Mark subscribed in session only (not localStorage) so it re-runs after login.
       sessionStorage.setItem("ma3_push_subscribed_session", "1");
     } catch (err) {
-      // Log for debugging but don't surface to user — push is non-critical.
+      // DOMException: "Registration failed" usually means the VAPID key changed.
+      // Try to force a fresh subscription.
+      if ((err as Error)?.name === "InvalidStateError" || (err as Error)?.message?.includes("Registration failed")) {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          const oldSub = await reg.pushManager.getSubscription();
+          if (oldSub) await oldSub.unsubscribe();
+          // Retry once after clearing stale subscription
+          await registerPushSubscription();
+        } catch {}
+      }
       if (import.meta.env.DEV) console.warn("[PWA] Push subscription failed:", err);
     }
   };

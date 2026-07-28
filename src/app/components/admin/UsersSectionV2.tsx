@@ -434,15 +434,20 @@ type SortKey = "name" | "joined" | "status";
 
 // ── Activity Timeline component (role-gated) ─────────────────
 // Avatar that fetches the user's first profile photo from Django
+function resolvePhotoUrl(raw: string): string {
+  if (!raw) return "";
+  const base = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+  if (raw.startsWith("http")) return raw;
+  return base + raw;
+}
+
 function UserAvatar({ name, userId, size = 44 }: { name: string; userId: string; size?: number }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     adminApi.userDetail(userId).then(u => {
-      const photo = (u as { photos?: { image_url: string }[] }).photos?.[0]?.image_url;
-      if (photo) {
-        const base = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
-        setSrc(photo.startsWith("/") ? base + photo : photo);
-      }
+      const photos = (u as { photos?: { image_url: string; order?: number }[] }).photos ?? [];
+      const main = photos.find(p => p.order === 0) ?? photos[0];
+      if (main?.image_url) setSrc(resolvePhotoUrl(main.image_url));
     }).catch(() => {});
   }, [userId]);
 
@@ -458,6 +463,67 @@ function UserAvatar({ name, userId, size = 44 }: { name: string; userId: string;
     <div className="rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0"
       style={{ width: size, height: size }}>
       <span style={{ fontSize: r, fontWeight: 800, color: "var(--primary)" }}>{initials}</span>
+    </div>
+  );
+}
+
+function UserPhotoGallery({ userId }: { userId: string }) {
+  const [photos, setPhotos] = useState<{ id: string; image_url: string; order: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lightbox, setLightbox] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPhotos([]);
+    setLoading(true);
+    adminApi.userDetail(userId).then(u => {
+      const raw = (u as { photos?: { id: string; image_url: string; order: number }[] }).photos ?? [];
+      setPhotos(raw.filter(p => p.image_url));
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [userId]);
+
+  if (loading) return (
+    <div className="flex gap-2">
+      {[0, 1, 2].map(i => <div key={i} className="w-16 h-16 rounded-xl bg-muted animate-pulse" />)}
+    </div>
+  );
+
+  return (
+    <div>
+      {lightbox && (
+        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center" onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt="User photo" className="max-w-full max-h-[85vh] rounded-2xl object-contain" />
+          <button className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/20 flex items-center justify-center" aria-label="Close">
+            <X size={18} className="text-white" />
+          </button>
+        </div>
+      )}
+      <div className="flex items-center justify-between mb-2">
+        <h4 style={{ fontWeight: 700, fontSize: "0.9375rem" }}>Photo Catalogue</h4>
+        <span className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{photos.length} photo{photos.length !== 1 ? "s" : ""}</span>
+      </div>
+      {photos.length === 0 ? (
+        <p className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>No photos uploaded yet.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {photos.map((ph, i) => (
+            <div key={ph.id} className="relative flex-shrink-0">
+              <button onClick={() => setLightbox(resolvePhotoUrl(ph.image_url))}
+                className="w-16 h-16 rounded-xl overflow-hidden border-2 block bg-muted"
+                style={{ borderColor: i === 0 ? "var(--primary)" : "var(--border)" }}>
+                <img
+                  src={resolvePhotoUrl(ph.image_url)}
+                  alt={`Photo ${i + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </button>
+              {i === 0 && (
+                <span className="absolute top-0.5 left-0.5 px-1 py-0.5 rounded-sm bg-primary text-primary-foreground" style={{ fontSize: "0.45rem", fontWeight: 800 }}>MAIN</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -898,6 +964,9 @@ export function UsersSectionV2() {
                 <KeyRound size={14} /> Reset Password
               </button>
             </div>
+
+            {/* Photo catalogue */}
+            <UserPhotoGallery userId={detailUser.id} />
 
             {/* Activity timeline — loaded from API, falls back to mock */}
             <ActivityTimeline userId={detailUser.id} />

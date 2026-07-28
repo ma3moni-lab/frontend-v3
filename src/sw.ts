@@ -13,6 +13,8 @@ const PRECACHE_URLS = [
   "/",
   "/manifest.json",
   "/offline.html",
+  "/icons/icon-192.png",
+  "/icons/icon-512.png",
 ];
 
 const sw = self as unknown as ServiceWorkerGlobalScope;
@@ -96,39 +98,66 @@ sw.addEventListener("fetch", (e: FetchEvent) => {
 
 // ── Push notifications ────────────────────────────────────
 sw.addEventListener("push", (e: PushEvent) => {
-  const data = e.data?.json() ?? { title: "Ma3moni", body: "You have a new notification." };
+  // Robust data parsing — handle JSON, plain text, or missing payload
+  let data: { title?: string; body?: string; url?: string } = {};
+  try {
+    data = e.data?.json() ?? {};
+  } catch {
+    try { data = { body: e.data?.text() ?? "" }; } catch {}
+  }
+
+  const title = (data.title ?? "Ma3moni") as string;
+  const body  = (data.body  ?? "You have a new notification.") as string;
+  const url   = (data.url   ?? "/") as string;
+
+  // showNotification MUST be called synchronously inside waitUntil.
+  // We do NOT chain it after clients.matchAll() because that chain can silently
+  // fail on some mobile browsers if matchAll resolves with 0 clients.
+  // Instead we run both in parallel via Promise.all so neither blocks the other.
   e.waitUntil(
-    // Notify all open clients so they can play an in-app sound
-    sw.clients.matchAll({ type: "window" }).then(clients => {
-      clients.forEach(c => c.postMessage({ type: "PUSH_RECEIVED", data }));
-    }).then(() =>
-      sw.registration.showNotification(data.title, {
-        body:             data.body,
-        icon:             "/icons/icon-192.svg",
-        badge:            "/icons/icon-192.svg",
-        data:             { url: data.url ?? "/" },
-        vibrate:          [120, 60, 120, 60, 200],
+    Promise.all([
+      // Always show the OS notification — this is the critical path.
+      // icon must be PNG — SVG is NOT supported on Android Chrome or iOS.
+      sw.registration.showNotification(title, {
+        body,
+        icon:             "/icons/icon-192.png",
+        badge:            "/icons/icon-192.png",
+        data:             { url },
+        vibrate:          [200, 100, 200],
         requireInteraction: false,
         tag:              "ma3moni-push",
         renotify:         true,
         silent:           false,
-      })
-    )
+      }),
+      // Best-effort: tell open tabs a push arrived (for in-app badges / sounds)
+      sw.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
+        clients.forEach(c => c.postMessage({ type: "PUSH_RECEIVED", data: { title, body, url } }));
+      }).catch(() => {}),
+    ])
   );
 });
 
 sw.addEventListener("notificationclick", (e: NotificationEvent) => {
   e.notification.close();
+  const target = (e.notification.data?.url as string | undefined) ?? "/";
   e.waitUntil(
     sw.clients
-      .matchAll({ type: "window" })
+      .matchAll({ type: "window", includeUncontrolled: true })
       .then(list => {
-        const target = e.notification.data?.url ?? "/";
+        // Focus existing window if already open at target URL
         for (const client of list) {
-          if (client.url === target && "focus" in client) return (client as WindowClient).focus();
+          if (client.url.includes(target.replace(/^\//, "")) && "focus" in client) {
+            return (client as WindowClient).focus();
+          }
+        }
+        // Focus any open window and navigate, or open a new one
+        if (list.length > 0 && "navigate" in list[0]) {
+          return (list[0] as WindowClient & { navigate: (url: string) => Promise<WindowClient> })
+            .navigate(target).then(c => c?.focus());
         }
         return sw.clients.openWindow(target);
       })
+      .catch(() => sw.clients.openWindow(target))
   );
 });
 

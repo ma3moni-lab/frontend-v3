@@ -1991,9 +1991,11 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
   useEffect(() => {
     import("../../lib/api").then(({ auth: apiAuth }) => {
       apiAuth.me().then(me => {
-        const first = me.photos.find(ph => ph.image_url && ph.image_url.length > 0);
-        if (!first) return;
-        const url = fixMediaUrl(first.image_url!, djangoBase);
+        const valid = me.photos.filter(ph => ph.image_url && ph.image_url.length > 0);
+        if (!valid.length) return;
+        // Prefer order=0 (main/profile photo); fall back to first in list
+        const main = valid.find(ph => ph.order === 0) ?? valid[0];
+        const url = fixMediaUrl(main.image_url!, djangoBase);
         setAvatarSrc(url);
         try { localStorage.setItem(AVATAR_KEY, url); } catch {}
       }).catch(() => {});
@@ -2005,17 +2007,19 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    // Show base64 preview immediately
+    // Show base64 preview immediately while uploading
     const b64 = await fileToBase64(file);
     setAvatarSrc(b64);
     try {
       const { auth: apiAuth } = await import("../../lib/api");
-      await apiAuth.uploadPhoto(file);
-      // Fetch the authoritative Cloudinary URL from the server
-      const me = await apiAuth.me();
-      const first = me.photos.find(ph => ph.image_url && ph.image_url.length > 0);
-      if (first?.image_url) {
-        const url = fixMediaUrl(first.image_url, djangoBase);
+      // uploadPhoto returns the newly created ProfilePhoto — use its URL directly
+      const newPhoto = await apiAuth.uploadPhoto(file);
+      // Move the new photo to position 0 so it becomes the main profile picture
+      if (newPhoto.id) {
+        try { await apiAuth.reorderPhoto(newPhoto.id, 0); } catch {}
+      }
+      const url = fixMediaUrl(newPhoto.image_url, djangoBase);
+      if (url) {
         setAvatarSrc(url);
         try { localStorage.setItem(AVATAR_KEY, url); } catch {}
       }
@@ -2024,7 +2028,7 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
       try { localStorage.setItem(AVATAR_KEY, b64); } catch {}
     }
     onAvatarSaved?.();
-    toast.success("Profile picture saved.");
+    toast.success("Profile picture updated.");
   };
 
   // #11 — SVG ring geometry
@@ -4226,6 +4230,19 @@ function ProfilePhotoGrid() {
     await loadFromApi();
   };
 
+  const setAsMain = async (i: number) => {
+    const photo = photos[i];
+    if (!photo.id || i === 0) return;
+    try {
+      const { auth: apiAuth } = await import("../../lib/api");
+      await apiAuth.reorderPhoto(photo.id, 0);
+      toast.success("Profile picture updated.");
+      await loadFromApi();
+    } catch {
+      toast.error("Could not update profile picture. Please try again.");
+    }
+  };
+
   return (
     <div className="px-4 mt-5">
       {lightbox && (
@@ -4255,9 +4272,10 @@ function ProfilePhotoGrid() {
       ) : (
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
           {photos.filter(ph => ph.url).map((ph, i) => (
-            <div key={ph.id ?? i} className="relative flex-shrink-0 group">
+            <div key={ph.id ?? i} className="relative flex-shrink-0">
               <button onClick={() => !brokenIdx.has(i) && setLightbox(ph.url)}
-                className="w-20 h-20 rounded-xl overflow-hidden border-2 border-primary/40 block relative bg-muted"
+                className="w-24 h-24 rounded-xl overflow-hidden border-2 block relative bg-muted"
+                style={{ borderColor: i === 0 ? "var(--primary)" : "var(--border)" }}
                 title={ph.url}>
                 {brokenIdx.has(i) ? (
                   <div className="w-full h-full flex flex-col items-center justify-center gap-0.5">
@@ -4271,15 +4289,26 @@ function ProfilePhotoGrid() {
                     onError={() => setBrokenIdx(prev => new Set([...prev, i]))} />
                 )}
               </button>
+              {/* MAIN badge always visible for first photo */}
               {i === 0 && (
-                <span className="absolute -top-1.5 left-0 right-0 flex justify-center">
-                  <span className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground" style={{ fontSize: "0.5rem", fontWeight: 800 }}>MAIN</span>
+                <span className="absolute top-1 left-1">
+                  <span className="px-1 py-0.5 rounded-sm bg-primary text-primary-foreground" style={{ fontSize: "0.45rem", fontWeight: 800 }}>MAIN</span>
                 </span>
               )}
+              {/* Set as main button — visible for non-first photos with an id */}
+              {i > 0 && ph.id && (
+                <button onClick={() => setAsMain(i)}
+                  className="absolute top-1 left-1 px-1 py-0.5 rounded-sm bg-black/60 text-white"
+                  style={{ fontSize: "0.45rem", fontWeight: 700 }}
+                  aria-label="Set as profile picture">
+                  SET MAIN
+                </button>
+              )}
+              {/* Delete button — always visible (no hover-only for mobile) */}
               <button onClick={() => remove(i)}
-                className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center shadow-sm active:scale-90 transition-transform"
                 aria-label="Remove photo">
-                <X size={11} />
+                <X size={10} />
               </button>
             </div>
           ))}
