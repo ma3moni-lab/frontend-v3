@@ -3458,6 +3458,24 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
   const [paying, setPaying] = useState(false);
   const [payCardType, setPayCardType] = useState<"verve" | "standard">("standard");
 
+  // Merge live plan data over the static PLANS constant
+  const [livePlans, setLivePlans] = useState(PLANS);
+  useEffect(() => {
+    import("../../lib/api").then(({ subscriptions: subApi }) => {
+      subApi.plans().then(apiPlans => {
+        setLivePlans(PLANS.map(p => {
+          const live = apiPlans.find(a => a.name === p.id);
+          if (!live) return p;
+          return {
+            ...p,
+            price: live.price_monthly === 0 ? "$0" : `$${Number(live.price_monthly).toFixed(0)}`,
+            features: live.features?.length ? live.features : p.features,
+          };
+        }));
+      }).catch(() => {});
+    });
+  }, []);
+
   if (paying) {
     return (
       <div className="flex flex-col h-full bg-background">
@@ -3471,7 +3489,7 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
           <div className="bg-secondary rounded-2xl p-4 border border-primary/20">
             <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>You selected</p>
             <p style={{ fontWeight: 700, fontSize: "1.125rem", color: "var(--primary)" }}>
-              {PLANS.find(p => p.id === selected)?.name} — {PLANS.find(p => p.id === selected)?.price}{PLANS.find(p => p.id === selected)?.period}
+              {livePlans.find(p => p.id === selected)?.name} — {livePlans.find(p => p.id === selected)?.price}{livePlans.find(p => p.id === selected)?.period}
             </p>
           </div>
           <div>
@@ -3518,7 +3536,7 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
       <div className="flex-1 overflow-y-auto p-4">
         <p className="text-muted-foreground mb-6" style={{ fontSize: "0.9375rem" }}>Unlock more matches, features, and better visibility.</p>
         <div className="space-y-3">
-          {PLANS.map(plan => {
+          {livePlans.map(plan => {
             const isCurrent = plan.id === currentPlan;
             const isSelected = plan.id === selected;
             return (

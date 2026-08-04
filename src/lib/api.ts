@@ -928,7 +928,8 @@ export interface AdminUserDetail extends AdminUserRecord {
   conversations_count:  number;
   reports_filed_count:  number;
   reports_received_count: number;
-  referrals_made_count: number;
+  referrals_made_count:      number;
+  referrals_converted_count: number;
 }
 
 export interface ReportTicketMessage {
@@ -1131,6 +1132,10 @@ export const adminApi = {
 
   updateSettings: (data: Partial<PlatformSettings> & { credo_secret_key?: string; credo_webhook_secret?: string }) =>
     patch<PlatformSettings>("/api/admin/settings/", data),
+
+  // Plan pricing (super admin)
+  updatePlan: (name: string, data: { price_monthly?: number; price_yearly?: number; features?: string[] }) =>
+    patch<Plan>(`/api/admin/plans/${name}/`, data),
 
   // Staff / admin accounts (super_admin only)
   staff: () =>

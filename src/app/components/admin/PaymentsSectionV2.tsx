@@ -1,19 +1,23 @@
-import { useState } from "react";
-import { CheckCircle, Eye, EyeOff, RefreshCw, Save, ToggleLeft, ToggleRight, TrendingUp, DollarSign, Users, X, AlertTriangle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  AlertTriangle, CheckCircle, DollarSign, Eye, EyeOff,
+  Loader2, Plus, RefreshCw, Save, TrendingUp, Users, X,
+} from "lucide-react";
+import { adminApi, subscriptions as subscriptionsApi, type Plan } from "../../../lib/api";
 
-// ── Mock transaction data (replaced by real API on live) ─────
+// ── Mock transaction data (replaced by real billing_history API on live) ─
 const TRANSACTIONS = [
-  { id: "tx1", user: "Aisha Mohammed", plan: "Premium", amount: 49, date: "Jul 1, 2026", status: "completed", provider: "Credo", ref: "CREDO_8821a9" },
-  { id: "tx2", user: "Layla Rahman",   plan: "Premium", amount: 49, date: "Jun 28, 2026", status: "completed", provider: "Credo", ref: "CREDO_44bc1" },
-  { id: "tx3", user: "Yusuf Al-Rashid",plan: "Basic",   amount: 19, date: "Jun 25, 2026", status: "completed", provider: "Credo", ref: "CREDO_C7H3X2" },
-  { id: "tx4", user: "Noor Aziz",      plan: "Premium", amount: 49, date: "Jun 20, 2026", status: "refunded",  provider: "Credo", ref: "CREDO_ref91c" },
-  { id: "tx5", user: "Tariq Mansouri", plan: "Basic",   amount: 19, date: "Jun 18, 2026", status: "failed",    provider: "Credo", ref: "CREDO_fail7" },
-  { id: "tx6", user: "Omar Hassan",    plan: "Basic",   amount: 19, date: "Jun 15, 2026", status: "completed", provider: "Credo", ref: "CREDO_H9G2K1" },
+  { id: "tx1", user: "Aisha Mohammed",  plan: "Premium", amount: 49, date: "Jul 1, 2026",  status: "completed", provider: "Credo", ref: "CREDO_8821a9" },
+  { id: "tx2", user: "Layla Rahman",    plan: "Premium", amount: 49, date: "Jun 28, 2026", status: "completed", provider: "Credo", ref: "CREDO_44bc1" },
+  { id: "tx3", user: "Yusuf Al-Rashid", plan: "Basic",   amount: 19, date: "Jun 25, 2026", status: "completed", provider: "Credo", ref: "CREDO_C7H3X2" },
+  { id: "tx4", user: "Noor Aziz",       plan: "Premium", amount: 49, date: "Jun 20, 2026", status: "refunded",  provider: "Credo", ref: "CREDO_ref91c" },
+  { id: "tx5", user: "Tariq Mansouri",  plan: "Basic",   amount: 19, date: "Jun 18, 2026", status: "failed",    provider: "Credo", ref: "CREDO_fail7" },
+  { id: "tx6", user: "Omar Hassan",     plan: "Basic",   amount: 19, date: "Jun 15, 2026", status: "completed", provider: "Credo", ref: "CREDO_H9G2K1" },
 ];
 
 type PaymentMode = "test" | "live";
-// Credo is the primary gateway. PayPal and Paystack remain as future alternatives.
-type ProviderKey = "credo" | "paypal" | "paystack";
+type ProviderKey  = "credo" | "paypal" | "paystack";
 
 interface ProviderConfig {
   enabled: boolean;
@@ -22,7 +26,7 @@ interface ProviderConfig {
   liveKeys: Record<string, string>;
 }
 
-const PROVIDER_FIELDS: Record<ProviderKey, { label: string; testKeys: string[]; liveKeys: string[]; color: string; description: string; primary?: boolean }> = {
+const PROVIDER_META: Record<ProviderKey, { label: string; testKeys: string[]; liveKeys: string[]; color: string; description: string; primary?: boolean }> = {
   credo: {
     label: "Credo · eTranzact",
     description: "Primary payment gateway — NGN, USD and more. Keys from dashboard.credocentral.com.",
@@ -47,11 +51,7 @@ const PROVIDER_FIELDS: Record<ProviderKey, { label: string; testKeys: string[]; 
   },
 };
 
-const PROVIDER_LOGOS: Record<ProviderKey, string> = {
-  credo:    "CR",
-  paypal:   "PP",
-  paystack: "PS",
-};
+const PROVIDER_LOGOS: Record<ProviderKey, string> = { credo: "CR", paypal: "PP", paystack: "PS" };
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   completed: { bg: "#dcfce7", text: "#166534" },
@@ -68,21 +68,207 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function PaymentsSectionV2() {
-  const [providers, setProviders] = useState<Record<ProviderKey, ProviderConfig>>({
-    credo:    { enabled: true,  mode: "test", testKeys: {}, liveKeys: {} },  // primary
-    paypal:   { enabled: false, mode: "test", testKeys: {}, liveKeys: {} },  // optional
-    paystack: { enabled: false, mode: "test", testKeys: {}, liveKeys: {} },  // optional
-  });
+// ── Plan editor ────────────────────────────────────────────────
+interface PlanEditorProps {
+  plan: Plan;
+  onSaved: (updated: Plan) => void;
+}
 
-  const [plans, setPlans] = useState({ basic: "19", premium: "49" });
-  const [editing, setEditing] = useState<"basic" | "premium" | null>(null);
-  const [draft, setDraft] = useState("");
-  const [savedPlan, setSavedPlan] = useState<"basic" | "premium" | null>(null);
-  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+function PlanEditor({ plan, onSaved }: PlanEditorProps) {
+  const [editing, setEditing] = useState(false);
+  const [priceMonthly, setPriceMonthly] = useState(String(plan.price_monthly));
+  const [priceYearly, setPriceYearly]   = useState(String(plan.price_yearly));
+  const [features, setFeatures]         = useState<string[]>(plan.features ?? []);
+  const [saving, setSaving]             = useState(false);
+
+  const startEdit = () => {
+    setPriceMonthly(String(plan.price_monthly));
+    setPriceYearly(String(plan.price_yearly));
+    setFeatures([...(plan.features ?? [])]);
+    setEditing(true);
+  };
+
+  const cancel = () => setEditing(false);
+
+  const save = async () => {
+    const pm = parseFloat(priceMonthly);
+    const py = parseFloat(priceYearly);
+    if (isNaN(pm) || isNaN(py)) {
+      toast.error("Price must be a number.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await adminApi.updatePlan(plan.name, {
+        price_monthly: pm,
+        price_yearly:  py,
+        features:      features.filter(f => f.trim()),
+      });
+      toast.success(`${plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} plan saved to production.`);
+      onSaved(updated);
+      setEditing(false);
+    } catch {
+      toast.error("Failed to save plan. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (plan.name === "free") {
+    return (
+      <div className="rounded-xl border border-border p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span style={{ fontWeight: 700, textTransform: "capitalize" }}>Free</span>
+          <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>$0 / month</span>
+        </div>
+        <ul className="space-y-1">
+          {(plan.features ?? []).map((f, i) => (
+            <li key={i} className="flex items-center gap-2 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+              <CheckCircle size={12} className="text-green-500 flex-shrink-0" />{f}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-primary/25 bg-secondary/30 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span style={{ fontWeight: 700, textTransform: "capitalize" }}>{plan.name}</span>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            className="text-primary hover:underline"
+            style={{ fontSize: "0.8125rem", fontWeight: 600 }}
+          >
+            Edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Monthly ($)</label>
+              <input
+                autoFocus
+                value={priceMonthly}
+                onChange={e => setPriceMonthly(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-primary/50 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+                style={{ fontSize: "1.125rem", fontWeight: 700 }}
+              />
+            </div>
+            <div>
+              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Yearly ($)</label>
+              <input
+                value={priceYearly}
+                onChange={e => setPriceYearly(e.target.value)}
+                className="w-full px-3 py-1.5 rounded-lg border border-primary/50 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+                style={{ fontSize: "1.125rem", fontWeight: 700 }}
+              />
+            </div>
+          </div>
+
+          {/* Feature list */}
+          <div>
+            <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Features</label>
+            <div className="space-y-1.5">
+              {features.map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={f}
+                    onChange={e => {
+                      const next = [...features];
+                      next[i] = e.target.value;
+                      setFeatures(next);
+                    }}
+                    className="flex-1 px-2.5 py-1 rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    style={{ fontSize: "0.8125rem" }}
+                  />
+                  <button
+                    onClick={() => setFeatures(features.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => setFeatures([...features, ""])}
+                className="flex items-center gap-1 text-primary hover:underline"
+                style={{ fontSize: "0.8125rem" }}
+              >
+                <Plus size={12} /> Add feature
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60"
+              style={{ fontSize: "0.8125rem", fontWeight: 600 }}
+            >
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+              Save to production
+            </button>
+            <button
+              onClick={cancel}
+              className="px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors border border-border rounded-lg"
+              style={{ fontSize: "0.8125rem" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-baseline gap-1 mb-1">
+            <span style={{ fontSize: "2rem", fontWeight: 900, color: "var(--primary)" }}>${plan.price_monthly}</span>
+            <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>/mo</span>
+            <span className="ml-2 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>(${plan.price_yearly}/yr)</span>
+          </div>
+          <ul className="space-y-1 mt-2">
+            {(plan.features ?? []).map((f, i) => (
+              <li key={i} className="flex items-center gap-2" style={{ fontSize: "0.8125rem" }}>
+                <CheckCircle size={12} className="text-primary flex-shrink-0" />{f}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────
+export function PaymentsSectionV2() {
+  const [plans, setPlans]   = useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  const [providers, setProviders] = useState<Record<ProviderKey, ProviderConfig>>({
+    credo:    { enabled: true,  mode: "test", testKeys: {}, liveKeys: {} },
+    paypal:   { enabled: false, mode: "test", testKeys: {}, liveKeys: {} },
+    paystack: { enabled: false, mode: "test", testKeys: {}, liveKeys: {} },
+  });
+  const [showKeys,    setShowKeys]    = useState<Record<string, boolean>>({});
   const [refundModal, setRefundModal] = useState<string | null>(null);
 
-  const toggleMode = (key: ProviderKey) =>
+  useEffect(() => {
+    subscriptionsApi.plans()
+      .then(setPlans)
+      .catch(() => {/* keep empty — UI shows loading skeleton */})
+      .finally(() => setLoadingPlans(false));
+  }, []);
+
+  const handlePlanSaved = (updated: Plan) => {
+    setPlans(prev => prev.map(p => p.name === updated.name ? { ...p, ...updated } : p));
+  };
+
+  const toggleMode    = (key: ProviderKey) =>
     setProviders(p => ({ ...p, [key]: { ...p[key], mode: p[key].mode === "test" ? "live" : "test" } }));
 
   const toggleEnabled = (key: ProviderKey) =>
@@ -91,23 +277,14 @@ export function PaymentsSectionV2() {
   const saveKey = (provider: ProviderKey, mode: PaymentMode, field: string, value: string) => {
     setProviders(p => ({
       ...p,
-      [provider]: {
-        ...p[provider],
-        [`${mode}Keys`]: { ...p[provider][`${mode}Keys`], [field]: value },
-      },
+      [provider]: { ...p[provider], [`${mode}Keys`]: { ...p[provider][`${mode}Keys`], [field]: value } },
     }));
   };
 
-  const savePlan = (plan: "basic" | "premium") => {
-    if (!draft || isNaN(Number(draft))) return;
-    setPlans(p => ({ ...p, [plan]: draft }));
-    setEditing(null);
-    setSavedPlan(plan);
-    setTimeout(() => setSavedPlan(null), 2000);
-  };
-
-  const USER_COUNTS = { basic: 3420, premium: 2193, free: 7234 };
-  const MRR = USER_COUNTS.basic * Number(plans.basic) + USER_COUNTS.premium * Number(plans.premium);
+  const basicPlan   = plans.find(p => p.name === "basic");
+  const premiumPlan = plans.find(p => p.name === "premium");
+  const MRR = (basicPlan ? Number(basicPlan.price_monthly) * 3420 : 0)
+            + (premiumPlan ? Number(premiumPlan.price_monthly) * 2193 : 0);
 
   return (
     <div>
@@ -123,8 +300,8 @@ export function PaymentsSectionV2() {
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
           { icon: <DollarSign size={18} />, label: "Monthly Recurring Revenue", value: `$${MRR.toLocaleString()}`, color: "#0A6870" },
-          { icon: <Users size={18} />, label: "Paying Subscribers", value: (USER_COUNTS.basic + USER_COUNTS.premium).toLocaleString(), color: "#4A8DB8" },
-          { icon: <TrendingUp size={18} />, label: "Revenue Growth", value: "+7.2%", color: "#6B9E78" },
+          { icon: <Users size={18} />,      label: "Paying Subscribers",        value: (3420 + 2193).toLocaleString(),               color: "#4A8DB8" },
+          { icon: <TrendingUp size={18} />, label: "Revenue Growth",            value: "+7.2%",                                       color: "#6B9E78" },
         ].map(({ icon, label, value, color }) => (
           <div key={label} className="bg-card rounded-2xl border border-border p-4">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: color + "18", color }}>
@@ -138,82 +315,35 @@ export function PaymentsSectionV2() {
 
       {/* ── Subscription Plan Pricing ── */}
       <div className="bg-card rounded-2xl border border-border p-6 mb-6">
-        <h2 style={{ fontWeight: 700, fontSize: "1.0625rem", marginBottom: "1.25rem" }}>Subscription Plans</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Free */}
-          <div className="rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-3">
-              <span style={{ fontWeight: 700 }}>Free</span>
-              <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>$0 / month</span>
-            </div>
-            <p style={{ fontSize: "2rem", fontWeight: 900, color: "#68747F" }}>{USER_COUNTS.free.toLocaleString()}</p>
-            <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Active members</p>
-          </div>
-
-          {/* Basic */}
-          {(["basic", "premium"] as const).map(plan => (
-            <div key={plan} className="rounded-xl border border-primary/25 bg-secondary/30 p-4">
-              <div className="flex items-center justify-between mb-1">
-                <span style={{ fontWeight: 700, textTransform: "capitalize" }}>{plan}</span>
-                {savedPlan === plan && (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <CheckCircle size={13} />
-                    <span style={{ fontSize: "0.75rem", fontWeight: 600 }}>Saved</span>
-                  </div>
-                )}
-              </div>
-
-              {editing === plan ? (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-muted-foreground" style={{ fontSize: "1.125rem" }}>$</span>
-                  <input
-                    autoFocus
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") savePlan(plan); if (e.key === "Escape") setEditing(null); }}
-                    className="w-20 px-3 py-1.5 rounded-lg border border-primary/50 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    style={{ fontSize: "1.25rem", fontWeight: 700 }}
-                  />
-                  <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>/mo</span>
-                  <button onClick={() => savePlan(plan)} className="p-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
-                    <Save size={13} />
-                  </button>
-                  <button onClick={() => setEditing(null)} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
-                    <X size={13} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setEditing(plan); setDraft(plans[plan]); }}
-                  className="flex items-baseline gap-1 mt-2 group"
-                >
-                  <span style={{ fontSize: "2rem", fontWeight: 900, color: "var(--primary)" }}>${plans[plan]}</span>
-                  <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>/month</span>
-                  <span className="ml-2 opacity-0 group-hover:opacity-100 text-primary transition-opacity" style={{ fontSize: "0.75rem" }}>Edit</span>
-                </button>
-              )}
-
-              <p style={{ fontSize: "1.5rem", fontWeight: 800, marginTop: "0.75rem", color: "var(--foreground)" }}>
-                {USER_COUNTS[plan].toLocaleString()}
-              </p>
-              <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>subscribers · ${(USER_COUNTS[plan] * Number(plans[plan])).toLocaleString()} MRR</p>
-            </div>
-          ))}
+        <div className="flex items-center justify-between mb-5">
+          <h2 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Subscription Plans</h2>
+          <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Changes are saved directly to production</p>
         </div>
+
+        {loadingPlans ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
+            <Loader2 size={18} className="animate-spin" /> Loading plans…
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {plans.map(plan => (
+              <PlanEditor key={plan.name} plan={plan} onSaved={handlePlanSaved} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Payment Providers ── */}
       <div className="bg-card rounded-2xl border border-border p-6 mb-6">
         <h2 style={{ fontWeight: 700, fontSize: "1.0625rem", marginBottom: "1.25rem" }}>Payment Providers</h2>
         <div className="space-y-4">
-          {(Object.entries(PROVIDER_FIELDS) as [ProviderKey, typeof PROVIDER_FIELDS[ProviderKey]][]).map(([key, meta]) => {
+          {(Object.entries(PROVIDER_META) as [ProviderKey, typeof PROVIDER_META[ProviderKey]][]).map(([key, meta]) => {
             const cfg = providers[key];
             const activeKeys = cfg.mode === "test" ? meta.testKeys : meta.liveKeys;
-            const modeData = cfg.mode === "test" ? cfg.testKeys : cfg.liveKeys;
+            const modeData   = cfg.mode === "test" ? cfg.testKeys  : cfg.liveKeys;
 
             return (
               <div key={key} className={`rounded-xl border p-4 transition-all ${cfg.enabled ? "border-primary/20 bg-background" : "border-border opacity-60"}`}>
-                {/* Provider header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white" style={{ background: meta.color, fontSize: "0.75rem" }}>
@@ -225,7 +355,6 @@ export function PaymentsSectionV2() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {/* Test / Live toggle */}
                     <div className="flex items-center gap-2">
                       <span style={{ fontSize: "0.75rem", fontWeight: cfg.mode === "test" ? 700 : 400, color: cfg.mode === "test" ? "#C5733F" : "var(--muted-foreground)" }}>Test</span>
                       <button
@@ -237,7 +366,6 @@ export function PaymentsSectionV2() {
                       </button>
                       <span style={{ fontSize: "0.75rem", fontWeight: cfg.mode === "live" ? 700 : 400, color: cfg.mode === "live" ? "var(--primary)" : "var(--muted-foreground)" }}>Live</span>
                     </div>
-                    {/* Enable/disable */}
                     <button
                       onClick={() => toggleEnabled(key)}
                       className={`px-3 py-1.5 rounded-lg border transition-all ${cfg.enabled ? "border-primary/30 text-primary bg-secondary hover:bg-primary hover:text-white" : "border-border text-muted-foreground hover:bg-muted"}`}
@@ -248,7 +376,6 @@ export function PaymentsSectionV2() {
                   </div>
                 </div>
 
-                {/* Mode badge */}
                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-4 ${cfg.mode === "live" ? "bg-green-50 border border-green-200" : "bg-amber-50 border border-amber-200"}`}>
                   <div className={`w-1.5 h-1.5 rounded-full ${cfg.mode === "live" ? "bg-green-500" : "bg-amber-500"}`} />
                   <span style={{ fontSize: "0.75rem", fontWeight: 700, color: cfg.mode === "live" ? "#16a34a" : "#d97706" }}>
@@ -263,7 +390,6 @@ export function PaymentsSectionV2() {
                   </div>
                 )}
 
-                {/* API key fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {activeKeys.map(field => {
                     const fieldId = `${key}-${cfg.mode}-${field}`;
@@ -292,7 +418,6 @@ export function PaymentsSectionV2() {
                   })}
                 </div>
 
-                {/* Webhook URL */}
                 <div className="mt-3">
                   <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Webhook URL</label>
                   <div className="flex items-center gap-2">
