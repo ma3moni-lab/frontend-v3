@@ -4385,129 +4385,6 @@ function ProfilePhotoGrid() {
       {!loading && photos.length === 0 && !apiError && (
         <p className="text-muted-foreground mt-2" style={{ fontSize: "0.75rem" }}>Tap + to upload up to {MAX_PHOTOS} photos.</p>
       )}
-      <PhotoDebugPanel />
-    </div>
-  );
-}
-
-type PhotoDebugData = {
-  USE_CLOUDINARY: boolean;
-  CLOUDINARY_STORAGE_cloud: string;
-  cloudinary_sdk_cloud: string;
-  MEDIA_URL: string;
-  photos: Array<{
-    id: string;
-    image_name: string | null;
-    build_media_url: string | null;
-    cloudinary: { exists: boolean; secure_url?: string; format?: string; error?: string; public_id?: string } | null;
-  }>;
-  cloudinary_folder_listing: Array<{ public_id: string; secure_url: string; format: string }> | { error: string };
-};
-
-function PhotoDebugPanel() {
-  const [open, setOpen]         = useState(false);
-  const [data, setData]         = useState<PhotoDebugData | null>(null);
-  const [loading, setLoading]   = useState(false);
-  const [fixing, setFixing]     = useState(false);
-  const [fixResult, setFixResult] = useState<string | null>(null);
-  const [err, setErr]           = useState<string | null>(null);
-
-  const run = async () => {
-    setLoading(true); setErr(null); setFixResult(null);
-    try {
-      const { auth: apiAuth } = await import("../../lib/api");
-      setData(await apiAuth.photoDebug());
-      setOpen(true);
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : String(e));
-      setOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fixUrls = async () => {
-    setFixing(true); setFixResult(null);
-    try {
-      const { auth: apiAuth } = await import("../../lib/api");
-      const res = await apiAuth.fixPhotoUrls();
-      setFixResult(`Fixed ${res.fixed.length} photo(s). Failed: ${res.failed.length}. Refresh the page to see updated photos.`);
-      await run();
-    } catch (e: unknown) {
-      setFixResult(`Fix failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setFixing(false);
-    }
-  };
-
-  return (
-    <div className="mt-3">
-      <button onClick={run} disabled={loading}
-        className="text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-        style={{ fontSize: "0.7rem" }}>
-        <Search size={11} /> {loading ? "Checking…" : "Diagnose photo issue"}
-      </button>
-      {open && (
-        <div className="mt-2 p-3 rounded-xl border border-border bg-muted/60 text-left" style={{ fontSize: "0.7rem" }}>
-          <div className="flex items-center justify-between mb-2">
-            <span style={{ fontWeight: 700 }}>Photo Diagnostics</span>
-            <button onClick={() => setOpen(false)} className="text-muted-foreground"><X size={12} /></button>
-          </div>
-          {err && <p className="text-destructive break-all">Error: {err}</p>}
-          {fixResult && <p className="text-primary break-all mb-2">{fixResult}</p>}
-          {data && (
-            <div className="space-y-1">
-              <p>
-                <span className="text-muted-foreground">USE_CLOUDINARY: </span>
-                <span className={data.USE_CLOUDINARY ? "text-green-600" : "text-destructive"}>{String(data.USE_CLOUDINARY)}</span>
-              </p>
-              <p><span className="text-muted-foreground">Cloud: </span>{data.CLOUDINARY_STORAGE_cloud}</p>
-              <p style={{ fontWeight: 600 }} className="mt-1">Photos ({data.photos.length}):</p>
-              {data.photos.map(ph => (
-                <div key={ph.id} className="pl-2 border-l-2 border-border space-y-0.5 mb-1">
-                  <p className="break-all" style={{ color: ph.build_media_url ? "inherit" : "var(--destructive)" }}>
-                    url: {ph.build_media_url ?? "null"}
-                  </p>
-                  {ph.cloudinary && (
-                    <p className={ph.cloudinary.exists ? "text-green-600" : "text-destructive"}>
-                      cloudinary: {ph.cloudinary.exists
-                        ? `✓ exists (.${ph.cloudinary.format})`
-                        : `✗ NOT FOUND — ${ph.cloudinary.error ?? "404"}`}
-                    </p>
-                  )}
-                  {ph.cloudinary?.exists && ph.cloudinary.secure_url && (
-                    <p className="break-all text-green-600">real url: {ph.cloudinary.secure_url}</p>
-                  )}
-                </div>
-              ))}
-              {data.photos.some(ph => ph.cloudinary?.exists) && (
-                <button onClick={fixUrls} disabled={fixing}
-                  className="mt-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground w-full"
-                  style={{ fontSize: "0.7rem", fontWeight: 600 }}>
-                  {fixing ? "Fixing…" : "Fix All Photo URLs"}
-                </button>
-              )}
-              <p style={{ fontWeight: 600 }} className="mt-2">
-                Cloudinary folder ({Array.isArray(data.cloudinary_folder_listing)
-                  ? data.cloudinary_folder_listing.length
-                  : "err"} files):
-              </p>
-              {Array.isArray(data.cloudinary_folder_listing) ? (
-                data.cloudinary_folder_listing.length === 0
-                  ? <p className="text-destructive pl-2">Empty — uploads are NOT reaching Cloudinary.</p>
-                  : data.cloudinary_folder_listing.map(r => (
-                    <div key={r.public_id} className="pl-2 border-l-2 border-green-600/40 space-y-0.5 mb-1">
-                      <p className="break-all text-green-700">id: {r.public_id}</p>
-                      <p className="break-all text-muted-foreground">url: {r.secure_url}</p>
-                    </div>
-                  ))
-              ) : (
-                <p className="text-destructive pl-2">Listing error: {(data.cloudinary_folder_listing as { error: string }).error}</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -4721,7 +4598,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
             </label>
             <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center gap-2`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
               <Mail size={14} className="flex-shrink-0 opacity-50" />
-              {(() => { try { return localStorage.getItem("ma3moni_login_email") || "—"; } catch { return "—"; } })()}
+              {userEmail || "—"}
             </div>
           </div>
         )}
