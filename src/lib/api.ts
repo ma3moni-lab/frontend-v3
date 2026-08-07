@@ -561,11 +561,28 @@ export const messaging = {
 // ═══════════════════════════════════════════════════════════════
 export interface Plan {
   name:                     UserPlan;
+  description?:             string;
+  badge?:                   string;
+  is_active?:               boolean;
+  sort_order?:              number;
+  duration_months?:         number;
+  // USD pricing (international)
   price_monthly:            number;
   price_yearly:             number;
+  // NGN pricing (Nigeria) — independent of USD, never derived via exchange rate
+  price_monthly_ngn?:       number;
+  price_yearly_ngn?:        number;
+  // Currency-resolved price returned by list_plans when authenticated
+  price?:                   number;
+  currency?:                string;
   features:                 string[];
-  stripe_price_id_monthly:  string;   // reused as credo_code_monthly
-  stripe_price_id_yearly:   string;   // reused as credo_code_yearly
+  // Per-currency Credo codes
+  credo_code_monthly_ngn?:  string;
+  credo_code_yearly_ngn?:   string;
+  credo_code_monthly_usd?:  string;
+  credo_code_yearly_usd?:   string;
+  stripe_price_id_monthly?:  string;
+  stripe_price_id_yearly?:   string;
   credo_code_monthly?:      string;
   credo_code_yearly?:       string;
 }
@@ -579,28 +596,54 @@ export interface Subscription {
 }
 
 export interface PaymentRecord {
-  id:          string;
-  amount:      number;
-  currency:    string;
-  status:      "completed" | "refunded" | "failed";
-  description: string;
-  created_at:  string;
+  id:             string;
+  amount:         number;
+  currency:       string;
+  country?:       string;
+  plan_name?:     string;
+  status:         "completed" | "refunded" | "failed" | "pending";
+  description:    string;
+  payment_method?: string;
+  created_at:     string;
+}
+
+/** Payment record shape returned by the admin billing history endpoint */
+export interface AdminPaymentRecord {
+  id:             string;
+  reference:      string;
+  user:           { id: string; name: string; email: string };
+  country:        string;
+  currency:       string;
+  amount:         number;
+  plan:           string;
+  status:         string;
+  payment_method: string;
+  description:    string;
+  created_at:     string;
 }
 
 export const subscriptions = {
-  plans: () =>
-    get<Plan[]>("/api/plans/"),
+  plans: (billing_cycle?: "monthly" | "yearly") => {
+    const qs = billing_cycle ? `?billing_cycle=${billing_cycle}` : "";
+    return get<Plan[]>(`/api/plans/${qs}`);
+  },
 
   status: () =>
-    get<Subscription>("/api/subscriptions/status/"),
+    get<Subscription & { currency?: string }>("/api/subscriptions/status/"),
 
-  // Initiates payment — Credo returns a checkout_url to redirect the user to
+  // Backend determines currency from authenticated user — frontend cannot override
   create: (plan: UserPlan, billing_cycle: "monthly" | "yearly") =>
-    post<{ checkout_url: string | null; reference?: string; plan?: string }>("/api/subscriptions/create/", { plan, billing_cycle }),
+    post<{
+      checkout_url: string | null;
+      reference?: string;
+      plan?: string;
+      currency?: string;
+      country?: string;
+      amount?: number;
+    }>("/api/subscriptions/create/", { plan, billing_cycle }),
 
-  // Called after Credo redirects back with ?ref=... to confirm payment
   verify: (reference: string, plan: UserPlan) =>
-    post<{ status: string; plan: string }>("/api/subscriptions/verify/", { reference, plan }),
+    post<{ status: string; plan: string; currency?: string }>("/api/subscriptions/verify/", { reference, plan }),
 
   cancel: () =>
     post<{ detail: string }>("/api/subscriptions/cancel/"),
@@ -1140,9 +1183,32 @@ export const adminApi = {
   updateMe: (name: string) =>
     patch<{ id: string; email: string; role: string; name: string }>("/api/admin/me/", { name }),
 
-  // Plan pricing (super admin)
-  updatePlan: (planName: string, data: { price_monthly?: number; price_yearly?: number; features?: string[] }) =>
+  // Plan pricing — supports independent NGN and USD fields
+  updatePlan: (planName: string, data: {
+    price_monthly?: number; price_yearly?: number;
+    price_monthly_ngn?: number; price_yearly_ngn?: number;
+    features?: string[]; is_active?: boolean; sort_order?: number;
+    badge?: string; description?: string;
+    credo_code_monthly_ngn?: string; credo_code_yearly_ngn?: string;
+    credo_code_monthly_usd?: string; credo_code_yearly_usd?: string;
+  }) =>
     patch<Plan>(`/api/admin/plans/${planName}/`, data),
+
+  // Admin billing history with multi-currency filters
+  billingHistory: (params: {
+    currency?: "NGN" | "USD";
+    country?: "nigeria" | "uk" | "others";
+    status?: "completed" | "failed" | "refunded" | "pending";
+    plan?: string; search?: string;
+    page?: number; page_size?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') qs.set(k, String(v)); });
+    const q = qs.toString();
+    return get<{ results: AdminPaymentRecord[]; count: number; page: number; pages: number }>(
+      `/api/admin/billing/${q ? "?" + q : ""}`
+    );
+  },
 
   // Staff / admin accounts (super_admin only)
   staff: () =>

@@ -1,511 +1,699 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  AlertTriangle, CheckCircle, DollarSign, Eye, EyeOff,
-  Loader2, Plus, RefreshCw, Save, TrendingUp, Users, X,
+  ArrowDownToLine, ChevronLeft, ChevronRight, Download, Edit2,
+  Filter, Loader2, RefreshCw, Save, Search, X,
 } from "lucide-react";
-import { adminApi, subscriptions as subscriptionsApi, type Plan } from "../../../lib/api";
+import {
+  adminApi, subscriptions as subApi,
+  type Plan, type AdminPaymentRecord,
+} from "../../../lib/api";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from "recharts";
 
-// ── Mock transaction data (replaced by real billing_history API on live) ─
-const TRANSACTIONS = [
-  { id: "tx1", user: "Aisha Mohammed",  plan: "Premium", amount: 49, date: "Jul 1, 2026",  status: "completed", provider: "Credo", ref: "CREDO_8821a9" },
-  { id: "tx2", user: "Layla Rahman",    plan: "Premium", amount: 49, date: "Jun 28, 2026", status: "completed", provider: "Credo", ref: "CREDO_44bc1" },
-  { id: "tx3", user: "Yusuf Al-Rashid", plan: "Basic",   amount: 19, date: "Jun 25, 2026", status: "completed", provider: "Credo", ref: "CREDO_C7H3X2" },
-  { id: "tx4", user: "Noor Aziz",       plan: "Premium", amount: 49, date: "Jun 20, 2026", status: "refunded",  provider: "Credo", ref: "CREDO_ref91c" },
-  { id: "tx5", user: "Tariq Mansouri",  plan: "Basic",   amount: 19, date: "Jun 18, 2026", status: "failed",    provider: "Credo", ref: "CREDO_fail7" },
-  { id: "tx6", user: "Omar Hassan",     plan: "Basic",   amount: 19, date: "Jun 15, 2026", status: "completed", provider: "Credo", ref: "CREDO_H9G2K1" },
-];
+// ── Helpers ────────────────────────────────────────────────────
+const DJANGO_BASE =
+  (import.meta as { env: Record<string, string> }).env.VITE_API_URL
+  ?? "https://ma3moni-backend26.onrender.com";
 
-type PaymentMode = "test" | "live";
-type ProviderKey  = "credo" | "paypal" | "paystack";
-
-interface ProviderConfig {
-  enabled: boolean;
-  mode: PaymentMode;
-  testKeys: Record<string, string>;
-  liveKeys: Record<string, string>;
+function adminToken() {
+  try { return localStorage.getItem("ma3moni_admin_access_token") ?? ""; } catch { return ""; }
 }
 
-const PROVIDER_META: Record<ProviderKey, { label: string; testKeys: string[]; liveKeys: string[]; color: string; description: string; primary?: boolean }> = {
-  credo: {
-    label: "Credo · eTranzact",
-    description: "Primary payment gateway — NGN, USD and more. Keys from dashboard.credocentral.com.",
-    color: "#0A6870",
-    primary: true,
-    testKeys: ["Test Public Key", "Test Secret Key", "Webhook Secret"],
-    liveKeys: ["Live Public Key", "Live Secret Key", "Webhook Secret"],
-  },
-  paypal: {
-    label: "PayPal",
-    description: "Global payments — USD, EUR, GBP and 25+ currencies.",
-    color: "#003087",
-    testKeys: ["Sandbox Client ID", "Sandbox Secret Key"],
-    liveKeys: ["Live Client ID", "Live Secret Key"],
-  },
-  paystack: {
-    label: "Paystack",
-    description: "Africa-first payment stack — NGN, GHS, ZAR and more.",
-    color: "#00C3F7",
-    testKeys: ["Test Public Key", "Test Secret Key", "Webhook Secret"],
-    liveKeys: ["Live Public Key", "Live Secret Key", "Webhook Secret"],
-  },
+function countryFlag(country: string): string {
+  const c = (country ?? "").toLowerCase();
+  if (c.includes("nigeria") || c === "ng") return "🇳🇬";
+  if (c.includes("united kingdom") || c === "uk" || c === "gb") return "🇬🇧";
+  if (c.includes("united states") || c === "us") return "🇺🇸";
+  if (c.includes("canada"))      return "🇨🇦";
+  if (c.includes("ghana"))       return "🇬🇭";
+  if (c.includes("south africa"))return "🇿🇦";
+  if (c.includes("kenya"))       return "🇰🇪";
+  return "🌍";
+}
+
+function fmtAmt(amount: number, currency: string) {
+  if (currency === "NGN") return `₦${Number(amount).toLocaleString()}`;
+  return `$${Number(amount).toFixed(2)}`;
+}
+
+const STATUS_CHIP: Record<string, { bg: string; text: string; label: string }> = {
+  completed: { bg: "#dcfce7", text: "#166534", label: "Success"  },
+  failed:    { bg: "#fee2e2", text: "#991b1b", label: "Failed"   },
+  refunded:  { bg: "#fef9c3", text: "#854d0e", label: "Refunded" },
+  pending:   { bg: "#dbeafe", text: "#1e40af", label: "Pending"  },
 };
 
-const PROVIDER_LOGOS: Record<ProviderKey, string> = { credo: "CR", paypal: "PP", paystack: "PS" };
-
-const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  completed: { bg: "#dcfce7", text: "#166534" },
-  refunded:  { bg: "#fef9c3", text: "#854d0e" },
-  failed:    { bg: "#fee2e2", text: "#991b1b" },
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_STYLES[status] ?? { bg: "#f3f4f6", text: "#6b7280" };
-  return (
-    <span className="px-2 py-0.5 rounded-full capitalize" style={{ fontSize: "0.75rem", fontWeight: 600, background: s.bg, color: s.text }}>
-      {status}
-    </span>
-  );
+// ── Analytics types ────────────────────────────────────────────
+interface Analytics {
+  ngn_series: { period: string; amount: number }[];
+  usd_series: { period: string; amount: number }[];
+  kpis:         Record<string, number>;
+  summary:      Record<string, number>;
+  status_counts:Record<string, number>;
+  sub_counts:   Record<string, number>;
 }
 
-// ── Plan editor ────────────────────────────────────────────────
-interface PlanEditorProps {
-  plan: Plan;
-  onSaved: (updated: Plan) => void;
-}
+// ── Plan editor modal ──────────────────────────────────────────
+function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
+  const [open,   setOpen]   = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    price_monthly:          String(plan.price_monthly     ?? 0),
+    price_yearly:           String(plan.price_yearly      ?? 0),
+    price_monthly_ngn:      String(plan.price_monthly_ngn ?? 0),
+    price_yearly_ngn:       String(plan.price_yearly_ngn  ?? 0),
+    description:            plan.description ?? "",
+    badge:                  plan.badge       ?? "",
+    is_active:              plan.is_active   !== false,
+    sort_order:             String(plan.sort_order ?? 0),
+    features:               (plan.features ?? []).join("\n"),
+    credo_code_monthly_ngn: plan.credo_code_monthly_ngn ?? "",
+    credo_code_yearly_ngn:  plan.credo_code_yearly_ngn  ?? "",
+    credo_code_monthly_usd: plan.credo_code_monthly_usd ?? "",
+    credo_code_yearly_usd:  plan.credo_code_yearly_usd  ?? "",
+  });
 
-function PlanEditor({ plan, onSaved }: PlanEditorProps) {
-  const [editing, setEditing] = useState(false);
-  const [priceMonthly, setPriceMonthly] = useState(String(plan.price_monthly));
-  const [priceYearly, setPriceYearly]   = useState(String(plan.price_yearly));
-  const [features, setFeatures]         = useState<string[]>(plan.features ?? []);
-  const [saving, setSaving]             = useState(false);
-
-  const startEdit = () => {
-    setPriceMonthly(String(plan.price_monthly));
-    setPriceYearly(String(plan.price_yearly));
-    setFeatures([...(plan.features ?? [])]);
-    setEditing(true);
-  };
-
-  const cancel = () => setEditing(false);
+  const f = (k: keyof typeof form, v: string | boolean) =>
+    setForm(prev => ({ ...prev, [k]: v }));
 
   const save = async () => {
-    const pm = parseFloat(priceMonthly);
-    const py = parseFloat(priceYearly);
-    if (isNaN(pm) || isNaN(py)) {
-      toast.error("Price must be a number.");
-      return;
-    }
     setSaving(true);
     try {
-      const updated = await adminApi.updatePlan(plan.name, {
-        price_monthly: pm,
-        price_yearly:  py,
-        features:      features.filter(f => f.trim()),
+      await adminApi.updatePlan(plan.name, {
+        price_monthly:          parseFloat(form.price_monthly)     || 0,
+        price_yearly:           parseFloat(form.price_yearly)      || 0,
+        price_monthly_ngn:      parseFloat(form.price_monthly_ngn) || 0,
+        price_yearly_ngn:       parseFloat(form.price_yearly_ngn)  || 0,
+        description:            form.description,
+        badge:                  form.badge,
+        is_active:              form.is_active,
+        sort_order:             parseInt(form.sort_order) || 0,
+        features:               form.features.split("\n").map(s => s.trim()).filter(Boolean),
+        credo_code_monthly_ngn: form.credo_code_monthly_ngn,
+        credo_code_yearly_ngn:  form.credo_code_yearly_ngn,
+        credo_code_monthly_usd: form.credo_code_monthly_usd,
+        credo_code_yearly_usd:  form.credo_code_yearly_usd,
       });
-      toast.success(`${plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} plan saved to production.`);
-      onSaved(updated);
-      setEditing(false);
+      toast.success(`${plan.name} plan saved — changes are live`);
+      setOpen(false);
+      onSaved();
     } catch {
-      toast.error("Failed to save plan. Check your connection and try again.");
+      toast.error("Failed to save plan");
     } finally {
       setSaving(false);
     }
   };
 
-  if (plan.name === "free") {
-    return (
-      <div className="rounded-xl border border-border p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span style={{ fontWeight: 700, textTransform: "capitalize" }}>Free</span>
-          <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>$0 / month</span>
-        </div>
-        <ul className="space-y-1">
-          {(plan.features ?? []).map((f, i) => (
-            <li key={i} className="flex items-center gap-2 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
-              <CheckCircle size={12} className="text-green-500 flex-shrink-0" />{f}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
+  const inp = "w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30";
 
   return (
-    <div className="rounded-xl border border-primary/25 bg-secondary/30 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span style={{ fontWeight: 700, textTransform: "capitalize" }}>{plan.name}</span>
-        {!editing && (
-          <button
-            onClick={startEdit}
-            className="text-primary hover:underline"
-            style={{ fontSize: "0.8125rem", fontWeight: 600 }}
-          >
-            Edit
-          </button>
-        )}
-      </div>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 transition-colors font-semibold"
+      >
+        <Edit2 size={13} /> Edit
+      </button>
 
-      {editing ? (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Monthly ($)</label>
-              <input
-                autoFocus
-                value={priceMonthly}
-                onChange={e => setPriceMonthly(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-primary/50 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ fontSize: "1.125rem", fontWeight: 700 }}
-              />
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b">
+              <div>
+                <h3 className="font-bold text-lg">{plan.name.charAt(0).toUpperCase() + plan.name.slice(1)} Plan</h3>
+                <p className="text-gray-500 text-sm mt-0.5">Changes apply to all future checkouts immediately.</p>
+              </div>
+              <button onClick={() => setOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors"><X size={20} /></button>
             </div>
-            <div>
-              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Yearly ($)</label>
-              <input
-                value={priceYearly}
-                onChange={e => setPriceYearly(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg border border-primary/50 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ fontSize: "1.125rem", fontWeight: 700 }}
-              />
-            </div>
-          </div>
-
-          {/* Feature list */}
-          <div>
-            <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Features</label>
-            <div className="space-y-1.5">
-              {features.map((f, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input
-                    value={f}
-                    onChange={e => {
-                      const next = [...features];
-                      next[i] = e.target.value;
-                      setFeatures(next);
-                    }}
-                    className="flex-1 px-2.5 py-1 rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    style={{ fontSize: "0.8125rem" }}
-                  />
-                  <button
-                    onClick={() => setFeatures(features.filter((_, j) => j !== i))}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <X size={13} />
-                  </button>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Description</label>
+                  <input className={inp} value={form.description} onChange={e => f("description", e.target.value)} />
                 </div>
-              ))}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Badge label</label>
+                  <input className={inp} placeholder="e.g. Popular" value={form.badge} onChange={e => f("badge", e.target.value)} />
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Sort order</label>
+                  <input type="number" className={inp} value={form.sort_order} onChange={e => f("sort_order", e.target.value)} />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer mt-4">
+                  <input type="checkbox" checked={form.is_active} onChange={e => f("is_active", e.target.checked)} className="w-4 h-4 accent-teal-600" />
+                  <span className="text-sm font-semibold text-gray-700">Active</span>
+                </label>
+              </div>
+
+              {/* Nigeria pricing */}
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span>🇳🇬</span>
+                  <span className="text-sm font-bold text-green-800">Nigeria Pricing (NGN ₦)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Monthly (₦)</label>
+                    <input type="number" className={inp} value={form.price_monthly_ngn} onChange={e => f("price_monthly_ngn", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Yearly (₦)</label>
+                    <input type="number" className={inp} value={form.price_yearly_ngn} onChange={e => f("price_yearly_ngn", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo monthly code</label>
+                    <input className={inp} value={form.credo_code_monthly_ngn} onChange={e => f("credo_code_monthly_ngn", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo yearly code</label>
+                    <input className={inp} value={form.credo_code_yearly_ngn} onChange={e => f("credo_code_yearly_ngn", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* International pricing */}
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span>🌍</span>
+                  <span className="text-sm font-bold text-blue-800">International Pricing (USD $)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Monthly ($)</label>
+                    <input type="number" className={inp} value={form.price_monthly} onChange={e => f("price_monthly", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Yearly ($)</label>
+                    <input type="number" className={inp} value={form.price_yearly} onChange={e => f("price_yearly", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo monthly code</label>
+                    <input className={inp} value={form.credo_code_monthly_usd} onChange={e => f("credo_code_monthly_usd", e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo yearly code</label>
+                    <input className={inp} value={form.credo_code_yearly_usd} onChange={e => f("credo_code_yearly_usd", e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Features */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Features (one per line)</label>
+                <textarea rows={5} className={inp} value={form.features} onChange={e => f("features", e.target.value)} />
+              </div>
+            </div>
+            <div className="flex gap-3 p-5 border-t">
+              <button onClick={() => setOpen(false)} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
               <button
-                onClick={() => setFeatures([...features, ""])}
-                className="flex items-center gap-1 text-primary hover:underline"
-                style={{ fontSize: "0.8125rem" }}
+                onClick={save} disabled={saving}
+                className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                style={{ background: "#0A6870" }}
               >
-                <Plus size={12} /> Add feature
+                {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                Save Changes
               </button>
             </div>
           </div>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-60"
-              style={{ fontSize: "0.8125rem", fontWeight: 600 }}
-            >
-              {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-              Save to production
-            </button>
-            <button
-              onClick={cancel}
-              className="px-3 py-1.5 text-muted-foreground hover:text-foreground transition-colors border border-border rounded-lg"
-              style={{ fontSize: "0.8125rem" }}
-            >
-              Cancel
-            </button>
-          </div>
         </div>
-      ) : (
-        <>
-          <div className="flex items-baseline gap-1 mb-1">
-            <span style={{ fontSize: "2rem", fontWeight: 900, color: "var(--primary)" }}>${plan.price_monthly}</span>
-            <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>/mo</span>
-            <span className="ml-2 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>(${plan.price_yearly}/yr)</span>
-          </div>
-          <ul className="space-y-1 mt-2">
-            {(plan.features ?? []).map((f, i) => (
-              <li key={i} className="flex items-center gap-2" style={{ fontSize: "0.8125rem" }}>
-                <CheckCircle size={12} className="text-primary flex-shrink-0" />{f}
-              </li>
-            ))}
-          </ul>
-        </>
       )}
-    </div>
+    </>
   );
 }
 
 // ── Main component ─────────────────────────────────────────────
-export function PaymentsSectionV2() {
-  const [plans, setPlans]   = useState<Plan[]>([]);
-  const [loadingPlans, setLoadingPlans] = useState(true);
+export function PaymentsSectionV2({ role }: { role: string }) {
+  const isSuperAdmin = role === "super-admin";
 
-  const [providers, setProviders] = useState<Record<ProviderKey, ProviderConfig>>({
-    credo:    { enabled: true,  mode: "test", testKeys: {}, liveKeys: {} },
-    paypal:   { enabled: false, mode: "test", testKeys: {}, liveKeys: {} },
-    paystack: { enabled: false, mode: "test", testKeys: {}, liveKeys: {} },
-  });
-  const [showKeys,    setShowKeys]    = useState<Record<string, boolean>>({});
-  const [refundModal, setRefundModal] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "plans">("overview");
 
-  useEffect(() => {
-    subscriptionsApi.plans()
-      .then(setPlans)
-      .catch(() => {/* keep empty — UI shows loading skeleton */})
-      .finally(() => setLoadingPlans(false));
+  // Plans
+  const [plans,        setPlans]        = useState<Plan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+
+  // Analytics
+  const [analytics,        setAnalytics]        = useState<Analytics | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [chartPeriod,      setChartPeriod]      = useState<"daily" | "weekly" | "monthly" | "yearly">("monthly");
+
+  // Billing table
+  const [payments,    setPayments]    = useState<AdminPaymentRecord[]>([]);
+  const [payTotal,    setPayTotal]    = useState(0);
+  const [payPage,     setPayPage]     = useState(1);
+  const [payPages,    setPayPages]    = useState(1);
+  const [payLoading,  setPayLoading]  = useState(false);
+  const [filters, setFilters] = useState<{
+    currency: "NGN" | "USD" | "";
+    country:  "nigeria" | "uk" | "others" | "";
+    status:   "completed" | "failed" | "refunded" | "pending" | "";
+    search:   string;
+  }>({ currency: "", country: "", status: "", search: "" });
+
+  const loadPlans = useCallback(() => {
+    setPlansLoading(true);
+    subApi.plans()
+      .then(p => setPlans(p))
+      .catch(() => {})
+      .finally(() => setPlansLoading(false));
   }, []);
 
-  const handlePlanSaved = (updated: Plan) => {
-    setPlans(prev => prev.map(p => p.name === updated.name ? { ...p, ...updated } : p));
+  const loadAnalytics = useCallback(() => {
+    if (!isSuperAdmin) return;
+    setAnalyticsLoading(true);
+    const qs = new URLSearchParams({ period: chartPeriod });
+    fetch(`${DJANGO_BASE}/api/admin/analytics/revenue/?${qs}`, {
+      headers: { Authorization: `Bearer ${adminToken()}` },
+    })
+      .then(r => r.json())
+      .then(d => setAnalytics(d as Analytics))
+      .catch(() => {})
+      .finally(() => setAnalyticsLoading(false));
+  }, [isSuperAdmin, chartPeriod]);
+
+  const loadPayments = useCallback((page = 1) => {
+    if (!isSuperAdmin) return;
+    setPayLoading(true);
+    const params: Parameters<typeof adminApi.billingHistory>[0] = { page, page_size: 25 };
+    if (filters.currency) params.currency = filters.currency;
+    if (filters.country)  params.country  = filters.country;
+    if (filters.status)   params.status   = filters.status;
+    if (filters.search)   params.search   = filters.search;
+    adminApi.billingHistory(params)
+      .then(r => { setPayments(r.results); setPayTotal(r.count); setPayPage(r.page); setPayPages(r.pages); })
+      .catch(() => {})
+      .finally(() => setPayLoading(false));
+  }, [isSuperAdmin, filters]);
+
+  useEffect(() => { loadPlans(); }, [loadPlans]);
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
+  useEffect(() => { if (activeTab === "transactions") loadPayments(1); }, [activeTab, loadPayments]);
+
+  const downloadCSV = () => {
+    if (!payments.length) return;
+    const hdr = ["Reference", "Customer", "Email", "Country", "Currency", "Amount", "Plan", "Status", "Gateway", "Date"];
+    const rows = payments.map(p => [
+      p.reference, p.user.name, p.user.email, p.country,
+      p.currency, p.amount, p.plan, p.status, p.payment_method,
+      new Date(p.created_at).toLocaleDateString(),
+    ]);
+    const csv  = [hdr, ...rows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a    = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `payments-${Date.now()}.csv` });
+    a.click(); URL.revokeObjectURL(a.href);
+    toast.success("CSV downloaded");
   };
 
-  const toggleMode    = (key: ProviderKey) =>
-    setProviders(p => ({ ...p, [key]: { ...p[key], mode: p[key].mode === "test" ? "live" : "test" } }));
+  const kpis       = analytics?.kpis        ?? {};
+  const summary    = analytics?.summary     ?? {};
+  const subCounts  = analytics?.sub_counts  ?? {};
+  const statusCnts = analytics?.status_counts ?? {};
 
-  const toggleEnabled = (key: ProviderKey) =>
-    setProviders(p => ({ ...p, [key]: { ...p[key], enabled: !p[key].enabled } }));
-
-  const saveKey = (provider: ProviderKey, mode: PaymentMode, field: string, value: string) => {
-    setProviders(p => ({
-      ...p,
-      [provider]: { ...p[provider], [`${mode}Keys`]: { ...p[provider][`${mode}Keys`], [field]: value } },
-    }));
-  };
-
-  const basicPlan   = plans.find(p => p.name === "basic");
-  const premiumPlan = plans.find(p => p.name === "premium");
-  const MRR = (basicPlan ? Number(basicPlan.price_monthly) * 3420 : 0)
-            + (premiumPlan ? Number(premiumPlan.price_monthly) * 2193 : 0);
+  const kpiCards = [
+    { label: "Total NGN Revenue",    value: `₦${Number(summary.ngn_total ?? 0).toLocaleString()}`,      icon: "🇳🇬", color: "#0A6870" },
+    { label: "Total USD Revenue",    value: `$${Number(summary.usd_total ?? 0).toLocaleString()}`,      icon: "🌍", color: "#1d4ed8" },
+    { label: "Monthly NGN",          value: `₦${Number(kpis.mrr_ngn ?? 0).toLocaleString()}`,           icon: "📅", color: "#059669" },
+    { label: "Monthly USD",          value: `$${Number(kpis.mrr_usd ?? 0).toFixed(2)}`,                 icon: "📅", color: "#7c3aed" },
+    { label: "Successful",           value: String(statusCnts.completed ?? 0),                           icon: "✅", color: "#166534" },
+    { label: "Failed",               value: String(statusCnts.failed ?? 0),                              icon: "❌", color: "#991b1b" },
+    { label: "Pending",              value: String(statusCnts.pending ?? 0),                             icon: "⏳", color: "#1e40af" },
+    { label: "Refunded",             value: String(statusCnts.refunded ?? 0),                            icon: "↩️", color: "#854d0e" },
+    { label: "Active Subscriptions", value: String(subCounts.active ?? 0),                               icon: "🟢", color: "#0A6870" },
+    { label: "Expired",              value: String(subCounts.expired ?? 0),                              icon: "⚫", color: "#6b7280" },
+    { label: "Cancelled",            value: String(subCounts.cancelled ?? 0),                            icon: "🔴", color: "#b91c1c" },
+    { label: "NGN Transactions",     value: String(summary.ngn_transactions ?? 0),                       icon: "🇳🇬", color: "#0A6870" },
+    { label: "USD Transactions",     value: String(summary.usd_transactions ?? 0),                       icon: "🌍", color: "#1d4ed8" },
+    { label: "Avg NGN Payment",      value: `₦${Number(summary.avg_ngn ?? 0).toLocaleString()}`,         icon: "📊", color: "#059669" },
+    { label: "Avg USD Payment",      value: `$${Number(summary.avg_usd ?? 0).toFixed(2)}`,               icon: "📊", color: "#7c3aed" },
+  ];
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 style={{ fontWeight: 800, fontSize: "1.5rem", letterSpacing: "-0.02em" }}>Payments & Subscriptions</h1>
-          <p className="text-muted-foreground mt-1" style={{ fontSize: "0.9375rem" }}>Manage payment providers, pricing, and transactions</p>
+          <h2 className="font-extrabold text-2xl">Payments & Revenue</h2>
+          <p className="text-gray-500 text-sm mt-0.5">Multi-currency management · 🇳🇬 NGN & 🌍 USD</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button onClick={downloadCSV} className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition-colors">
+              <Download size={14} /> Export CSV
+            </button>
+          )}
+          <button
+            onClick={() => { loadAnalytics(); if (activeTab === "transactions") loadPayments(1); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition-colors"
+          >
+            <RefreshCw size={14} /> Refresh
+          </button>
         </div>
       </div>
 
-      {/* MRR summary */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[
-          { icon: <DollarSign size={18} />, label: "Monthly Recurring Revenue", value: `$${MRR.toLocaleString()}`, color: "#0A6870" },
-          { icon: <Users size={18} />,      label: "Paying Subscribers",        value: (3420 + 2193).toLocaleString(),               color: "#4A8DB8" },
-          { icon: <TrendingUp size={18} />, label: "Revenue Growth",            value: "+7.2%",                                       color: "#6B9E78" },
-        ].map(({ icon, label, value, color }) => (
-          <div key={label} className="bg-card rounded-2xl border border-border p-4">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3" style={{ background: color + "18", color }}>
-              {icon}
-            </div>
-            <p style={{ fontSize: "1.75rem", fontWeight: 900, letterSpacing: "-0.03em" }}>{value}</p>
-            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>{label}</p>
-          </div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        {(["overview", "transactions", "plans"] as const).map(t => (
+          <button key={t} onClick={() => setActiveTab(t)}
+            className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === t ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+            {t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
         ))}
       </div>
 
-      {/* ── Subscription Plan Pricing ── */}
-      <div className="bg-card rounded-2xl border border-border p-6 mb-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Subscription Plans</h2>
-          <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Changes are saved directly to production</p>
-        </div>
-
-        {loadingPlans ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground gap-2">
-            <Loader2 size={18} className="animate-spin" /> Loading plans…
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {plans.map(plan => (
-              <PlanEditor key={plan.name} plan={plan} onSaved={handlePlanSaved} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Payment Providers ── */}
-      <div className="bg-card rounded-2xl border border-border p-6 mb-6">
-        <h2 style={{ fontWeight: 700, fontSize: "1.0625rem", marginBottom: "1.25rem" }}>Payment Providers</h2>
-        <div className="space-y-4">
-          {(Object.entries(PROVIDER_META) as [ProviderKey, typeof PROVIDER_META[ProviderKey]][]).map(([key, meta]) => {
-            const cfg = providers[key];
-            const activeKeys = cfg.mode === "test" ? meta.testKeys : meta.liveKeys;
-            const modeData   = cfg.mode === "test" ? cfg.testKeys  : cfg.liveKeys;
-
-            return (
-              <div key={key} className={`rounded-xl border p-4 transition-all ${cfg.enabled ? "border-primary/20 bg-background" : "border-border opacity-60"}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white" style={{ background: meta.color, fontSize: "0.75rem" }}>
-                      {PROVIDER_LOGOS[key]}
-                    </div>
-                    <div>
-                      <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{meta.label}</p>
-                      <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{meta.description}</p>
-                    </div>
+      {/* ── OVERVIEW ───────────────────────────────────────────── */}
+      {activeTab === "overview" && (
+        <div className="space-y-6">
+          {analyticsLoading ? (
+            <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-teal-600" /></div>
+          ) : (
+            <>
+              {/* KPI cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {kpiCards.map(card => (
+                  <div key={card.label} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                    <div className="text-xl mb-1">{card.icon}</div>
+                    <div className="font-extrabold text-xl" style={{ color: card.color }}>{card.value}</div>
+                    <div className="text-gray-500 mt-0.5 text-xs font-medium">{card.label}</div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <span style={{ fontSize: "0.75rem", fontWeight: cfg.mode === "test" ? 700 : 400, color: cfg.mode === "test" ? "#C5733F" : "var(--muted-foreground)" }}>Test</span>
-                      <button
-                        onClick={() => toggleMode(key)}
-                        className="relative w-10 h-5 rounded-full transition-colors"
-                        style={{ background: cfg.mode === "live" ? "var(--primary)" : "#CBD5E0" }}
-                      >
-                        <div className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-all shadow-sm ${cfg.mode === "live" ? "left-[22px]" : "left-0.5"}`} />
-                      </button>
-                      <span style={{ fontSize: "0.75rem", fontWeight: cfg.mode === "live" ? 700 : 400, color: cfg.mode === "live" ? "var(--primary)" : "var(--muted-foreground)" }}>Live</span>
-                    </div>
-                    <button
-                      onClick={() => toggleEnabled(key)}
-                      className={`px-3 py-1.5 rounded-lg border transition-all ${cfg.enabled ? "border-primary/30 text-primary bg-secondary hover:bg-primary hover:text-white" : "border-border text-muted-foreground hover:bg-muted"}`}
-                      style={{ fontSize: "0.75rem", fontWeight: 600 }}
-                    >
-                      {cfg.enabled ? "Enabled" : "Disabled"}
+                ))}
+              </div>
+
+              {/* Period selector */}
+              {isSuperAdmin && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-gray-700">Period:</span>
+                  {(["daily", "weekly", "monthly", "yearly"] as const).map(p => (
+                    <button key={p} onClick={() => setChartPeriod(p)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${chartPeriod === p ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                      style={chartPeriod === p ? { background: "#0A6870" } : {}}>
+                      {p.charAt(0).toUpperCase() + p.slice(1)}
                     </button>
-                  </div>
+                  ))}
                 </div>
+              )}
 
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-4 ${cfg.mode === "live" ? "bg-green-50 border border-green-200" : "bg-amber-50 border border-amber-200"}`}>
-                  <div className={`w-1.5 h-1.5 rounded-full ${cfg.mode === "live" ? "bg-green-500" : "bg-amber-500"}`} />
-                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: cfg.mode === "live" ? "#16a34a" : "#d97706" }}>
-                    {cfg.mode === "live" ? "Live Mode — real transactions active" : "Test Mode — no real transactions"}
+              {/* NGN chart */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">🇳🇬</span>
+                  <h3 className="font-bold">NGN Revenue</h3>
+                  <span className="ml-auto text-sm font-semibold" style={{ color: "#0A6870" }}>
+                    ₦{Number(summary.ngn_total ?? 0).toLocaleString()} total
                   </span>
                 </div>
-
-                {cfg.mode === "live" && (
-                  <div className="flex items-center gap-2 mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                    <AlertTriangle size={13} className="text-amber-600 flex-shrink-0" />
-                    <p style={{ fontSize: "0.75rem", color: "#92400e" }}>Live keys are sensitive. They are stored encrypted and only displayed partially.</p>
-                  </div>
+                {!(analytics?.ngn_series?.length) ? (
+                  <p className="text-center text-gray-400 py-8 text-sm">No NGN transactions yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={analytics.ngn_series}>
+                      <defs>
+                        <linearGradient id="ng" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#0A6870" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#0A6870" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                      <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `₦${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(v: number) => [`₦${Number(v).toLocaleString()}`, "Revenue"]} />
+                      <Area type="monotone" dataKey="amount" stroke="#0A6870" strokeWidth={2.5} fill="url(#ng)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {activeKeys.map(field => {
-                    const fieldId = `${key}-${cfg.mode}-${field}`;
-                    const visible = showKeys[fieldId];
-                    return (
-                      <div key={field}>
-                        <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>{field}</label>
-                        <div className="relative">
-                          <input
-                            type={visible ? "text" : "password"}
-                            placeholder={cfg.mode === "test" ? `${key}_test_xxxx…` : `${key}_live_xxxx…`}
-                            value={modeData[field] ?? ""}
-                            onChange={e => saveKey(key, cfg.mode, field, e.target.value)}
-                            className="w-full pr-9 pl-3 py-2 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                            style={{ fontSize: "0.8125rem", fontFamily: "monospace" }}
-                          />
-                          <button
-                            onClick={() => setShowKeys(s => ({ ...s, [fieldId]: !visible }))}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {visible ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-3">
-                  <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Webhook URL</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={`https://api.ma3moni.com/webhooks/${key}`}
-                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-muted text-muted-foreground"
-                      style={{ fontSize: "0.75rem", fontFamily: "monospace" }}
-                    />
-                    <button
-                      onClick={() => navigator.clipboard?.writeText(`https://api.ma3moni.com/webhooks/${key}`)}
-                      className="px-3 py-2 bg-card border border-border rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                      style={{ fontSize: "0.75rem" }}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* ── Transaction History ── */}
-      <div className="bg-card rounded-2xl border border-border overflow-hidden">
-        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-          <h2 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Recent Transactions</h2>
-          <button className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.8125rem" }}>
-            <RefreshCw size={13} /> Refresh
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                {["User", "Plan", "Amount", "Provider", "Ref", "Date", "Status", ""].map(h => (
-                  <th key={h} className="text-left px-5 py-3 text-muted-foreground" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{h}</th>
+              {/* USD chart */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">🌍</span>
+                  <h3 className="font-bold">USD Revenue</h3>
+                  <span className="ml-auto text-sm font-semibold" style={{ color: "#1d4ed8" }}>
+                    ${Number(summary.usd_total ?? 0).toFixed(2)} total
+                  </span>
+                </div>
+                {!(analytics?.usd_series?.length) ? (
+                  <p className="text-center text-gray-400 py-8 text-sm">No USD transactions yet.</p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={analytics.usd_series}>
+                      <defs>
+                        <linearGradient id="us" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#1d4ed8" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#1d4ed8" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                      <XAxis dataKey="period" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${v}`} />
+                      <Tooltip formatter={(v: number) => [`$${Number(v).toFixed(2)}`, "Revenue"]} />
+                      <Area type="monotone" dataKey="amount" stroke="#1d4ed8" strokeWidth={2.5} fill="url(#us)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+
+              {/* Summary side-by-side */}
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { flag: "🇳🇬", label: "NGN Summary", color: "#166534", bg: "green",
+                    rows: [
+                      ["Total", `₦${Number(summary.ngn_total ?? 0).toLocaleString()}`],
+                      ["Transactions", String(summary.ngn_transactions ?? 0)],
+                      ["Average", `₦${Number(summary.avg_ngn ?? 0).toLocaleString()}`],
+                      ["Monthly MRR", `₦${Number(kpis.mrr_ngn ?? 0).toLocaleString()}`],
+                    ]},
+                  { flag: "🌍", label: "USD Summary", color: "#1e40af", bg: "blue",
+                    rows: [
+                      ["Total", `$${Number(summary.usd_total ?? 0).toFixed(2)}`],
+                      ["Transactions", String(summary.usd_transactions ?? 0)],
+                      ["Average", `$${Number(summary.avg_usd ?? 0).toFixed(2)}`],
+                      ["Monthly MRR", `$${Number(kpis.mrr_usd ?? 0).toFixed(2)}`],
+                    ]},
+                ].map(card => (
+                  <div key={card.label} className={`bg-white rounded-2xl border border-${card.bg}-100 shadow-sm p-5`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span>{card.flag}</span>
+                      <span className="text-sm font-bold" style={{ color: card.color }}>{card.label}</span>
+                    </div>
+                    <dl className="space-y-2 text-sm">
+                      {card.rows.map(([k, v]) => (
+                        <div key={k} className="flex justify-between">
+                          <dt className="text-gray-500">{k}</dt>
+                          <dd className="font-bold">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {TRANSACTIONS.map(tx => (
-                <tr key={tx.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3.5" style={{ fontSize: "0.875rem", fontWeight: 500 }}>{tx.user}</td>
-                  <td className="px-5 py-3.5">
-                    <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: tx.plan === "Premium" ? "var(--primary)" : "#4A8DB8" }}>{tx.plan}</span>
-                  </td>
-                  <td className="px-5 py-3.5" style={{ fontSize: "0.875rem", fontWeight: 700 }}>${tx.amount}</td>
-                  <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>{tx.provider}</span>
-                  </td>
-                  <td className="px-5 py-3.5 text-muted-foreground" style={{ fontSize: "0.75rem", fontFamily: "monospace" }}>{tx.ref}</td>
-                  <td className="px-5 py-3.5 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{tx.date}</td>
-                  <td className="px-5 py-3.5"><StatusBadge status={tx.status} /></td>
-                  <td className="px-5 py-3.5">
-                    {tx.status === "completed" && (
-                      <button
-                        onClick={() => setRefundModal(tx.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors"
-                        style={{ fontSize: "0.8125rem" }}
-                      >
-                        Refund
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* Refund confirm */}
-      {refundModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl p-6">
-            <h3 style={{ fontWeight: 700, fontSize: "1.125rem" }}>Confirm Refund</h3>
-            <p className="text-muted-foreground mt-2 mb-5" style={{ fontSize: "0.9rem" }}>
-              Refund <strong>{TRANSACTIONS.find(t => t.id === refundModal)?.user}</strong> ${TRANSACTIONS.find(t => t.id === refundModal)?.amount}? This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setRefundModal(null)} className="flex-1 py-3 rounded-xl border border-border hover:bg-muted transition-colors" style={{ fontSize: "0.9rem" }}>Cancel</button>
-              <button onClick={() => setRefundModal(null)} className="flex-1 py-3 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors" style={{ fontSize: "0.9rem", fontWeight: 600 }}>Confirm Refund</button>
+      {/* ── TRANSACTIONS ────────────────────────────────────────── */}
+      {activeTab === "transactions" && isSuperAdmin && (
+        <div className="space-y-4">
+          {/* Filter bar */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <div className="flex flex-wrap gap-3">
+              <div className="relative flex-1 min-w-44">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input placeholder="Search name, email, reference…"
+                  className="w-full pl-8 pr-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                  value={filters.search}
+                  onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && loadPayments(1)} />
+              </div>
+              <select className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none"
+                value={filters.currency}
+                onChange={e => setFilters(f => ({ ...f, currency: e.target.value as "NGN"|"USD"|"" }))}>
+                <option value="">All Currencies</option>
+                <option value="NGN">🇳🇬 NGN</option>
+                <option value="USD">🌍 USD</option>
+              </select>
+              <select className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none"
+                value={filters.country}
+                onChange={e => setFilters(f => ({ ...f, country: e.target.value as "nigeria"|"uk"|"others"|"" }))}>
+                <option value="">All Countries</option>
+                <option value="nigeria">🇳🇬 Nigeria</option>
+                <option value="uk">🇬🇧 United Kingdom</option>
+                <option value="others">🌍 Others</option>
+              </select>
+              <select className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none"
+                value={filters.status}
+                onChange={e => setFilters(f => ({ ...f, status: e.target.value as "completed"|"failed"|"refunded"|"pending"|"" }))}>
+                <option value="">All Statuses</option>
+                <option value="completed">✅ Success</option>
+                <option value="pending">⏳ Pending</option>
+                <option value="failed">❌ Failed</option>
+                <option value="refunded">↩️ Refunded</option>
+              </select>
+              <button onClick={() => loadPayments(1)}
+                className="px-4 py-2 rounded-lg text-white text-sm font-semibold transition-colors"
+                style={{ background: "#0A6870" }}>
+                <Filter size={14} className="inline mr-1" /> Filter
+              </button>
+              <button onClick={() => setFilters({ currency: "", country: "", status: "", search: "" })}
+                className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-500 hover:bg-gray-50 transition-colors">
+                <X size={14} className="inline" />
+              </button>
             </div>
           </div>
+
+          {/* Table */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b">
+              <span className="text-sm font-semibold text-gray-700">{payTotal} records</span>
+              <button onClick={downloadCSV} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+                <ArrowDownToLine size={12} /> Download CSV
+              </button>
+            </div>
+            {payLoading ? (
+              <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin text-teal-600" /></div>
+            ) : !payments.length ? (
+              <p className="text-center text-gray-400 py-12 text-sm">No transactions found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                      {["Reference","Customer","Country","Currency","Amount","Plan","Status","Gateway","Date"].map(h => (
+                        <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p, i) => {
+                      const sc = STATUS_CHIP[p.status] ?? STATUS_CHIP.pending;
+                      return (
+                        <tr key={p.id} className={`border-t border-gray-50 hover:bg-gray-50/60 transition-colors ${i % 2 ? "bg-gray-50/30" : ""}`}>
+                          <td className="px-4 py-3 font-mono text-xs text-gray-600">{p.reference || "—"}</td>
+                          <td className="px-4 py-3">
+                            <div className="font-semibold">{p.user.name}</div>
+                            <div className="text-xs text-gray-400">{p.user.email}</div>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            {countryFlag(p.country)} {p.country || "Unknown"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white"
+                              style={{ background: p.currency === "NGN" ? "#0A6870" : "#1d4ed8" }}>
+                              {p.currency}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-bold">{fmtAmt(p.amount, p.currency)}</td>
+                          <td className="px-4 py-3 capitalize">{p.plan || "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
+                              style={{ background: sc.bg, color: sc.text }}>
+                              {sc.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-600 capitalize">{p.payment_method || "Credo"}</td>
+                          <td className="px-4 py-3 text-xs text-gray-500">
+                            {new Date(p.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {payPages > 1 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t bg-gray-50/50">
+                <span className="text-xs text-gray-500">Page {payPage} of {payPages}</span>
+                <div className="flex gap-2">
+                  <button disabled={payPage <= 1 || payLoading} onClick={() => loadPayments(payPage - 1)}
+                    className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 transition-colors">
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button disabled={payPage >= payPages || payLoading} onClick={() => loadPayments(payPage + 1)}
+                    className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 disabled:opacity-40 transition-colors">
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── PLANS ──────────────────────────────────────────────── */}
+      {activeTab === "plans" && (
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Configure independent NGN and USD pricing. Changes apply immediately to new checkouts — existing subscriptions are unaffected.
+          </p>
+          {plansLoading ? (
+            <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-teal-600" /></div>
+          ) : !plans.length ? (
+            <p className="text-center text-gray-400 py-8 text-sm">No plans found. They are auto-seeded on first user request.</p>
+          ) : (
+            <div className="grid gap-4">
+              {plans.map(plan => (
+                <div key={plan.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h3 className="font-extrabold text-lg">{plan.name.charAt(0).toUpperCase() + plan.name.slice(1)}</h3>
+                        {plan.badge && (
+                          <span className="px-2 py-0.5 rounded-full text-white text-xs font-bold" style={{ background: "#0A6870" }}>
+                            {plan.badge}
+                          </span>
+                        )}
+                        {plan.is_active === false && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700">Inactive</span>
+                        )}
+                      </div>
+                      {plan.description && <p className="text-gray-500 text-sm">{plan.description}</p>}
+                      <div className="flex items-center gap-3 mt-3">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-50 border border-green-200">
+                          <span className="text-sm">🇳🇬</span>
+                          <div>
+                            <div className="text-xs text-green-700 font-semibold">NGN</div>
+                            <div className="font-extrabold" style={{ color: "#166534" }}>
+                              ₦{Number(plan.price_monthly_ngn ?? 0).toLocaleString()}
+                              <span className="text-xs font-normal text-gray-500">/mo</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200">
+                          <span className="text-sm">🌍</span>
+                          <div>
+                            <div className="text-xs text-blue-700 font-semibold">USD</div>
+                            <div className="font-extrabold" style={{ color: "#1e40af" }}>
+                              ${Number(plan.price_monthly ?? 0).toFixed(2)}
+                              <span className="text-xs font-normal text-gray-500">/mo</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {plan.features?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {plan.features.map((f: string) => (
+                            <span key={f} className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-600">{f}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {isSuperAdmin && <PlanEditor plan={plan} onSaved={loadPlans} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+export default PaymentsSectionV2;

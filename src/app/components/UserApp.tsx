@@ -3454,27 +3454,56 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
   currentPlan?: "free" | "basic" | "premium";
   displayName?: string;
 }) {
-  const [selected, setSelected] = useState<string | null>(currentPlan !== "free" ? currentPlan : null);
-  const [paying, setPaying] = useState(false);
-  const [payCardType, setPayCardType] = useState<"verve" | "standard">("standard");
+  const [selected,   setSelected]   = useState<string | null>(currentPlan !== "free" ? currentPlan : null);
+  const [paying,     setPaying]     = useState(false);
+  const [initiating, setInitiating] = useState(false);
+  // Checkout summary filled once backend responds to create()
+  const [checkout, setCheckout] = useState<{ currency: string; country: string; amount: number } | null>(null);
 
-  // Merge live plan data over the static PLANS constant
+  // Currency detected from backend (profile.location_country → phone → USD)
+  const [currency, setCurrency] = useState<"NGN" | "USD">("USD");
   const [livePlans, setLivePlans] = useState(PLANS);
+
   useEffect(() => {
     import("../../lib/api").then(({ subscriptions: subApi }) => {
-      subApi.plans().then(apiPlans => {
+      Promise.all([subApi.plans(), subApi.status().catch(() => null)]).then(([apiPlans, status]) => {
+        const detected = ((status as { currency?: string } | null)?.currency ?? "USD") as "NGN" | "USD";
+        setCurrency(detected);
         setLivePlans(PLANS.map(p => {
-          const live = apiPlans.find(a => a.name === p.id);
+          const live = apiPlans.find((a: { name: string }) => a.name === p.id);
           if (!live) return p;
-          return {
-            ...p,
-            price: live.price_monthly === 0 ? "$0" : `$${Number(live.price_monthly).toFixed(0)}`,
-            features: live.features?.length ? live.features : p.features,
-          };
+          const isNgn = detected === "NGN";
+          const raw   = isNgn ? (live.price_monthly_ngn ?? 0) : (live.price_monthly ?? 0);
+          const fmt   = raw === 0
+            ? (isNgn ? "₦0" : "$0")
+            : isNgn ? `₦${Number(raw).toLocaleString()}` : `$${Number(raw).toFixed(0)}`;
+          return { ...p, price: fmt, features: live.features?.length ? live.features : p.features };
         }));
       }).catch(() => {});
     });
   }, []);
+
+  const handleContinue = async () => {
+    if (!selected || selected === "free") return;
+    setInitiating(true);
+    try {
+      const { subscriptions: subApi } = await import("../../lib/api");
+      const res = await subApi.create(selected as "basic" | "premium", "monthly");
+      if (res.checkout_url) {
+        window.location.href = res.checkout_url;
+      } else {
+        setCheckout({ currency: res.currency ?? currency, country: res.country ?? "", amount: res.amount ?? 0 });
+        setPaying(true);
+      }
+    } catch {
+      toast.error("Could not initiate payment. Please try again.");
+    } finally {
+      setInitiating(false);
+    }
+  };
+
+  const selectedPlan = livePlans.find(p => p.id === selected);
+  const sym          = currency === "NGN" ? "₦" : "$";
 
   if (paying) {
     return (
@@ -3483,25 +3512,32 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
           <button onClick={() => setPaying(false)} className="text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft size={22} />
           </button>
-          <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Payment</h3>
+          <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Checkout</h3>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          <div className="bg-secondary rounded-2xl p-4 border border-primary/20">
-            <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>You selected</p>
-            <p style={{ fontWeight: 700, fontSize: "1.125rem", color: "var(--primary)" }}>
-              {livePlans.find(p => p.id === selected)?.name} — {livePlans.find(p => p.id === selected)?.price}{livePlans.find(p => p.id === selected)?.period}
-            </p>
-          </div>
-          <div>
-            <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Cardholder Name</label>
-            <input placeholder={displayName || "Full name on card"} className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all" style={{ fontSize: "0.9375rem" }} />
-          </div>
-          <CardNumberInput onTypeChange={ct => setPayCardType(ct)} />
-          <div className="grid grid-cols-2 gap-3">
-            {/* Expiry with auto-slash */}
-            <ExpiryInput />
-            <div>
-              <CvcInput cardType={payCardType} />
+          {/* Checkout summary */}
+          <div className="bg-secondary rounded-2xl p-4 border border-primary/20 space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Plan</span>
+              <span style={{ fontWeight: 700 }}>{selectedPlan?.name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Country</span>
+              <span style={{ fontWeight: 600 }}>{checkout?.country || "International"}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Currency</span>
+              <span className="px-2.5 py-0.5 rounded-full text-white text-xs font-bold"
+                style={{ background: (checkout?.currency ?? currency) === "NGN" ? "#0A6870" : "#1d4ed8" }}>
+                {checkout?.currency ?? currency}
+              </span>
+            </div>
+            <div className="flex justify-between items-center border-t border-border pt-3">
+              <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Amount</span>
+              <span style={{ fontWeight: 900, fontSize: "1.25rem", color: "var(--primary)" }}>
+                {selectedPlan?.price ?? `${sym}${checkout?.amount ?? 0}`}
+                <span className="text-muted-foreground" style={{ fontSize: "0.8rem", fontWeight: 400 }}>/mo</span>
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -3512,13 +3548,13 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
             onClick={() => {
               const tier = selected as "basic" | "premium";
               onUpgrade(tier);
-              toast.success(`You're now on the ${tier === "premium" ? "Premium" : "Basic"} plan 🎉`);
+              toast.success(`You're now on the ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan!`);
               onBack();
             }}
             className="w-full bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
             style={{ fontWeight: 700, fontSize: "1rem" }}
           >
-            Confirm Payment
+            Pay Securely with Credo
           </button>
         </div>
       </div>
@@ -3532,21 +3568,25 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
           <ChevronLeft size={22} />
         </button>
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Choose Your Plan</h3>
+        <span className="ml-auto px-2.5 py-1 rounded-full text-white text-xs font-bold"
+          style={{ background: currency === "NGN" ? "#0A6870" : "#1d4ed8" }}>
+          {currency === "NGN" ? "🇳🇬 NGN" : "🌍 USD"}
+        </span>
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         <p className="text-muted-foreground mb-6" style={{ fontSize: "0.9375rem" }}>Unlock more matches, features, and better visibility.</p>
         <div className="space-y-3">
           {livePlans.map(plan => {
-            const isCurrent = plan.id === currentPlan;
+            const isCurrent  = plan.id === currentPlan;
             const isSelected = plan.id === selected;
             return (
               <button key={plan.id}
                 onClick={() => !isCurrent && setSelected(plan.id)}
                 disabled={isCurrent}
                 className={`w-full text-left rounded-2xl border p-4 transition-all ${
-                  isCurrent ? "border-primary/40 bg-primary/5 cursor-default"
-                    : isSelected ? "border-primary bg-secondary shadow-md shadow-primary/10"
-                      : "border-border bg-card hover:border-primary/30"
+                  isCurrent  ? "border-primary/40 bg-primary/5 cursor-default"
+                  : isSelected ? "border-primary bg-secondary shadow-md shadow-primary/10"
+                  : "border-border bg-card hover:border-primary/30"
                 } ${plan.highlight && !isCurrent ? "ring-2 ring-primary/30" : ""}`}>
                 <div className="flex items-start justify-between">
                   <div>
@@ -3580,12 +3620,12 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
         </div>
         {selected && selected !== "free" && selected !== currentPlan && (
           <button
-            onClick={() => setPaying(true)}
-            className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
+            onClick={handleContinue}
+            disabled={initiating}
+            className="w-full mt-6 flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-60"
             style={{ fontWeight: 700, fontSize: "1rem" }}
           >
-            Continue to Payment
-            <ArrowRight size={18} />
+            {initiating ? "Please wait…" : <>Continue to Payment <ArrowRight size={18} /></>}
           </button>
         )}
       </div>
