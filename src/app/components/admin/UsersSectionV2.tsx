@@ -4,7 +4,8 @@ import {
   Search, Filter, Eye, Trash2, Lock, Unlock, CheckCircle, X,
   Bell, Gift, ChevronRight, MapPin, Briefcase, Calendar,
   MessageSquare, Heart, LogIn, Star, Shield, Send, Check,
-  Download, UserCheck, Clock, AlertCircle, KeyRound, Copy
+  Download, UserCheck, Clock, AlertCircle, KeyRound, Copy,
+  UserX, ShieldOff, RefreshCw
 } from "lucide-react";
 import { USERS } from "../../../data/users";
 import { adminApi, restoreAdminToken } from "../../../lib/api";
@@ -578,6 +579,229 @@ function ActivityTimeline({ userId }: {
   );
 }
 
+// ── Delete User Modal ────────────────────────────────────────────────────────
+
+interface DeleteUserModalProps {
+  user: { id: string; name: string; email?: string };
+  onClose: () => void;
+  onDeleted: (userId: string) => void;
+}
+
+function DeleteUserModal({ user, onClose, onDeleted }: DeleteUserModalProps) {
+  const [reason, setReason] = useState("");
+  const [blacklist, setBlacklist] = useState<"blacklist" | "delete" | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleConfirm() {
+    if (!blacklist) return;
+    if (!reason.trim()) { toast.error("Please enter a reason before proceeding."); return; }
+    setLoading(true);
+    try {
+      await adminApi.deleteUser(user.id, { blacklist: blacklist === "blacklist", reason });
+      onDeleted(user.id);
+      toast.success(`${user.name} has been permanently deleted.${blacklist === "blacklist" ? " Email & phone blacklisted." : ""}`);
+      onClose();
+    } catch (err) {
+      toast.error(`Delete failed: ${(err as { message?: string })?.message ?? "Unknown error"}`);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-2xl border border-border w-full max-w-md shadow-2xl p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center flex-shrink-0">
+            <UserX size={18} className="text-red-600" />
+          </div>
+          <div>
+            <h3 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Delete {user.name}?</h3>
+            <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Choose how to handle this deletion</p>
+          </div>
+        </div>
+
+        {/* Option cards */}
+        <div className="space-y-3 mb-5">
+          <button
+            onClick={() => setBlacklist("blacklist")}
+            className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-colors ${
+              blacklist === "blacklist" ? "border-red-500 bg-red-50" : "border-border hover:border-red-300 hover:bg-red-50/30"
+            }`}
+          >
+            <ShieldOff size={18} className={blacklist === "blacklist" ? "text-red-600" : "text-muted-foreground"} style={{ marginTop: 2, flexShrink: 0 }} />
+            <div>
+              <p style={{ fontWeight: 600, fontSize: "0.9rem", color: blacklist === "blacklist" ? "#dc2626" : undefined }}>
+                Blacklist &amp; Delete
+              </p>
+              <p className="text-muted-foreground" style={{ fontSize: "0.8125rem", lineHeight: 1.5 }}>
+                Block email and phone so this user cannot create a new account in the future.
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setBlacklist("delete")}
+            className={`w-full flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-colors ${
+              blacklist === "delete" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-primary/5"
+            }`}
+          >
+            <Trash2 size={18} className={blacklist === "delete" ? "text-primary" : "text-muted-foreground"} style={{ marginTop: 2, flexShrink: 0 }} />
+            <div>
+              <p style={{ fontWeight: 600, fontSize: "0.9rem", color: blacklist === "delete" ? "var(--primary)" : undefined }}>
+                Just Delete
+              </p>
+              <p className="text-muted-foreground" style={{ fontSize: "0.8125rem", lineHeight: 1.5 }}>
+                Remove this account but allow re-registration with the same email or phone in the future.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Reason */}
+        <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+          Reason <span className="text-red-500">*</span>
+        </label>
+        <textarea
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          rows={3}
+          placeholder="Enter the reason for deletion…"
+          className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none mb-5"
+          style={{ fontSize: "0.9rem" }}
+        />
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="flex-1 py-3 rounded-xl border border-border hover:bg-muted transition-colors disabled:opacity-50"
+            style={{ fontSize: "0.9rem" }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={loading || !blacklist}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-destructive text-white rounded-xl hover:bg-destructive/90 disabled:opacity-50 transition-colors"
+            style={{ fontSize: "0.9rem", fontWeight: 700 }}
+          >
+            {loading
+              ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              : <Trash2 size={14} />}
+            {loading ? "Deleting…" : "Confirm Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Deleted Users Log ────────────────────────────────────────────────────────
+
+function DeletedUsersLog() {
+  const [rows, setRows] = useState<Array<{
+    id: number; email: string; phone: string; full_name: string;
+    reason: string; was_blacklisted: boolean; deleted_by: string | null; deleted_at: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  function load() {
+    setLoading(true);
+    setError(null);
+    restoreAdminToken();
+    adminApi.deletedUsers().then(res => {
+      setRows(res.results);
+    }).catch(err => {
+      setError((err as { message?: string })?.message ?? "Failed to load deleted users log.");
+    }).finally(() => setLoading(false));
+  }
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+        <div>
+          <h3 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Deleted Users Log</h3>
+          <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+            Permanent record of all deleted accounts and their blacklist status.
+          </p>
+        </div>
+        <button
+          onClick={load}
+          className="flex items-center gap-1.5 px-3 py-2 bg-card border border-border rounded-xl hover:border-primary/30 transition-colors text-muted-foreground"
+          style={{ fontSize: "0.8125rem" }}
+        >
+          <RefreshCw size={13} /> Refresh
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <AlertCircle size={15} className="text-amber-600 flex-shrink-0" />
+          <p style={{ fontSize: "0.8125rem", color: "#92400e" }}>{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-muted-foreground py-10 justify-center">
+          <div className="w-5 h-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+          <span style={{ fontSize: "0.875rem" }}>Loading deleted users…</span>
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+            <UserX size={24} className="text-muted-foreground" />
+          </div>
+          <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>No deleted users yet</p>
+          <p className="text-muted-foreground mt-1" style={{ fontSize: "0.8125rem" }}>
+            Deleted accounts will appear here with their reason and blacklist status.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-card rounded-2xl border border-border overflow-auto flex-1">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-card z-10">
+              <tr className="border-b border-border">
+                {["Email", "Phone", "Name", "Reason", "Blacklisted", "Deleted By", "Date"].map(h => (
+                  <th key={h} className="text-left px-4 py-3.5 text-muted-foreground" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => (
+                <tr key={r.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3" style={{ fontSize: "0.875rem" }}>{r.email}</td>
+                  <td className="px-4 py-3 text-muted-foreground" style={{ fontSize: "0.875rem" }}>{r.phone || "—"}</td>
+                  <td className="px-4 py-3" style={{ fontSize: "0.875rem" }}>{r.full_name || "—"}</td>
+                  <td className="px-4 py-3 max-w-[200px]" style={{ fontSize: "0.8125rem", color: "var(--muted-foreground)" }}>
+                    <span title={r.reason} className="line-clamp-2">{r.reason || "—"}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.was_blacklisted ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700" style={{ fontSize: "0.75rem", fontWeight: 600 }}>
+                        <ShieldOff size={11} /> Blacklisted
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-muted text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>No</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{r.deleted_by || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                    {new Date(r.deleted_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function UsersSectionV2() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
@@ -589,6 +813,8 @@ export function UsersSectionV2() {
   const [showResetPwModal, setShowResetPwModal] = useState(false);
   const [suspendModal, setSuspendModal] = useState<string | null>(null);
   const [suspendReason, setSuspendReason] = useState("");
+  const [deleteModal, setDeleteModal] = useState<{ id: string; name: string; email?: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<"users" | "deleted">("users");
   const [sortKey, setSortKey] = useState<SortKey>("joined");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -681,7 +907,42 @@ export function UsersSectionV2() {
   const pushTargets = detailUser ? [detailUser] : selectedUsers;
 
   return (
-    <div className="flex h-full gap-0 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Tabs ── */}
+      <div className="flex items-center justify-between mb-5 flex-shrink-0">
+        <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1 border border-border">
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`px-4 py-2 rounded-lg transition-colors ${activeTab === "users" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            style={{ fontSize: "0.875rem", fontWeight: activeTab === "users" ? 700 : 500 }}
+          >
+            Active Users {apiLoading ? "" : `(${liveUsers.length})`}
+          </button>
+          <button
+            onClick={() => setActiveTab("deleted")}
+            className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${activeTab === "deleted" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            style={{ fontSize: "0.875rem", fontWeight: activeTab === "deleted" ? 700 : 500 }}
+          >
+            <UserX size={13} /> Deleted Users
+          </button>
+        </div>
+        {activeTab === "users" && (
+          <button className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+            <Download size={14} /> Export
+          </button>
+        )}
+      </div>
+
+      {/* ── Deleted Users tab ── */}
+      {activeTab === "deleted" && (
+        <div className="flex-1 overflow-hidden">
+          <DeletedUsersLog />
+        </div>
+      )}
+
+      {/* ── Active Users tab ── */}
+      {activeTab === "users" && (
+      <div className="flex flex-1 gap-0 overflow-hidden">
       {/* ── Left: user table ── */}
       <div className={`flex flex-col transition-all ${detailUser ? "w-[55%]" : "w-full"} overflow-hidden`}>
         {/* Header */}
@@ -692,9 +953,6 @@ export function UsersSectionV2() {
               {apiLoading ? "Loading…" : `${liveUsers.length} member${liveUsers.length !== 1 ? "s" : ""}`}
             </p>
           </div>
-          <button className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
-            <Download size={14} /> Export
-          </button>
         </div>
 
         {/* API status banner */}
@@ -849,17 +1107,7 @@ export function UsersSectionV2() {
                         {u.status === "suspended" ? <Unlock size={14} /> : <Lock size={14} />}
                       </button>
                       <button
-                        onClick={async () => {
-                          if (!window.confirm(`Permanently delete ${u.name}? This cannot be undone.`)) return;
-                          try {
-                            await adminApi.deleteUser(u.id);
-                            setLiveUsers(prev => prev.filter(x => x.id !== u.id));
-                            window.dispatchEvent(new Event("ma3moni:users-changed"));
-                            toast.success(`${u.name} permanently deleted.`);
-                          } catch (err) {
-                            toast.error(`Delete failed: ${(err as {message?:string})?.message ?? "Unknown error"}`);
-                          }
-                        }}
+                        onClick={() => setDeleteModal({ id: u.id, name: u.name, email: u.email })}
                         className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-red-50 rounded-lg transition-colors"
                         title="Permanently delete">
                         <Trash2 size={14} />
@@ -1076,6 +1324,22 @@ export function UsersSectionV2() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Single delete modal ── */}
+      {deleteModal && (
+        <DeleteUserModal
+          user={deleteModal}
+          onClose={() => setDeleteModal(null)}
+          onDeleted={(id) => {
+            setLiveUsers(prev => prev.filter(u => u.id !== id));
+            if (detailUser?.id === id) setDetailUser(null);
+            window.dispatchEvent(new Event("ma3moni:users-changed"));
+            setDeleteModal(null);
+          }}
+        />
+      )}
+    </div>
       )}
     </div>
   );

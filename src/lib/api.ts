@@ -293,7 +293,7 @@ async function request<T>(
 const get    = <T>(path: string, signal?: AbortSignal) => request<T>("GET", path, undefined, { signal });
 const post   = <T>(path: string, body?: unknown)       => request<T>("POST", path, body);
 const patch  = <T>(path: string, body?: unknown)       => request<T>("PATCH", path, body);
-const del    = <T>(path: string)                       => request<T>("DELETE", path);
+const del    = <T>(path: string, body?: unknown)       => request<T>("DELETE", path, body);
 const upload = <T>(path: string, form: FormData)       => request<T>("POST", path, form, { multipart: true });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1077,13 +1077,23 @@ export const adminApi = {
   updateUserStatus: (id: string, status: "active" | "suspended" | "deactivated") =>
     patch<void>(`/api/admin/users/${id}/status/`, { status }),
 
-  deleteUser: (id: string) =>
-    del<void>(`/api/admin/users/${id}/delete/`),
+  deleteUser: (id: string, opts?: { blacklist?: boolean; reason?: string }) =>
+    del<void>(`/api/admin/users/${id}/delete/`, opts),
 
-  bulkDeleteUsers: (user_ids: string[]) =>
+  bulkDeleteUsers: (user_ids: string[], opts?: { blacklist?: boolean; reason?: string }) =>
     post<{ deleted: string[]; errors: Array<{ id: string; error: string }> }>(
-      "/api/admin/users/bulk-delete/", { user_ids }
+      "/api/admin/users/bulk-delete/", { user_ids, ...opts }
     ),
+
+  deletedUsers: (page = 1, page_size = 50) =>
+    get<{
+      results: Array<{
+        id: number; email: string; phone: string; full_name: string;
+        reason: string; was_blacklisted: boolean; deleted_by: string | null;
+        deleted_at: string;
+      }>;
+      count: number; page: number; pages: number;
+    }>(`/api/admin/deleted-users/?page=${page}&page_size=${page_size}`),
 
   grantSubscription: (id: string, plan: UserPlan, days: number) =>
     post<{ detail: string; plan: string }>(`/api/admin/users/${id}/grant-subscription/`, { plan, days }),
