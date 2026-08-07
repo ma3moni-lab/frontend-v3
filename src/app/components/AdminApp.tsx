@@ -1501,100 +1501,183 @@ function RolesSection({ role }: { role: AdminRole }) {
 }
 
 // ─── PAYMENTS SECTION ─────────────────────────────────────
-function PaymentsSection() {
-  return <PaymentsSectionV2 />;
+function PaymentsSection({ role }: { role: AdminRole }) {
+  return <PaymentsSectionV2 role={role} />;
 }
 
 // ─── ANALYTICS SECTION ────────────────────────────────────
 function AnalyticsSection({ role }: { role: AdminRole }) {
   const canSeeRevenue = role === "super-admin" || (role === "admin" && getRevenuePermission());
-  const [period, setPeriod] = useState<"7D" | "30D" | "90D" | "1Y">("30D");
+  const [period, setPeriod] = useState<"30d" | "90d" | "1y">("90d");
+  const [loading, setLoading] = useState(true);
+
+  const [usersData,   setUsersData]   = useState<Array<{ month: string; total: number; new: number }>>([]);
+  const [matchesData, setMatchesData] = useState<Array<{ month: string; matches: number }>>([]);
+  const [genderData,  setGenderData]  = useState<Array<{ name: string; value: number; color: string }>>([]);
+  const [revenueData, setRevenueData] = useState<Array<{ month: string; amount: number }>>([]);
+  const [revKpis,     setRevKpis]     = useState<{ mrr: number; arr: number; arpu: number } | null>(null);
+  const [subDist,     setSubDist]     = useState<Array<{ name: string; value: number; color: string }>>([]);
+
+  useEffect(() => {
+    setLoading(true);
+    const apiPeriod = period as "30d" | "90d" | "1y";
+    Promise.allSettled([
+      analyticsApi.users(apiPeriod).then(r => { setUsersData(r.series); setGenderData(r.gender); }),
+      analyticsApi.matches().then(r => setMatchesData(r.series)),
+      canSeeRevenue ? analyticsApi.revenue().then(r => { setRevenueData(r.series); setRevKpis(r.kpis); }) : Promise.resolve(),
+      analyticsApi.subscriptions().then(r => setSubDist(r.distribution)),
+    ]).finally(() => setLoading(false));
+  }, [period, canSeeRevenue]);
+
+  const PERIOD_LABELS: Record<string, string> = { "30d": "30D", "90d": "90D", "1y": "1Y" };
 
   return (
     <div>
       <SectionHeader
         title="Analytics & Insights"
-        sub="Understand platform performance and user behavior"
+        sub="Live platform performance data"
         action={
-          <div className="flex gap-1 bg-muted rounded-xl p-1">
-            {(["7D", "30D", "90D", "1Y"] as const).map(p => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg transition-all ${period === p ? "bg-card shadow-sm" : "text-muted-foreground"}`}
-                style={{ fontSize: "0.8125rem", fontWeight: period === p ? 600 : 400 }}
-              >
-                {p}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            {loading && <Loader2 size={14} className="animate-spin text-muted-foreground" />}
+            <div className="flex gap-1 bg-muted rounded-xl p-1">
+              {(["30d", "90d", "1y"] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${period === p ? "bg-card shadow-sm" : "text-muted-foreground"}`}
+                  style={{ fontSize: "0.8125rem", fontWeight: period === p ? 600 : 400 }}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
 
+      {/* Revenue KPI strip — super-admin only */}
+      {canSeeRevenue && revKpis && (
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {[
+            { label: "MRR", value: `$${revKpis.mrr.toLocaleString()}` },
+            { label: "ARR", value: `$${revKpis.arr.toLocaleString()}` },
+            { label: "ARPU", value: `$${revKpis.arpu.toFixed(2)}` },
+          ].map(k => (
+            <div key={k.label} className="bg-card rounded-2xl border border-border p-4">
+              <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{k.label}</p>
+              <p style={{ fontSize: "1.5rem", fontWeight: 800 }}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Growth — explicit keys prevent recharts key collision */}
+        {/* User Growth */}
         <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">New Users</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={analyticsData.users}>
-              <XAxis key="x" dataKey="month" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
-              <YAxis key="y" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
-              <Tooltip key="tip" contentStyle={{ borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.8125rem" }} />
-              <Bar key="bar" dataKey="new" fill="#0A6870" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {!usersData.length ? (
+            <div className="flex justify-center items-center h-[220px]"><Loader2 size={20} className="animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={usersData}>
+                <XAxis key="x" dataKey="month" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
+                <YAxis key="y" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
+                <Tooltip key="tip" contentStyle={{ borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.8125rem" }} />
+                <Bar key="bar" dataKey="new" fill="#0A6870" radius={[6, 6, 0, 0]} name="New users" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Match Trends */}
         <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Match Trends</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={analyticsData.matches}>
-              <XAxis key="x" dataKey="month" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
-              <YAxis key="y" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
-              <Tooltip key="tip" contentStyle={{ borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.8125rem" }} />
-              <Line key="line" type="monotone" dataKey="matches" stroke="#C5733F" strokeWidth={2.5} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+          {!matchesData.length ? (
+            <div className="flex justify-center items-center h-[220px]"><Loader2 size={20} className="animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={matchesData}>
+                <XAxis key="x" dataKey="month" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
+                <YAxis key="y" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
+                <Tooltip key="tip" contentStyle={{ borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.8125rem" }} />
+                <Line key="line" type="monotone" dataKey="matches" stroke="#C5733F" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Gender Balance — PieChart with fixed size, no ResponsiveContainer */}
+        {/* Gender Balance */}
         <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Gender Balance</h3>
-          <div className="flex items-center gap-8">
-            <PieChart width={180} height={180}>
-              <Pie key="pie" data={analyticsData.gender} cx={90} cy={90} innerRadius={50} outerRadius={80} dataKey="value" strokeWidth={0}>
-                {analyticsData.gender.map((entry, i) => (
-                  <Cell key={`cell-${i}`} fill={entry.color} />
-                ))}
-              </Pie>
-            </PieChart>
-            <div className="space-y-4">
-              {analyticsData.gender.map(g => (
-                <div key={g.name}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-3 h-3 rounded-full" style={{ background: g.color }} />
-                    <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{g.name}</span>
+          {!genderData.length ? (
+            <div className="flex justify-center items-center h-[180px]"><Loader2 size={20} className="animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="flex items-center gap-8">
+              <PieChart width={180} height={180}>
+                <Pie key="pie" data={genderData} cx={90} cy={90} innerRadius={50} outerRadius={80} dataKey="value" strokeWidth={0}>
+                  {genderData.map((entry, i) => (
+                    <Cell key={`cell-${i}`} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+              <div className="space-y-4">
+                {genderData.map(g => (
+                  <div key={g.name}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 rounded-full" style={{ background: g.color }} />
+                      <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{g.name}</span>
+                    </div>
+                    <p style={{ fontSize: "1.5rem", fontWeight: 900, color: g.color }}>{g.value}%</p>
                   </div>
-                  <p style={{ fontSize: "1.5rem", fontWeight: 900, color: g.color }}>{g.value}%</p>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Subscription distribution */}
+        {subDist.length > 0 && (
+          <div className="bg-card rounded-2xl border border-border p-4">
+            <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Subscription Plans</h3>
+            <div className="flex items-center gap-6">
+              <PieChart width={160} height={160}>
+                <Pie key="pie2" data={subDist} cx={80} cy={80} innerRadius={44} outerRadius={72} dataKey="value" strokeWidth={0}>
+                  {subDist.map((entry, i) => <Cell key={`sc-${i}`} fill={entry.color} />)}
+                </Pie>
+              </PieChart>
+              <div className="flex-1 space-y-2">
+                {subDist.map(s => (
+                  <div key={s.name} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ background: s.color }} />
+                      <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>{s.name}</span>
+                    </div>
+                    <span style={{ fontSize: "0.875rem", fontWeight: 700 }}>{s.value.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Revenue — only super-admin or admin with permission */}
         {canSeeRevenue && (
-          <div className="bg-card rounded-2xl border border-border p-4">
-            <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Monthly Revenue</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={analyticsData.revenue}>
-                <XAxis key="x" dataKey="month" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
-                <YAxis key="y" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip key="tip" contentStyle={{ borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.8125rem" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Revenue"]} />
-                <Line key="line" type="monotone" dataKey="amount" stroke="#6B9E78" strokeWidth={2.5} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+          <div className={subDist.length > 0 ? "lg:col-span-2" : ""} style={{}}>
+            <div className="bg-card rounded-2xl border border-border p-4">
+              <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Monthly Revenue</h3>
+              {!revenueData.length ? (
+                <div className="flex justify-center items-center h-[200px]"><Loader2 size={20} className="animate-spin text-muted-foreground" /></div>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={revenueData}>
+                    <XAxis key="x" dataKey="month" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} />
+                    <YAxis key="y" tick={{ fontSize: 11, fill: "#68747F" }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip key="tip" contentStyle={{ borderRadius: "10px", border: "1px solid var(--border)", fontSize: "0.8125rem" }} formatter={(v: number) => [`$${v.toLocaleString()}`, "Revenue"]} />
+                    <Line key="line" type="monotone" dataKey="amount" stroke="#6B9E78" strokeWidth={2.5} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -3374,7 +3457,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
       case "support":    return <SupportSection role={role} />;
       case "roles":      return <RolesSection role={role} />;
       case "blog":       return <BlogSection role={role} />;
-      case "payments":   return <PaymentsSection />;
+      case "payments":   return <PaymentsSection role={role} />;
       case "analytics":  return <AnalyticsSection role={role} />;
       case "reports":    return <ReportsSection />;
       case "settings":   return <SettingsSection role={role} />;
