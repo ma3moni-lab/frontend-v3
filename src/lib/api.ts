@@ -43,12 +43,28 @@ function lset(key: string, val: string) { try { localStorage.setItem(key, val); 
  *  Admin endpoints use ONLY the admin slot; all other endpoints prefer the user
  *  slot but fall back to the admin token so that admins can call blog/user APIs
  *  without needing a separate user session. */
+// Public auth endpoints that must NEVER receive a token — simplejwt rejects
+// requests with invalid/expired tokens even on AllowAny views.
+const PUBLIC_AUTH_PREFIXES = [
+  "/api/auth/register/",
+  "/api/auth/login/",
+  "/api/auth/send-otp/",
+  "/api/auth/verify-otp/",
+  "/api/auth/verify-email/",
+  "/api/auth/forgot-password/",
+  "/api/auth/reset-password/",
+  "/api/auth/social/",
+];
+
 function tokenForPath(path: string): string | null {
+  if (PUBLIC_AUTH_PREFIXES.some(p => path.startsWith(p))) {
+    return null;                           // public endpoints: never send a token
+  }
   if (path.startsWith("/api/admin/")) {
     return ls(ADMIN_ACCESS_KEY);           // admin endpoints: admin token only
   }
-  // Non-admin paths: user token first, legacy fallback, then admin token as last resort
-  return ls(USER_ACCESS_KEY) ?? ls(ACCESS_KEY) ?? ls(ADMIN_ACCESS_KEY);
+  // User-facing protected endpoints: user token only (no admin token fallthrough)
+  return ls(USER_ACCESS_KEY) ?? ls(ACCESS_KEY) ?? null;
 }
 function refreshForPath(path: string): string | null {
   if (path.startsWith("/api/admin/")) {
