@@ -26,7 +26,7 @@ import {
   CheckCircle, XCircle, Clock, Send, User, MessageSquare,
   Lock, Unlock, Menu, ChevronDown, Star, ArrowUpRight,
   BookOpen, ThumbsUp, UserPlus, Pencil,
-  Tag, Trash, Activity, Info
+  Tag, Trash, Activity, Info, Save, Loader2
 } from "lucide-react";
 import { BlogSection, TopArticlesPanel } from "./admin/AdminBlogSection";
 import {
@@ -44,6 +44,7 @@ interface AdminAppProps {
   adminEmail: string;
   initialSection?: string;
   onSectionChange?: (section: string) => void;
+  onNameChange?: (name: string) => void;
 }
 
 // Sections each role can access
@@ -379,7 +380,7 @@ function ActivityPanel({ role }: { role: AdminRole }) {
   const items = activityTab === "user" ? userActivity : adminActivity;
 
   return (
-    <div className="bg-card rounded-2xl border border-border p-6">
+    <div className="bg-card rounded-2xl border border-border p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Recent Activity</h3>
         {isSuperAdmin && (
@@ -433,7 +434,7 @@ function QuickActionsRow({ liveOverview, onNavigate }: { liveOverview?: Analytic
   return (
     <div className="grid grid-cols-3 gap-4 mt-6">
       {items.map(({ label, value, action, color, target }) => (
-        <div key={label} className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between">
+        <div key={label} className="bg-card rounded-2xl border border-border p-4 flex items-center justify-between">
           <div>
             <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{label}</p>
             <p style={{ fontSize: "1.75rem", fontWeight: 900, color }}>{value}</p>
@@ -550,7 +551,7 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Daily Active Users — super-admin and admin only */}
         {(role === "super-admin" || role === "admin") && (
-          <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
+          <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-4">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Daily Active Users</h3>
@@ -607,7 +608,7 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
 
         {/* Blog article engagement — blog-admin */}
         {isBlogAdmin && (
-          <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
+          <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-4">
             <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Article Views (Last 6 Months)</h3>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={[
@@ -625,7 +626,7 @@ function OverviewSection({ role, onNavigate, liveOverview, liveUsersChart, liveR
 
         {/* Revenue chart — only for those with financial access */}
         {canSeeFinancials && (
-          <div className={`${role === "super-admin" ? "" : "lg:col-span-2"} bg-card rounded-2xl border border-border p-6`}>
+          <div className={`${role === "super-admin" ? "" : "lg:col-span-2"} bg-card rounded-2xl border border-border p-4`}>
             <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Monthly Revenue</h3>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={liveRevenueChart ?? analyticsData.revenue} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -860,7 +861,7 @@ function ModerationSection() {
             </div>
 
             {/* User info */}
-            <div className="p-5">
+            <div className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 style={{ fontWeight: 800, fontSize: "1.125rem" }}>{previewItem.userName}</h3>
@@ -1069,7 +1070,7 @@ function BlacklistSection() {
       <SectionHeader title="Blacklist System" sub="Block users from re-registering on any account" />
 
       {/* Add form */}
-      <div className="bg-card rounded-2xl border border-border p-6 mb-6">
+      <div className="bg-card rounded-2xl border border-border p-4 mb-6">
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Add to Blacklist</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -1191,7 +1192,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           <h3 style={{ fontWeight: 700, fontSize: "1.0625rem" }}>Create Admin User</h3>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><X size={18} /></button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4">
           <div>
             <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Full Name</label>
             <input value={form.name} onChange={e => u("name", e.target.value)} placeholder="e.g. Aisha Mohammed" className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ fontSize: "0.9rem" }} />
@@ -1532,7 +1533,7 @@ function AnalyticsSection({ role }: { role: AdminRole }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* User Growth — explicit keys prevent recharts key collision */}
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">New Users</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={analyticsData.users}>
@@ -1545,7 +1546,7 @@ function AnalyticsSection({ role }: { role: AdminRole }) {
         </div>
 
         {/* Match Trends */}
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Match Trends</h3>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={analyticsData.matches}>
@@ -1558,7 +1559,7 @@ function AnalyticsSection({ role }: { role: AdminRole }) {
         </div>
 
         {/* Gender Balance — PieChart with fixed size, no ResponsiveContainer */}
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Gender Balance</h3>
           <div className="flex items-center gap-8">
             <PieChart width={180} height={180}>
@@ -1584,7 +1585,7 @@ function AnalyticsSection({ role }: { role: AdminRole }) {
 
         {/* Revenue — only super-admin or admin with permission */}
         {canSeeRevenue && (
-          <div className="bg-card rounded-2xl border border-border p-6">
+          <div className="bg-card rounded-2xl border border-border p-4">
             <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Monthly Revenue</h3>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={analyticsData.revenue}>
@@ -1751,7 +1752,7 @@ function ReportsSection() {
           { label: "Pending Review", value: displayReports.filter(r => r.status === "pending").length, color: "#C5733F" },
           { label: "Actioned",       value: displayReports.filter(r => r.status === "actioned").length, color: "#6B9E78" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="bg-card rounded-2xl border border-border p-5">
+          <div key={label} className="bg-card rounded-2xl border border-border p-4">
             <p className="text-muted-foreground mb-1" style={{ fontSize: "0.875rem" }}>{label}</p>
             <p style={{ fontSize: "2rem", fontWeight: 900, color }}>{value}</p>
           </div>
@@ -2005,13 +2006,13 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* ── Left: tab content ── */}
-        <div className="xl:col-span-2 space-y-5">
+        <div className="xl:col-span-2 space-y-4">
 
           {/* DETAILS TAB */}
           {tab === "details" && (
             <>
               {/* Parties */}
-              <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="bg-card rounded-2xl border border-border p-4">
                 <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Parties Involved</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
@@ -2052,7 +2053,7 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
               </div>
 
               {/* Description */}
-              <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="bg-card rounded-2xl border border-border p-4">
                 <div className="flex items-start gap-3 mb-4">
                   <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-lg flex-shrink-0">⚠️</div>
                   <div>
@@ -2067,7 +2068,7 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
 
               {/* Evidence */}
               {report.evidence.length > 0 && (
-                <div className="bg-card rounded-2xl border border-border p-6">
+                <div className="bg-card rounded-2xl border border-border p-4">
                   <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1rem" }}>Evidence ({report.evidence.length})</h3>
                   <div className="space-y-3">
                     {report.evidence.map((ev: { type: string; content: string; time: string }, i: number) => {
@@ -2211,14 +2212,14 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
 
           {/* HISTORY TAB */}
           {tab === "history" && (
-            <div className="bg-card rounded-2xl border border-border p-6">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "1.5rem" }}>Action Timeline</h3>
               {report.actionHistory.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>No actions taken yet.</p>
                 </div>
               ) : (
-                <div className="relative space-y-6">
+                <div className="relative space-y-4">
                   <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-border" />
                   {[
                     { action: "Report submitted", by: initialReport.reporter, date: initialReport.date, type: "system" },
@@ -2250,10 +2251,10 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
         </div>
 
         {/* ── Right: action panel ── */}
-        <div className="space-y-5">
+        <div className="space-y-4">
 
           {/* Take action */}
-          <div className="bg-card rounded-2xl border border-border p-5">
+          <div className="bg-card rounded-2xl border border-border p-4">
             {report.status === "actioned" || report.status === "dismissed" ? (
               <div className="text-center py-4">
                 <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center mx-auto mb-3 text-xl">✅</div>
@@ -2341,7 +2342,7 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
           </div>
 
           {/* Admin notes */}
-          <div className="bg-card rounded-2xl border border-border p-5">
+          <div className="bg-card rounded-2xl border border-border p-4">
             <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Internal Notes</h3>
             <textarea
               value={adminNote}
@@ -2364,7 +2365,7 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
 
           {/* Assign agent */}
           {staffList.length > 0 && (
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.875rem" }}>Assign to Agent</h3>
               {report.linked_ticket?.assigned_to && (
                 <div className="flex items-center gap-2 mb-3 p-2.5 bg-secondary rounded-xl border border-primary/15">
@@ -2412,7 +2413,7 @@ function ReportDetailView({ report: initialReport, allReports, onBack, onAction 
 
           {/* Appeal status control */}
           {report.appeal_status && report.appeal_status !== "none" && (
-            <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="bg-card rounded-2xl border border-border p-4">
               <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>Appeal Status</h3>
               <div className="flex flex-wrap gap-2">
                 {(["pending", "under_review", "resolved"] as const).map(s => (
@@ -2932,11 +2933,11 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Matching Controls */}
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Matching Controls</h3>
-          <div className="space-y-5">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Gender Balance Mechanism</p>
@@ -2971,7 +2972,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         </div>
 
         {/* Referral Settings */}
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Referral Program</h3>
           <div>
             <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Referral Bonus Points</label>
@@ -2994,7 +2995,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         </div>
 
         {/* Feature toggles */}
-        <div className="bg-card rounded-2xl border border-border p-6">
+        <div className="bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Feature Controls</h3>
           <div className="space-y-4">
             {[
@@ -3020,7 +3021,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         {/* Maintenance */}
         {/* Revenue access control — super-admin only */}
         {isSuperAdmin && (
-          <div className="bg-card rounded-2xl border border-border p-6">
+          <div className="bg-card rounded-2xl border border-border p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -3054,7 +3055,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           </div>
         )}
 
-        <div className={`rounded-2xl border p-6 ${settings.maintenanceMode ? "bg-amber-50 border-amber-200" : "bg-card border-border"}`}>
+        <div className={`rounded-2xl border p-4 ${settings.maintenanceMode ? "bg-amber-50 border-amber-200" : "bg-card border-border"}`}>
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="flex items-center gap-2">
@@ -3135,7 +3136,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
 
         {/* Payment Gateway — Credo by eTranzact */}
         {isSuperAdmin && (
-          <div className="bg-card rounded-2xl border border-border p-6">
+          <div className="bg-card rounded-2xl border border-border p-4">
             <div className="flex items-center gap-3 mb-1">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <CreditCard size={18} className="text-primary" />
@@ -3241,7 +3242,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
 }
 
 // ─── ADMIN SHELL ──────────────────────────────────────────
-export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, onSectionChange }: AdminAppProps) {
+export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, onSectionChange, onNameChange }: AdminAppProps) {
   // v2 — sections rendered on-demand via renderSection() to avoid recharts key collisions.
   // For admin role, dynamically add "payments" to nav when super-admin has granted access.
   const baseAccess = ROLE_ACCESS[role];
@@ -3257,6 +3258,30 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
   );
   const [section, setSection] = useState<AdminSection>(resolvedInitial);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // ── My Account modal ──────────────────────────────────────
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [editName, setEditName] = useState(adminName);
+  const [savingName, setSavingName] = useState(false);
+
+  const saveAdminName = async () => {
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    setSavingName(true);
+    try {
+      const { adminApi } = await import("../../lib/api");
+      const updated = await adminApi.updateMe(trimmed);
+      onNameChange?.(updated.name || trimmed);
+      setProfileOpen(false);
+      const { toast } = await import("sonner");
+      toast.success("Display name updated.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Could not save name. Please try again.");
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   // Admins are identified by role badge/initials — no dating-profile photo in admin UI
   const adminPhotoUrl: string | null = null;
@@ -3436,8 +3461,12 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
             <div className="h-5 w-px bg-border" />
-            {/* Admin identity chip */}
-            <div className="flex items-center gap-2.5">
+            {/* Admin identity chip — click to open My Account */}
+            <button
+              onClick={() => { setEditName(adminName); setProfileOpen(true); }}
+              className="flex items-center gap-2.5 rounded-xl px-2 py-1 hover:bg-muted/60 transition-colors"
+              title="My Account"
+            >
               <div className="hidden sm:block text-right">
                 <p style={{ fontSize: "0.8125rem", fontWeight: 700, lineHeight: 1.25 }}>
                   {adminName && adminName !== adminEmail ? adminName : ROLE_LABEL[role]}
@@ -3446,7 +3475,6 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
               </div>
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                title={`${adminName} — ${ROLE_LABEL[role]}`}
                 style={{
                   background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
@@ -3456,7 +3484,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
                   {adminName && adminName !== adminEmail ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
                 </span>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -3467,6 +3495,87 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
           </Suspense>
         </main>
       </div>
+
+      {/* ── My Account modal ─────────────────────────────── */}
+      {profileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl border border-border w-full max-w-sm shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{
+                    background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)",
+                  }}
+                >
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>
+                    {editName.trim() ? editName.trim().split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
+                  </span>
+                </div>
+                <h2 style={{ fontWeight: 700, fontSize: "1rem" }}>My Account</h2>
+              </div>
+              <button onClick={() => setProfileOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {/* Role — read-only */}
+              <div>
+                <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Role</label>
+                <div className="px-3 py-2.5 rounded-xl border border-border bg-muted/40 text-muted-foreground" style={{ fontSize: "0.9rem" }}>
+                  {ROLE_LABEL[role]}
+                </div>
+              </div>
+
+              {/* Email — read-only */}
+              <div>
+                <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Email</label>
+                <div className="px-3 py-2.5 rounded-xl border border-border bg-muted/40 text-muted-foreground" style={{ fontSize: "0.9rem", fontFamily: "monospace" }}>
+                  {adminEmail}
+                </div>
+              </div>
+
+              {/* Display name — editable */}
+              <div>
+                <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Display Name</label>
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") saveAdminName(); if (e.key === "Escape") setProfileOpen(false); }}
+                  placeholder="Enter your name"
+                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  style={{ fontSize: "0.9rem" }}
+                />
+                <p className="mt-1.5 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                  This name appears in the admin dashboard header and audit logs.
+                </p>
+              </div>
+            </div>
+
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setProfileOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-border hover:bg-muted transition-colors"
+                style={{ fontSize: "0.9rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveAdminName}
+                disabled={savingName || !editName.trim() || editName.trim() === adminName}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ fontSize: "0.9rem", fontWeight: 600 }}
+              >
+                {savingName ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                Save name
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1133,9 +1133,16 @@ export const adminApi = {
   updateSettings: (data: Partial<PlatformSettings> & { credo_secret_key?: string; credo_webhook_secret?: string }) =>
     patch<PlatformSettings>("/api/admin/settings/", data),
 
+  // Admin self-profile — always routes through admin JWT (never picks up user token)
+  me: () =>
+    get<{ id: string; email: string; role: string; name: string }>("/api/admin/me/"),
+
+  updateMe: (name: string) =>
+    patch<{ id: string; email: string; role: string; name: string }>("/api/admin/me/", { name }),
+
   // Plan pricing (super admin)
-  updatePlan: (name: string, data: { price_monthly?: number; price_yearly?: number; features?: string[] }) =>
-    patch<Plan>(`/api/admin/plans/${name}/`, data),
+  updatePlan: (planName: string, data: { price_monthly?: number; price_yearly?: number; features?: string[] }) =>
+    patch<Plan>(`/api/admin/plans/${planName}/`, data),
 
   // Staff / admin accounts (super_admin only)
   staff: () =>

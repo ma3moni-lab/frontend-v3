@@ -203,9 +203,13 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
       if (err instanceof ApiError) {
         const data = err.data as Record<string, unknown> | null;
         if (data) {
+          // Field names like "email" / "phone" / "password" are suppressed — the
+          // message is already self-explanatory ("An account with this email already
+          // exists."). Only "non_field_errors" would have needed stripping before.
+          const SILENT_KEYS = new Set(["email", "phone", "password", "non_field_errors"]);
           const msgs: string[] = [];
           Object.entries(data).forEach(([k, v]) => {
-            if (Array.isArray(v)) v.forEach(m => msgs.push(k === "non_field_errors" ? String(m) : `${k}: ${m}`));
+            if (Array.isArray(v)) v.forEach(m => msgs.push(SILENT_KEYS.has(k) ? String(m) : `${k}: ${m}`));
             else if (typeof v === "string") msgs.push(v);
           });
           setError(msgs[0] ?? err.message);

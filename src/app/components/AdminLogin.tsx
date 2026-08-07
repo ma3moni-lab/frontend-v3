@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, Shield, AlertCircle, Heart, Lock, ChevronRight, ChevronLeft } from "lucide-react";
 import type { AdminRole } from "./AdminRoot";
-import { auth as apiAuth, setAdminTokens, toFrontendRole, ApiError } from "../../lib/api";
+import { auth as apiAuth, adminApi, setAdminTokens, toFrontendRole, ApiError } from "../../lib/api";
 
 interface AdminSession {
   role: AdminRole;
@@ -60,12 +60,17 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
 
       setAdminTokens(res.access, res.refresh);
 
-      // Fetch real full name from profile — fall back to email if profile not set
-      let displayName = res.user.email;
-      try {
-        const me = await apiAuth.me();
-        displayName = me.profile?.full_name?.trim() || res.user.email;
-      } catch {}
+      // Prefer the name baked into the login response. Then try /api/admin/me/
+      // which always uses the admin JWT slot (avoiding user-token bleed-through).
+      // Fall back to email if the profile has no name yet.
+      let displayName: string = (res.user as { name?: string }).name?.trim() || "";
+      if (!displayName) {
+        try {
+          const me = await adminApi.me();
+          displayName = me.name?.trim() || "";
+        } catch {}
+      }
+      if (!displayName) displayName = res.user.email;
 
       setLoading(false);
       onLogin({

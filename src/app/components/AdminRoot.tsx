@@ -46,6 +46,7 @@ export function AdminRoot() {
             initialSection={section}
             onSectionChange={s => navigate(`/app/admin/${s}`, { replace: true })}
             onBack={() => { clearAdminTokens(); setSession(null); navigate("/app/admin", { replace: true }); }}
+            onNameChange={name => setSession(s => s ? { ...s, name } : s)}
           />
       }
     </div>
