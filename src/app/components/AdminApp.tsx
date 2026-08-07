@@ -2882,6 +2882,174 @@ function AdminAuditSection() {
   );
 }
 
+// ─── EMAIL DIAGNOSTICS PANEL ─────────────────────────────
+function EmailDiagnosticsPanel() {
+  type EmailStatus = Awaited<ReturnType<typeof adminApi.emailStatus>>;
+  const [status,     setStatus]    = useState<EmailStatus | null>(null);
+  const [loading,    setLoading]   = useState(true);
+  const [testTo,     setTestTo]    = useState("");
+  const [testing,    setTesting]   = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; provider: string; error: string } | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    adminApi.emailStatus()
+      .then(s => setStatus(s))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const sendTest = async () => {
+    if (!testTo.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await adminApi.sendTestEmail(testTo.trim());
+      setTestResult({ success: r.success, provider: r.provider, error: r.error });
+      if (r.success) toast.success(`Test email sent via ${r.provider} → ${r.to}`);
+      else           toast.error(`Delivery failed: ${r.error}`);
+    } catch {
+      toast.error("Could not reach email-test endpoint.");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const isSES  = status?.active_provider === "amazon_ses";
+  const isMock = status?.active_provider === "mock";
+
+  return (
+    <div className="bg-card rounded-2xl border border-border p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Send size={17} className="text-primary" />
+          </div>
+          <div>
+            <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Email Delivery</h3>
+            <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Amazon SES · OTP · Receipts · Alerts</p>
+          </div>
+        </div>
+        <button onClick={load} disabled={loading}
+          className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-40">
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
+
+      {loading && <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-muted-foreground" /></div>}
+
+      {!loading && status && (
+        <div className="space-y-4">
+          {/* Provider status banner */}
+          <div className={`rounded-xl px-4 py-3 flex items-start gap-3 ${isSES ? "bg-green-50 border border-green-200" : "bg-amber-50 border border-amber-200"}`}>
+            <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${isSES ? "bg-green-500" : "bg-amber-500"}`} />
+            <div>
+              <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: isSES ? "#166534" : "#92400e" }}>
+                {isSES ? "Amazon SES — live delivery active" : "Mock Provider — emails NOT sent to inbox"}
+              </p>
+              <p style={{ fontSize: "0.8125rem", color: isSES ? "#166534" : "#92400e", opacity: 0.85 }}>
+                {status.provider_reason}
+              </p>
+            </div>
+          </div>
+
+          {/* Checklist */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "AWS Key ID set",        ok: status.aws_key_set },
+              { label: "AWS Secret set",         ok: status.aws_secret_set },
+              { label: "Email verification on",  ok: status.email_verification_on },
+              { label: `Region: ${status.aws_region}`, ok: true },
+            ].map(({ label, ok }) => (
+              <div key={label} className="flex items-center gap-2">
+                {ok ? <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
+                    : <XCircle    size={14} className="text-red-500 flex-shrink-0" />}
+                <span style={{ fontWeight: ok ? 500 : 600, fontSize: "0.8125rem",
+                               color: ok ? "var(--foreground)" : "#991b1b" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { label: "Sent (last 50)",   value: status.stats.sent,   color: "#166534" },
+              { label: "Failed (last 50)", value: status.stats.failed, color: status.stats.failed > 0 ? "#991b1b" : "var(--foreground)" },
+            ].map(s => (
+              <div key={s.label} className="rounded-xl bg-muted/50 p-3 text-center">
+                <p style={{ fontSize: "1.5rem", fontWeight: 900, color: s.color }}>{s.value}</p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Recent log */}
+          {status.stats.recent.length > 0 && (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <p className="px-3 py-2 bg-muted/50 text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>RECENT ATTEMPTS</p>
+              <div className="divide-y divide-border">
+                {status.stats.recent.map((log, i) => (
+                  <div key={i} className="px-3 py-2 flex items-center gap-3">
+                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${log.status === "sent" ? "bg-green-500" : "bg-red-500"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate" style={{ fontSize: "0.8125rem" }}>
+                        {log.to} · <span className="text-muted-foreground">{log.type}</span>
+                      </p>
+                      {log.error && <p className="truncate text-red-500" style={{ fontSize: "0.75rem" }}>{log.error}</p>}
+                    </div>
+                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.6875rem" }}>
+                      {new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Test send */}
+          <div className="border-t border-border pt-4">
+            <p style={{ fontWeight: 600, fontSize: "0.875rem" }} className="mb-2">Send Test Email</p>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                placeholder="recipient@example.com"
+                value={testTo}
+                onChange={e => setTestTo(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && sendTest()}
+                className="flex-1 px-3 py-2 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                style={{ fontSize: "0.875rem" }}
+              />
+              <button
+                onClick={sendTest}
+                disabled={testing || !testTo.trim()}
+                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                style={{ fontSize: "0.875rem", fontWeight: 600 }}
+              >
+                {testing ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                Send
+              </button>
+            </div>
+            {testResult && (
+              <p className={`mt-2 px-3 py-2 rounded-lg text-sm ${testResult.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
+                {testResult.success
+                  ? `✅ Delivered via ${testResult.provider}`
+                  : `❌ Failed (${testResult.provider}): ${testResult.error}`}
+              </p>
+            )}
+            {isMock && (
+              <p className="mt-2 text-amber-600" style={{ fontSize: "0.75rem" }}>
+                ⚠️ Mock provider active — test logs to server console only. Add AWS credentials on Render to enable real delivery.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── SETTINGS SECTION ─────────────────────────────────────
 function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSettingsSaved?: (s: PlatformSettings) => void }) {
   const isSuperAdmin = role === "super-admin";
@@ -3216,6 +3384,9 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           )}
         </div>
       </div>
+
+        {/* ── Email Diagnostics ── super-admin only */}
+        {isSuperAdmin && <EmailDiagnosticsPanel />}
 
         {/* Payment Gateway — Credo by eTranzact */}
         {isSuperAdmin && (

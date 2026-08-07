@@ -1210,6 +1210,31 @@ export const adminApi = {
     );
   },
 
+  // Email diagnostics (super_admin only)
+  emailStatus: () =>
+    get<{
+      active_provider: "amazon_ses" | "mock";
+      provider_reason: string;
+      email_verification_on: boolean;
+      aws_key_set: boolean;
+      aws_secret_set: boolean;
+      aws_region: string;
+      email_from_accounts: string;
+      stats: {
+        sent: number;
+        failed: number;
+        recent: Array<{
+          to: string; type: string; status: string;
+          provider: string; error: string; created_at: string;
+        }>;
+      };
+    }>("/api/admin/email-status/"),
+
+  sendTestEmail: (to: string) =>
+    post<{ success: boolean; provider: string; message_id: string; error: string; to: string }>(
+      "/api/admin/email-test/", { to }
+    ),
+
   // Staff / admin accounts (super_admin only)
   staff: () =>
     get<{ results: StaffMember[] }>("/api/admin/staff/"),
