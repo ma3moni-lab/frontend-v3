@@ -4779,6 +4779,11 @@ export function UserApp({ onSignOut }: UserAppProps) {
       return raw ? (JSON.parse(raw) as ConvItem[]) : [];
     } catch { return []; }
   });
+  // Holds a just-created conversation that has no messages yet.
+  // Used only as a display-only fallback for ChatView so the partner info renders
+  // while the chat is open — it is intentionally NOT added to liveConversations
+  // (and therefore not shown in the Recent Messages list) until a real message is sent.
+  const [pendingConv, setPendingConv] = useState<ConvItem | null>(null);
   const [liveInterests,     setLiveInterests]     = useState<InterestItem[]>([]);
 
 
@@ -5046,6 +5051,10 @@ export function UserApp({ onSignOut }: UserAppProps) {
         const convs = dedupeConvs(res.results.map(mapApiConversation));
         setLiveConversations(convs);
         try { localStorage.setItem(CONV_CACHE_KEY, JSON.stringify(convs)); } catch {}
+        // Once the backend reports the pending conversation (meaning a message was sent
+        // and last_message_at is set), promote it out of pendingConv — it lives in
+        // liveConversations now and will appear in the recent messages list.
+        setPendingConv(prev => (prev && convs.some(c => c.id === prev.id) ? null : prev));
       }).catch(() => {});
     };
     convPoll();
@@ -5191,7 +5200,10 @@ export function UserApp({ onSignOut }: UserAppProps) {
     try {
       const apiConv = await messagingApi.start(partnerId);
       const convItem = mapApiConversation(apiConv);
-      setLiveConversations(prev => dedupeConvs([convItem, ...prev.filter(c => c.id !== convItem.id)]));
+      // Do NOT push to liveConversations yet — that would add the partner to Recent
+      // Messages before any message is exchanged. Store in pendingConv so ChatView
+      // can render partner info; polling will promote it once a message is sent.
+      setPendingConv(convItem);
       openChat(convItem.id);
     } catch (err: unknown) {
       const detail = (err as { data?: { detail?: string } })?.data?.detail;
@@ -5221,6 +5233,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
     setActiveMatchId(null);
     setActiveArticleId(null);
     setBlogFrom("none");
+    // If the user exits without sending a message, discard the pending conversation
+    // so it never surfaces in the Recent Messages list.
+    setPendingConv(null);
   };
 
   const navItems: { key: Tab; icon: ReactNode; label: string }[] = [
@@ -5333,7 +5348,11 @@ export function UserApp({ onSignOut }: UserAppProps) {
               conversationId={activeChatId}
               onBack={goBack}
               plan={userPlan}
-              conversations={liveConversations}
+              conversations={
+                pendingConv && pendingConv.id === activeChatId
+                  ? [...liveConversations, pendingConv]
+                  : liveConversations
+              }
               currentUserId={currentUserId}
               onGoToProfile={() => { goBack(); setTab("profile"); }}
               onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })}
