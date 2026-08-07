@@ -11,6 +11,41 @@ import { USERS } from "../../../data/users";
 import { adminApi, restoreAdminToken } from "../../../lib/api";
 
 
+// ── Last-active formatter ────────────────────────────────────────────────────
+// isAdmin=true  → exact date+time for 7+ day old records
+// isAdmin=false → caps at "7 days+" for privacy
+function formatLastActive(isoStr: string | null, isAdmin: boolean): { text: string; isActive: boolean } {
+  if (!isoStr) return { text: "Never", isActive: false };
+  const then  = new Date(isoStr);
+  if (isNaN(then.getTime())) return { text: "Never", isActive: false };
+  const now   = Date.now();
+  const diffMs = now - then.getTime();
+  const diffMins = Math.floor(diffMs / 60_000);
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  const diffDays  = Math.floor(diffMs / 86_400_000);
+
+  // Active = interacted within the last hour
+  if (diffMins < 1)    return { text: "Just now",          isActive: true  };
+  if (diffMins < 60)   return { text: `${diffMins}m ago`,  isActive: true  };
+  // > 1 hour = not active regardless of login state
+  if (diffHours < 24)  return { text: `${diffHours}h ago`, isActive: false };
+  if (diffDays === 1)  return { text: "Yesterday",          isActive: false };
+  if (diffDays < 7)    return { text: `${diffDays} days ago`, isActive: false };
+  if (!isAdmin)        return { text: "7 days+",            isActive: false };
+  // Admin sees exact date+time for old records
+  return {
+    text: then.toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric",
+                                          hour: "2-digit", minute: "2-digit" }),
+    isActive: false,
+  };
+}
+
+const NIGERIA_ALIASES = new Set(["nigeria", "ng", "nga", "ngr", "nigerian"]);
+function isNigeriaCountry(country: string): boolean {
+  const c = country.toLowerCase().trim();
+  return NIGERIA_ALIASES.has(c) || c.includes("nigeria");
+}
+
 const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
   login:        <LogIn size={13} />,
   match:        <Heart size={13} />,
@@ -277,10 +312,15 @@ function ResetPasswordModal({ user, onClose }: ResetPwModalProps) {
 }
 
 interface GrantSubModalProps {
-  user: typeof USERS[0];
+  user: typeof USERS[0] & { location_country?: string };
   onClose: () => void;
   onGranted: (userId: string, plan: string) => void;
 }
+
+const PLAN_PRICES = {
+  basic:   { usd: "$19/mo",    ngn: "₦29,500/mo" },
+  premium: { usd: "$49/mo",    ngn: "₦74,500/mo" },
+} as const;
 
 function GrantSubModal({ user, onClose, onGranted }: GrantSubModalProps) {
   const [plan, setPlan]       = useState<"basic" | "premium">("premium");
@@ -288,6 +328,10 @@ function GrantSubModal({ user, onClose, onGranted }: GrantSubModalProps) {
   const [granted, setGranted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [grantError, setGrantError] = useState("");
+
+  const nigeria = isNigeriaCountry(user.location_country ?? "");
+  const priceLabel = (p: "basic" | "premium") =>
+    nigeria ? PLAN_PRICES[p].ngn : PLAN_PRICES[p].usd;
 
   const grant = async () => {
     if (granted) return; // idempotency — prevent double-clicks after success
@@ -366,7 +410,9 @@ function GrantSubModal({ user, onClose, onGranted }: GrantSubModalProps) {
                   className={`p-3 rounded-xl border transition-all capitalize text-left ${plan === p ? "border-primary bg-secondary" : "border-border hover:border-primary/30"}`}
                 >
                   <p style={{ fontWeight: 700, fontSize: "0.9rem", color: plan === p ? "var(--primary)" : "var(--foreground)" }}>{p}</p>
-                  <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{p === "basic" ? "$19/mo value" : "$49/mo value"}</p>
+                  <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                    {priceLabel(p)} value {nigeria ? "🇳🇬" : "🌍"}
+                  </p>
                 </button>
               ))}
             </div>
@@ -836,19 +882,20 @@ export function UsersSectionV2() {
       const mapped = (res.results ?? []).map(u => {
         try {
           return {
-            id:           String(u.id ?? ""),
-            name:         String(u.name ?? u.email ?? ""),
-            email:        String(u.email ?? ""),
-            phone:        String(u.phone ?? ""),
-            age:          u.age ?? null,
-            location:     String(u.location ?? ""),
-            gender:       (u.gender ?? "") as typeof USERS[0]["gender"],
-            status:       (u.status ?? "active") as typeof USERS[0]["status"],
-            verified:     Boolean(u.verified),
-            subscription: (u.subscription ?? "free") as typeof USERS[0]["subscription"],
-            joined:       String(u.joined ?? ""),
-            lastActive:   String(u.last_active ?? u.lastActive ?? "Never"),
-            completion:   Number(u.completion ?? 0),
+            id:              String(u.id ?? ""),
+            name:            String(u.name ?? u.email ?? ""),
+            email:           String(u.email ?? ""),
+            phone:           String(u.phone ?? ""),
+            age:             u.age ?? null,
+            location:        String(u.location ?? ""),
+            location_country: String(u.location_country ?? ""),
+            gender:          (u.gender ?? "") as typeof USERS[0]["gender"],
+            status:          (u.status ?? "active") as typeof USERS[0]["status"],
+            verified:        Boolean(u.verified),
+            subscription:    (u.subscription ?? "free") as typeof USERS[0]["subscription"],
+            joined:          String(u.joined ?? ""),
+            lastActive:      (u.last_active as string | null) ?? null,
+            completion:      Number(u.completion ?? 0),
           };
         } catch (mapErr) {
           console.warn("[Admin Users] Failed to map user:", u, mapErr);
@@ -1022,7 +1069,7 @@ export function UsersSectionV2() {
                 <th className="px-4 py-3.5">
                   <input type="checkbox" checked={selected.length === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded accent-primary" />
                 </th>
-                {(["Name", "Status", "Plan", "Joined", "Actions"] as const).map(h => {
+                {(["Name", "Status", "Plan", "Joined", "Last Active", "Actions"] as const).map(h => {
                   const key = (h === "Name" ? "name" : h === "Status" ? "status" : h === "Joined" ? "joined" : null) as SortKey | null;
                   const active = key && sortKey === key;
                   return (
@@ -1085,6 +1132,17 @@ export function UsersSectionV2() {
                     </span>
                   </td>
                   <td className="px-4 py-3.5 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{u.joined}</td>
+                  <td className="px-4 py-3.5">
+                    {(() => {
+                      const { text, isActive } = formatLastActive(u.lastActive as string | null, true);
+                      return (
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? "bg-green-500" : "bg-gray-300"}`} />
+                          <span style={{ fontSize: "0.8125rem", color: isActive ? "#166534" : "var(--muted-foreground)" }}>{text}</span>
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <button onClick={() => { setDetailUser(u); }} className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors" title="View detail"><Eye size={14} /></button>
@@ -1172,7 +1230,7 @@ export function UsersSectionV2() {
               {[
                 { icon: <MapPin size={13} />, label: "Location", value: detailUser.location || "—" },
                 { icon: <Calendar size={13} />, label: "Joined", value: detailUser.joined },
-                { icon: <Clock size={13} />, label: "Last Active", value: detailUser.lastActive },
+                { icon: <Clock size={13} />, label: "Last Active", value: formatLastActive(detailUser.lastActive as string | null, true).text },
                 { icon: <Briefcase size={13} />, label: "Gender", value: detailUser.gender ? detailUser.gender.charAt(0).toUpperCase() + detailUser.gender.slice(1) : "—" },
                 { icon: <MessageSquare size={13} />, label: "Phone", value: detailUser.phone || "Not provided", private: true },
                 { icon: <UserCheck size={13} />, label: "Verified", value: detailUser.verified ? "Yes" : "No" },

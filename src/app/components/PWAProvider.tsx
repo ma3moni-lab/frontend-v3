@@ -244,11 +244,14 @@ export function PWAProvider({ children }: PWAProviderProps) {
       };
     }
 
-    // Chrome / Android / desktop — listen for the native install prompt
+    // Chrome / Android / desktop — listen for the native install prompt.
+    // Only call preventDefault() when we intend to show our own banner;
+    // otherwise let the browser show its native mini-infobar.
     const onInstall = (e: Event) => {
-      e.preventDefault();
+      const willShow = shouldShowBanner("pwa-chrome-dismissed");
+      if (willShow) e.preventDefault(); // suppress native banner only when ours will show
       setInstallPrompt(e as BeforeInstallPromptEvent);
-      if (shouldShowBanner("pwa-chrome-dismissed")) setShowBanner(true);
+      if (willShow) setShowBanner(true);
     };
     window.addEventListener("beforeinstallprompt", onInstall);
 
