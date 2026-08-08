@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowDownToLine, ChevronLeft, ChevronRight, Download, Edit2,
-  Filter, Loader2, RefreshCw, Save, Search, X,
+  Filter, Loader2, RefreshCw, Save, Search, Settings2, X, Zap,
 } from "lucide-react";
 import {
   adminApi, subscriptions as subApi,
@@ -40,10 +40,12 @@ function fmtAmt(amount: number, currency: string) {
 }
 
 const STATUS_CHIP: Record<string, { bg: string; text: string; label: string }> = {
-  completed: { bg: "#dcfce7", text: "#166534", label: "Success"  },
-  failed:    { bg: "#fee2e2", text: "#991b1b", label: "Failed"   },
-  refunded:  { bg: "#fef9c3", text: "#854d0e", label: "Refunded" },
-  pending:   { bg: "#dbeafe", text: "#1e40af", label: "Pending"  },
+  successful: { bg: "#dcfce7", text: "#166534", label: "Success"  },
+  completed:  { bg: "#dcfce7", text: "#166534", label: "Success"  }, // legacy alias
+  failed:     { bg: "#fee2e2", text: "#991b1b", label: "Failed"   },
+  cancelled:  { bg: "#fee2e2", text: "#991b1b", label: "Cancelled" },
+  refunded:   { bg: "#fef9c3", text: "#854d0e", label: "Refunded" },
+  pending:    { bg: "#dbeafe", text: "#1e40af", label: "Pending"  },
 };
 
 // ── Analytics types ────────────────────────────────────────────
@@ -229,10 +231,244 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
 }
 
 // ── Main component ─────────────────────────────────────────────
+// ── Credo Gateway Settings Panel ────────────────────────────────
+interface CredoConfig {
+  enabled: boolean;
+  environment: "production" | "sandbox";
+  public_key: string;
+  secret_key_set: boolean;
+  webhook_secret_set: boolean;
+  callback_url: string;
+  bearer: number;
+  channels: string;
+}
+
+function CredoSettingsPanel() {
+  const [cfg,       setCfg]       = useState<CredoConfig | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [saving,    setSaving]    = useState(false);
+  const [testing,   setTesting]   = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; latency_ms?: number; environment?: string; error?: string } | null>(null);
+
+  const [form, setForm] = useState({
+    enabled:        true,
+    environment:    "production" as "production" | "sandbox",
+    public_key:     "",
+    secret_key:     "",
+    webhook_secret: "",
+    callback_url:   "",
+    bearer:         "0",
+    channels:       "CARD,BANK",
+  });
+
+  const inp = "w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 font-mono";
+  const inpPlain = "w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30";
+  const f = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(prev => ({ ...prev, [k]: v }));
+
+  const load = useCallback(() => {
+    setLoading(true);
+    adminApi.credoSettings()
+      .then(d => {
+        setCfg(d);
+        setForm(prev => ({
+          ...prev,
+          enabled:     d.enabled,
+          environment: d.environment,
+          public_key:  d.public_key,
+          callback_url: d.callback_url,
+          bearer:      String(d.bearer),
+          channels:    d.channels,
+        }));
+      })
+      .catch(() => toast.error("Failed to load Credo settings"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        enabled:     form.enabled,
+        environment: form.environment,
+        public_key:  form.public_key,
+        callback_url: form.callback_url,
+        bearer:      parseInt(form.bearer) || 0,
+        channels:    form.channels,
+      };
+      if (form.secret_key)     payload.secret_key     = form.secret_key;
+      if (form.webhook_secret) payload.webhook_secret = form.webhook_secret;
+      await adminApi.updateCredoSettings(payload as Parameters<typeof adminApi.updateCredoSettings>[0]);
+      toast.success("Credo settings saved");
+      setForm(prev => ({ ...prev, secret_key: "", webhook_secret: "" }));
+      load();
+    } catch {
+      toast.error("Failed to save Credo settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const r = await adminApi.testCredoConnection();
+      setTestResult(r);
+      if (r.ok) toast.success(`Credo connected — ${r.latency_ms}ms (${r.environment})`);
+      else       toast.error(`Credo connection failed: ${r.error ?? "unknown error"}`);
+    } catch {
+      setTestResult({ ok: false, error: "Network error" });
+      toast.error("Failed to reach Credo API");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center py-16"><Loader2 size={28} className="animate-spin text-teal-600" /></div>;
+
+  return (
+    <div className="space-y-5">
+      {/* Status banner */}
+      <div className={`rounded-2xl p-4 flex items-start gap-3 ${form.enabled ? "bg-green-50 border border-green-200" : "bg-gray-100 border border-gray-200"}`}>
+        <div className={`w-3 h-3 rounded-full mt-0.5 flex-shrink-0 ${form.enabled ? "bg-green-500" : "bg-gray-400"}`} />
+        <div className="flex-1">
+          <div className="font-bold text-sm">{form.enabled ? "Credo Payments Active" : "Credo Payments Disabled"}</div>
+          <div className="text-xs text-gray-600 mt-0.5">
+            {form.enabled
+              ? `Environment: ${form.environment} · Secret key ${cfg?.secret_key_set ? "set ✓" : "not set ✗"} · Webhook ${cfg?.webhook_secret_set ? "set ✓" : "not set ✗"}`
+              : "Users will not see the payment option while Credo is disabled."}
+          </div>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <span className="text-xs font-semibold text-gray-600">{form.enabled ? "Enabled" : "Disabled"}</span>
+          <button
+            onClick={() => f("enabled", !form.enabled)}
+            className={`relative w-10 h-5 rounded-full transition-colors ${form.enabled ? "bg-teal-600" : "bg-gray-300"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.enabled ? "translate-x-5" : ""}`} />
+          </button>
+        </label>
+      </div>
+
+      {/* Environment */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+        <h3 className="font-bold text-sm flex items-center gap-2"><Settings2 size={15} /> Environment & Channels</h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Environment</label>
+            <select className={inpPlain} value={form.environment}
+              onChange={e => f("environment", e.target.value as "production" | "sandbox")}>
+              <option value="production">Production (live)</option>
+              <option value="sandbox">Sandbox (testing)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction fee bearer</label>
+            <select className={inpPlain} value={form.bearer}
+              onChange={e => f("bearer", e.target.value)}>
+              <option value="0">0 — Merchant pays fee</option>
+              <option value="1">1 — Customer pays fee</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Payment channels (comma-separated)</label>
+            <input className={inpPlain} value={form.channels}
+              placeholder="CARD,BANK"
+              onChange={e => f("channels", e.target.value)} />
+            <p className="text-xs text-gray-400 mt-1">e.g. CARD,BANK — enables those Credo checkout methods</p>
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Callback / redirect URL (optional)</label>
+            <input className={inpPlain} value={form.callback_url}
+              placeholder="https://yourapp.figma.site/?subscribed=1  (auto-built from FRONTEND_URL if blank)"
+              onChange={e => f("callback_url", e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* API Keys */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+        <h3 className="font-bold text-sm flex items-center gap-2">
+          <span>🔑</span> API Keys
+          <span className="ml-auto text-xs text-gray-400 font-normal">Keys from dashboard.credocentral.com → Settings → API Keys</span>
+        </h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Public key</label>
+            <input className={inp} value={form.public_key} placeholder="pk_live_…"
+              onChange={e => f("public_key", e.target.value)} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Secret key {cfg?.secret_key_set && <span className="text-green-600">(currently set ✓)</span>}
+            </label>
+            <input type="password" className={inp} value={form.secret_key}
+              placeholder={cfg?.secret_key_set ? "Leave blank to keep existing key" : "sk_live_…"}
+              onChange={e => f("secret_key", e.target.value)} />
+            <p className="text-xs text-red-500/80 mt-1">Never share this key. It never appears in responses — only a "set / not set" indicator is returned.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Webhook signing secret {cfg?.webhook_secret_set && <span className="text-green-600">(currently set ✓)</span>}
+            </label>
+            <input type="password" className={inp} value={form.webhook_secret}
+              placeholder={cfg?.webhook_secret_set ? "Leave blank to keep existing secret" : "whsec_…"}
+              onChange={e => f("webhook_secret", e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Test connection result */}
+      {testResult && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2 ${testResult.ok ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"}`}>
+          {testResult.ok
+            ? `Connected to Credo ${testResult.environment} in ${testResult.latency_ms}ms`
+            : `Connection failed: ${testResult.error ?? "unknown error"}`}
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={testConnection}
+          disabled={testing}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+        >
+          {testing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+          Test Connection
+        </button>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-50"
+          style={{ background: "#0A6870" }}
+        >
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+          Save Settings
+        </button>
+      </div>
+
+      {/* Webhook URL instructions */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
+        <div className="font-semibold text-amber-800 mb-1">Webhook setup</div>
+        <p className="text-amber-700 text-xs">
+          In the Credo dashboard, set your webhook URL to:<br />
+          <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded mt-1 inline-block">
+            {DJANGO_BASE}/api/payments/credo/webhook/
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Main section ────────────────────────────────────────────────
 export function PaymentsSectionV2({ role }: { role: string }) {
   const isSuperAdmin = role === "super-admin";
 
-  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "plans">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "plans" | "gateway">("overview");
 
   // Plans
   const [plans,        setPlans]        = useState<Plan[]>([]);
@@ -252,7 +488,7 @@ export function PaymentsSectionV2({ role }: { role: string }) {
   const [filters, setFilters] = useState<{
     currency: "NGN" | "USD" | "";
     country:  "nigeria" | "uk" | "others" | "";
-    status:   "completed" | "failed" | "refunded" | "pending" | "";
+    status:   "successful" | "failed" | "refunded" | "pending" | "cancelled" | "";
     search:   string;
   }>({ currency: "", country: "", status: "", search: "" });
 
@@ -358,10 +594,13 @@ export function PaymentsSectionV2({ role }: { role: string }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-        {(["overview", "transactions", "plans"] as const).map(t => (
+        {(isSuperAdmin
+          ? (["overview", "transactions", "plans", "gateway"] as const)
+          : (["overview", "plans"] as const)
+        ).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === t ? "bg-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-            {t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === "gateway" ? "Gateway" : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -528,11 +767,12 @@ export function PaymentsSectionV2({ role }: { role: string }) {
               </select>
               <select className="px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none"
                 value={filters.status}
-                onChange={e => setFilters(f => ({ ...f, status: e.target.value as "completed"|"failed"|"refunded"|"pending"|"" }))}>
+                onChange={e => setFilters(f => ({ ...f, status: e.target.value as "successful"|"failed"|"refunded"|"pending"|"cancelled"|"" }))}>
                 <option value="">All Statuses</option>
-                <option value="completed">✅ Success</option>
+                <option value="successful">✅ Success</option>
                 <option value="pending">⏳ Pending</option>
                 <option value="failed">❌ Failed</option>
+                <option value="cancelled">🚫 Cancelled</option>
                 <option value="refunded">↩️ Refunded</option>
               </select>
               <button onClick={() => loadPayments(1)}
@@ -624,6 +864,11 @@ export function PaymentsSectionV2({ role }: { role: string }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* ── GATEWAY SETTINGS ────────────────────────────────────── */}
+      {activeTab === "gateway" && isSuperAdmin && (
+        <CredoSettingsPanel />
       )}
 
       {/* ── PLANS ──────────────────────────────────────────────── */}

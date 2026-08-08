@@ -618,7 +618,7 @@ export interface PaymentRecord {
   currency:       string;
   country?:       string;
   plan_name?:     string;
-  status:         "completed" | "refunded" | "failed" | "pending";
+  status:         "successful" | "completed" | "refunded" | "failed" | "pending" | "cancelled";
   description:    string;
   payment_method?: string;
   created_at:     string;
@@ -628,15 +628,18 @@ export interface PaymentRecord {
 export interface AdminPaymentRecord {
   id:             string;
   reference:      string;
+  credo_reference?: string;
   user:           { id: string; name: string; email: string };
   country:        string;
   currency:       string;
   amount:         number;
   plan:           string;
-  status:         string;
+  status:         "successful" | "completed" | "refunded" | "failed" | "pending" | "cancelled";
   payment_method: string;
+  gateway?:       string;
   description:    string;
   created_at:     string;
+  paid_at?:       string;
 }
 
 export const subscriptions = {
@@ -661,6 +664,18 @@ export const subscriptions = {
 
   verify: (reference: string, plan: UserPlan) =>
     post<{ status: string; plan: string; currency?: string }>("/api/subscriptions/verify/", { reference, plan }),
+
+  // Poll /api/payments/{reference}/status/ for live payment state
+  paymentStatus: (reference: string) =>
+    get<{
+      reference: string;
+      status: "pending" | "successful" | "failed" | "cancelled" | "refunded";
+      plan?: string;
+      currency?: string;
+      amount?: number;
+      paid_at?: string;
+      failure_reason?: string;
+    }>(`/api/payments/${reference}/status/`),
 
   cancel: () =>
     post<{ detail: string }>("/api/subscriptions/cancel/"),
@@ -1225,7 +1240,7 @@ export const adminApi = {
   billingHistory: (params: {
     currency?: "NGN" | "USD";
     country?: "nigeria" | "uk" | "others";
-    status?: "completed" | "failed" | "refunded" | "pending";
+    status?: "successful" | "failed" | "refunded" | "pending" | "cancelled";
     plan?: string; search?: string;
     page?: number; page_size?: number;
   } = {}) => {
@@ -1292,6 +1307,42 @@ export const adminApi = {
     const q = qs.toString();
     return get<{ results: AuditEntry[]; count: number; page: number; pages: number }>(`/api/admin/audit-log/${q ? '?' + q : ''}`);
   },
+
+  // Credo gateway settings (super_admin only)
+  credoSettings: () =>
+    get<{
+      enabled: boolean;
+      environment: "production" | "sandbox";
+      public_key: string;
+      secret_key_set: boolean;
+      webhook_secret_set: boolean;
+      callback_url: string;
+      bearer: number;
+      channels: string;
+    }>("/api/admin/payment-settings/credo/"),
+
+  updateCredoSettings: (data: {
+    enabled?: boolean;
+    environment?: "production" | "sandbox";
+    public_key?: string;
+    secret_key?: string;
+    webhook_secret?: string;
+    callback_url?: string;
+    bearer?: number;
+    channels?: string;
+  }) =>
+    patch<{ ok: boolean }>("/api/admin/payment-settings/credo/", data),
+
+  testCredoConnection: () =>
+    post<{ ok: boolean; latency_ms: number; environment: string; error?: string }>(
+      "/api/admin/payment-settings/credo/test/", {}
+    ),
+
+  paymentSummary: () =>
+    get<{
+      ngn: { total: number; count: number; successful: number; failed: number; pending: number };
+      usd: { total: number; count: number; successful: number; failed: number; pending: number };
+    }>("/api/admin/payments/summary/"),
 };
 
 export interface AuditEntry {

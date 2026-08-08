@@ -34,6 +34,7 @@ import {
 } from "./user/ProfileSections";
 import { BlogDetail } from "./BlogDetail";
 import { SupportCenterView, getUnreadTickets, markTicketRead } from "./user/SupportCenterView";
+import { PaymentResultOverlay } from "./PaymentResultOverlay";
 
 interface UserAppProps {
   onSignOut: () => void;
@@ -4784,6 +4785,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
   // while the chat is open — it is intentionally NOT added to liveConversations
   // (and therefore not shown in the Recent Messages list) until a real message is sent.
   const [pendingConv, setPendingConv] = useState<ConvItem | null>(null);
+  const [paymentOverlay, setPaymentOverlay] = useState<{ reference: string; plan: string } | null>(null);
   const [liveInterests,     setLiveInterests]     = useState<InterestItem[]>([]);
 
 
@@ -5152,34 +5154,16 @@ export function UserApp({ onSignOut }: UserAppProps) {
     localStorage.setItem(PLAN_KEY, plan);
   };
 
-  // Handle Credo redirect back — verify payment and activate plan
+  // Handle Credo redirect back — show polling overlay that verifies via /api/payments/{ref}/status/
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("subscribed") !== "1") return;
     const reference   = params.get("ref") ?? localStorage.getItem("ma3moni_pending_reference") ?? "";
-    const pendingPlan = (localStorage.getItem("ma3moni_pending_plan") ?? "basic") as UserPlan;
-    if (!reference) return;
-    // Clean URL
+    const pendingPlan = localStorage.getItem("ma3moni_pending_plan") ?? "basic";
+    // Clean URL immediately so refresh doesn't re-trigger
     window.history.replaceState({}, "", window.location.pathname);
-    subsApi.verify(reference, pendingPlan).then(res => {
-      if (res.status === "success") {
-        const plan = (res.plan ?? pendingPlan) as UserPlan;
-        setUserPlan(plan);
-        localStorage.setItem(PLAN_KEY, plan);
-        localStorage.removeItem("ma3moni_pending_plan");
-        localStorage.removeItem("ma3moni_pending_reference");
-        toast.success(`🎉 Payment confirmed! You're now on the ${plan} plan.`);
-      } else {
-        toast.error("Payment could not be verified. Contact support if charged.");
-      }
-    }).catch(() => {
-      // Optimistic fallback — trust Credo redirect with subscribed=1
-      setUserPlan(pendingPlan);
-      localStorage.setItem(PLAN_KEY, pendingPlan);
-      localStorage.removeItem("ma3moni_pending_plan");
-      localStorage.removeItem("ma3moni_pending_reference");
-      toast.success(`You're now on the ${pendingPlan} plan!`);
-    });
+    if (!reference) return;
+    setPaymentOverlay({ reference, plan: pendingPlan });
   }, []);
 
   const openChat = (id: string) => {
@@ -5249,6 +5233,26 @@ export function UserApp({ onSignOut }: UserAppProps) {
 
   return (
     <div className="size-full flex items-center justify-center bg-muted/50">
+      {/* Payment confirmation overlay (shown after Credo redirect) */}
+      {paymentOverlay && (
+        <PaymentResultOverlay
+          reference={paymentOverlay.reference}
+          pendingPlan={paymentOverlay.plan}
+          onSuccess={(plan) => {
+            setUserPlan(plan as UserPlan);
+            localStorage.setItem(PLAN_KEY, plan);
+            localStorage.removeItem("ma3moni_pending_plan");
+            localStorage.removeItem("ma3moni_pending_reference");
+            setPaymentOverlay(null);
+            toast.success(`You're now on the ${plan} plan!`);
+          }}
+          onClose={() => {
+            localStorage.removeItem("ma3moni_pending_plan");
+            localStorage.removeItem("ma3moni_pending_reference");
+            setPaymentOverlay(null);
+          }}
+        />
+      )}
       <div className="w-full h-full max-w-[430px] bg-background flex flex-col overflow-hidden shadow-2xl">
         {/* Header (hidden during sub-views) */}
         {subView === "none" && (
