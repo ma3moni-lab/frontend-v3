@@ -239,6 +239,7 @@ interface CredoConfig {
   secret_key_set: boolean;
   webhook_secret_set: boolean;
   callback_url: string;
+  api_url: string;
   bearer: number;
   channels: string;
 }
@@ -379,11 +380,13 @@ function CredoSettingsPanel() {
               onChange={e => f("channels", e.target.value)} />
             <p className="text-xs text-gray-400 mt-1">e.g. CARD,BANK — enables those Credo checkout methods</p>
           </div>
+          {/* API URL — read-only, derived from environment */}
           <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Callback / redirect URL (optional)</label>
-            <input className={inpPlain} value={form.callback_url}
-              placeholder="https://yourapp.figma.site/?subscribed=1  (auto-built from FRONTEND_URL if blank)"
-              onChange={e => f("callback_url", e.target.value)} />
+            <label className="block text-xs font-semibold text-gray-600 mb-1">API URL (auto-configured)</label>
+            <div className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm font-mono text-gray-500">
+              {cfg?.api_url || (form.environment === "sandbox" ? "https://api.credodemo.com" : "https://api.credocentral.com")}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Auto-set from Environment — override via CREDO_API_URL env var only if needed.</p>
           </div>
         </div>
       </div>
@@ -392,12 +395,15 @@ function CredoSettingsPanel() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
         <h3 className="font-bold text-sm flex items-center gap-2">
           <span>🔑</span> API Keys
-          <span className="ml-auto text-xs text-gray-400 font-normal">Keys from dashboard.credocentral.com → Settings → API Keys</span>
+          <span className="ml-auto text-xs text-gray-400 font-normal">dashboard.credocentral.com → Settings → API Keys</span>
         </h3>
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          Credo does <strong>not</strong> require a Merchant ID — authentication uses Public Key + Secret Key only.
+        </p>
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Public key</label>
-            <input className={inp} value={form.public_key} placeholder="pk_live_…"
+            <input className={inp} value={form.public_key} placeholder="0PUB…"
               onChange={e => f("public_key", e.target.value)} />
           </div>
           <div>
@@ -450,15 +456,23 @@ function CredoSettingsPanel() {
         </button>
       </div>
 
-      {/* Webhook URL instructions */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm">
-        <div className="font-semibold text-amber-800 mb-1">Webhook setup</div>
-        <p className="text-amber-700 text-xs">
-          In the Credo dashboard, set your webhook URL to:<br />
-          <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded mt-1 inline-block">
+      {/* Credo dashboard setup instructions */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm space-y-3">
+        <div className="font-semibold text-slate-800">Credo dashboard setup</div>
+        <div>
+          <p className="text-xs text-slate-600 font-semibold mb-1">Callback URL (paste into Credo → Settings → Payment):</p>
+          <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded block break-all text-slate-700">
+            {DJANGO_BASE}/api/payments/credo/callback/
+          </span>
+          <p className="text-xs text-slate-500 mt-1">Credo redirects the user's browser here after payment. The backend then redirects to the app.</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-600 font-semibold mb-1">Webhook URL (paste into Credo → Settings → Webhooks):</p>
+          <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded block break-all text-slate-700">
             {DJANGO_BASE}/api/payments/credo/webhook/
           </span>
-        </p>
+          <p className="text-xs text-slate-500 mt-1">Server-to-server notification — the backend verifies and activates subscriptions here.</p>
+        </div>
       </div>
     </div>
   );

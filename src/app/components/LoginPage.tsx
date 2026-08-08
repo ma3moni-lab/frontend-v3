@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Sparkles, Shield, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Sparkles, Shield, CheckCircle, Loader2 } from "lucide-react";
 import { auth as apiAuth, setUserTokens, ApiError } from "../../lib/api";
 
 export type UserPlan = "free" | "basic" | "premium";
@@ -13,8 +13,25 @@ interface LoginPageProps {
 
 // ── Forgot password panel ──────────────────────────────────────
 function ForgotPanel({ initialId, onBack }: { initialId: string; onBack: () => void }) {
-  const [id, setId]     = useState(initialId);
-  const [sent, setSent] = useState(false);
+  const [email,   setEmail]   = useState(initialId);
+  const [loading, setLoading] = useState(false);
+  const [sent,    setSent]    = useState(false);
+  const [error,   setError]   = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await apiAuth.forgotPassword(email.trim().toLowerCase());
+      setSent(true);
+    } catch {
+      // Show generic message regardless of error so we don't reveal whether an email is registered
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (sent) {
     return (
@@ -25,7 +42,7 @@ function ForgotPanel({ initialId, onBack }: { initialId: string; onBack: () => v
           </div>
           <h3 style={{ fontWeight: 900, fontSize: "1.5rem", letterSpacing: "-0.025em" }}>Check your inbox</h3>
           <p className="text-muted-foreground mt-3 mb-8" style={{ fontSize: "0.9375rem", lineHeight: 1.75 }}>
-            If <strong style={{ color: "var(--foreground)" }}>{id}</strong> is registered, you'll receive a reset link shortly.
+            If <strong style={{ color: "var(--foreground)" }}>{email}</strong> is registered, you'll receive a reset link shortly. Check your spam folder if you don't see it within a few minutes.
           </p>
           <button onClick={onBack}
             className="w-full py-3.5 rounded-2xl border border-border bg-muted/40 hover:bg-muted transition-colors"
@@ -45,17 +62,33 @@ function ForgotPanel({ initialId, onBack }: { initialId: string; onBack: () => v
         </button>
         <h3 style={{ fontWeight: 900, fontSize: "1.75rem", letterSpacing: "-0.035em" }}>Forgot password?</h3>
         <p className="text-muted-foreground mt-2 mb-7" style={{ fontSize: "0.9375rem" }}>Enter your email and we'll send a reset link.</p>
-        <form onSubmit={async e => { e.preventDefault(); await new Promise(r => setTimeout(r, 500)); setSent(true); }} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700 }}>Email address</label>
-            <input type="email" value={id} onChange={e => setId(e.target.value)} placeholder="you@example.com" required
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(""); }}
+              placeholder="you@example.com"
+              required
+              autoComplete="email"
               className="w-full px-4 py-3.5 rounded-2xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
-              style={{ fontSize: "0.9375rem" }} />
+              style={{ fontSize: "0.9375rem" }}
+            />
           </div>
-          <button type="submit"
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white transition-all active:scale-[0.97]"
-            style={{ fontWeight: 700, fontSize: "1rem", background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: "0 6px 20px rgba(10,104,112,0.25)" }}>
-            Send Reset Link <ArrowRight size={17} />
+          {error && (
+            <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-2xl">
+              <AlertCircle size={15} className="text-destructive flex-shrink-0 mt-0.5" />
+              <p style={{ fontSize: "0.875rem", color: "var(--destructive)", lineHeight: 1.5 }}>{error}</p>
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white transition-all active:scale-[0.97] disabled:opacity-60"
+            style={{ fontWeight: 700, fontSize: "1rem", background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: loading ? "none" : "0 6px 20px rgba(10,104,112,0.25)" }}
+          >
+            {loading ? <><Loader2 size={17} className="animate-spin" /> Sending…</> : <>Send Reset Link <ArrowRight size={17} /></>}
           </button>
         </form>
       </div>
