@@ -1,7 +1,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { RouterProvider } from "react-router";
 import { Toaster } from "sonner";
-import { router } from "./routes";
+import { appRouter } from "./routes";
 import { PWAProvider } from "./components/PWAProvider";
 import { SplashScreen } from "./components/SplashScreen";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -20,7 +20,7 @@ export default function App() {
       <PWAProvider>
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         <Suspense fallback={null}>
-          <RouterProvider router={router} />
+          <RouterProvider router={appRouter} />
         </Suspense>
         <Toaster
           position="top-center"
