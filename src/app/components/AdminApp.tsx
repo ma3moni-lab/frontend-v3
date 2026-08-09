@@ -3059,6 +3059,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     maxDailyMatchesBasic: "5",
     minFemaleRatio: "48",
     referralBonus: "10",
+    referralBonusNgn: "5000",
     maintenanceMode: false,
     emailVerification: true,
     photoModerationRequired: true,
@@ -3087,6 +3088,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           maxDailyMatchesFree:  String(s.max_daily_matches_free),
           maxDailyMatchesBasic: String(s.max_daily_matches_basic),
           referralBonus:        String(s.referral_bonus_points),
+          referralBonusNgn:     String(s.referral_bonus_ngn ?? 5000),
           maintenanceMode:      s.maintenance_mode,
           maxPhotos:            String(s.max_photos),
           emailVerification:    s.email_verification_enabled ?? true,
@@ -3125,6 +3127,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         max_daily_matches_basic:      Number(settings.maxDailyMatchesBasic),
         max_photos:                   Number(settings.maxPhotos),
         referral_bonus_points:        Number(settings.referralBonus),
+        referral_bonus_ngn:           Number(settings.referralBonusNgn),
         maintenance_mode:             settings.maintenanceMode as boolean,
         email_verification_enabled:   settings.emailVerification as boolean,
         revenue_permission_for_admin: adminRevenueAccess,
@@ -3137,6 +3140,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         maxDailyMatchesFree:  String(updated.max_daily_matches_free),
         maxDailyMatchesBasic: String(updated.max_daily_matches_basic),
         referralBonus:        String(updated.referral_bonus_points),
+        referralBonusNgn:     String(updated.referral_bonus_ngn ?? 5000),
         maintenanceMode:      updated.maintenance_mode,
         maxPhotos:            String(updated.max_photos),
         emailVerification:    updated.email_verification_enabled ?? true,
@@ -3224,25 +3228,49 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
 
         {/* Referral Settings */}
         <div className="bg-card rounded-2xl border border-border p-4">
-          <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Referral Program</h3>
-          <div>
-            <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Referral Bonus Points</label>
-            <div className="flex gap-3">
-              <input
-                value={settings.referralBonus}
-                onChange={e => update("referralBonus", e.target.value)}
-                type="number"
-                min="0"
-                className="w-40 px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                style={{ fontSize: "0.9rem" }}
-              />
-              <button onClick={saveSettings} disabled={saving}
-                className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                style={{ fontSize: "0.875rem", fontWeight: 600 }}>
-                {saving ? "Saving…" : "Save"}
-              </button>
+          <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-1">Referral Program</h3>
+          <p className="text-muted-foreground mb-5" style={{ fontSize: "0.8125rem" }}>
+            Set the bonus amount shown to users when they share their referral code. Each currency is independent — never converted.
+          </p>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                Nigerian users <span className="font-normal text-muted-foreground">(₦ Naira)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold" style={{ fontSize: "0.9rem" }}>₦</span>
+                <input
+                  value={settings.referralBonusNgn}
+                  onChange={e => update("referralBonusNgn", e.target.value)}
+                  type="number"
+                  min="0"
+                  className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  style={{ fontSize: "0.9rem" }}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                International users <span className="font-normal text-muted-foreground">($ USD)</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold" style={{ fontSize: "0.9rem" }}>$</span>
+                <input
+                  value={settings.referralBonus}
+                  onChange={e => update("referralBonus", e.target.value)}
+                  type="number"
+                  min="0"
+                  className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  style={{ fontSize: "0.9rem" }}
+                />
+              </div>
             </div>
           </div>
+          <button onClick={saveSettings} disabled={saving}
+            className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
         </div>
 
         {/* Feature toggles */}
