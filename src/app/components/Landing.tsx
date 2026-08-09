@@ -76,7 +76,6 @@ function firstParagraphText(content: string, maxLen = 200): string {
   return plain.length > maxLen ? plain.slice(0, maxLen).trimEnd() + "…" : plain;
 }
 
-// ─────────────────────────── TRUST INDICATORS ────────────────────
 const TRUST_ITEMS = [
   "256-bit encryption",
   "Manual profile review",
@@ -98,9 +97,9 @@ function PolicyModal({ title, content, onClose }: { title: string; content: stri
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-card rounded-3xl border border-border w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-border bg-card/95 backdrop-blur-sm z-10 rounded-t-3xl">
-          <h3 style={{ fontWeight: 800, fontSize: "1.0625rem" }}>{title}</h3>
+      <div className="bg-card rounded-2xl border border-border w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-border bg-card/95 backdrop-blur-sm z-10 rounded-t-2xl">
+          <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>{title}</h3>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-full bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-all"
@@ -124,7 +123,7 @@ function PolicyModal({ title, content, onClose }: { title: string; content: stri
 function StatCard({ value, label, suffix = "" }: { value: string; label: string; suffix?: string }) {
   return (
     <div className="text-center">
-      <p className="text-gradient" style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1 }}>
+      <p className="text-primary" style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 800, letterSpacing: "-0.04em", lineHeight: 1 }}>
         {value}{suffix}
       </p>
       <p className="text-muted-foreground mt-1.5" style={{ fontSize: "0.875rem", fontWeight: 500 }}>{label}</p>
@@ -133,46 +132,60 @@ function StatCard({ value, label, suffix = "" }: { value: string; label: string;
 }
 
 // ─────────────────────────── HERO VISUAL ─────────────────────────
-function HeroCard() {
-  const bars = [{ label: "Values", w: "94%" }, { label: "Goals", w: "91%" }, { label: "Lifestyle", w: "88%" }];
+function HeroVisual() {
   return (
-    <div className="relative w-full max-w-[340px] mx-auto select-none" style={{ height: "420px" }}>
-      {/* Ambient glow */}
-      <div className="absolute inset-0 rounded-full blur-3xl" style={{ background: "radial-gradient(circle, rgba(10,104,112,0.15) 0%, transparent 70%)", transform: "scale(1.3)" }} />
+    <div className="relative w-full max-w-[400px] mx-auto select-none" style={{ height: "500px" }}>
+      {/* Main photo — editorial portrait crop */}
+      <div
+        className="absolute inset-0 overflow-hidden bg-muted"
+        style={{ borderRadius: "1.25rem", boxShadow: "var(--shadow-xl)" }}
+      >
+        <img
+          src="https://images.unsplash.com/photo-1776266098669-11331e211e97?w=620&h=760&fit=crop&auto=format"
+          alt="Couple standing together in sunlight"
+          className="w-full h-full object-cover"
+          style={{ objectPosition: "center 15%" }}
+        />
+        {/* Bottom gradient for badge legibility */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "linear-gradient(to top, rgba(10,26,34,0.72) 0%, rgba(10,26,34,0.10) 45%, transparent 65%)" }}
+        />
+      </div>
 
-      {/* Main profile card */}
-      <div className="absolute left-0 right-0 mx-auto w-[260px] bg-card rounded-3xl border border-border overflow-hidden float-animation"
-        style={{ boxShadow: "0 20px 60px rgba(10,104,112,0.18), 0 4px 12px rgba(12,20,34,0.10)", top: "32px" }}>
-        {/* Cover */}
-        <div className="h-28 relative" style={{ background: "linear-gradient(135deg, #0A6870 0%, #14A8B4 100%)" }}>
-          <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle at 70% 30%, rgba(255,255,255,0.12) 0%, transparent 60%)" }} />
-          {/* Avatar */}
-          <div className="absolute -bottom-8 left-5 w-16 h-16 rounded-2xl bg-white shadow-lg border-2 border-white flex items-center justify-center overflow-hidden">
-            <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #E6F2F3, #C5E4E6)" }}>
-              <span style={{ fontSize: "1.5rem" }}>👩</span>
+      {/* Active members — top right */}
+      <div
+        className="absolute top-4 right-4 bg-card/92 backdrop-blur-sm rounded-xl border border-border/50 flex items-center gap-2 px-3 py-2"
+        style={{ boxShadow: "var(--shadow-md)" }}
+      >
+        <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+        <span style={{ fontSize: "0.6875rem", fontWeight: 600 }}>12k+ active</span>
+      </div>
+
+      {/* Compatibility badge — bottom overlay */}
+      <div className="absolute bottom-5 left-5 right-5">
+        <div
+          className="bg-card/96 backdrop-blur-md rounded-xl border border-border/60 p-4"
+          style={{ boxShadow: "var(--shadow-lg)" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Sparkles size={15} className="text-primary" />
             </div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontWeight: 700, fontSize: "0.8125rem", color: "var(--foreground)" }}>94% Compatibility</p>
+              <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", marginTop: 2 }}>Values · Goals · Lifestyle aligned</p>
+            </div>
+            <span style={{ fontSize: "1rem", fontWeight: 800, color: "var(--primary)", flexShrink: 0 }}>94%</span>
           </div>
-          {/* Score badge */}
-          <div className="absolute -bottom-5 right-5 h-10 px-3 rounded-xl flex items-center gap-1.5 shadow-lg"
-            style={{ background: "linear-gradient(135deg, #0A6870, #14A8B4)", boxShadow: "0 4px 12px rgba(10,104,112,0.35)" }}>
-            <Sparkles size={12} style={{ color: "rgba(255,255,255,0.85)" }} />
-            <span style={{ color: "white", fontWeight: 800, fontSize: "0.9rem" }}>94%</span>
-          </div>
-        </div>
-
-        {/* Card body */}
-        <div className="pt-10 px-5 pb-5">
-          <div className="mb-1" style={{ fontWeight: 700, fontSize: "1rem" }}>Sarah A.</div>
-          <div className="text-muted-foreground mb-4" style={{ fontSize: "0.8125rem" }}>28 · Software Engineer · Dubai</div>
-          <div className="space-y-2">
-            {bars.map(b => (
-              <div key={b.label}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{b.label}</span>
-                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)" }}>{b.w}</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: b.w, background: "linear-gradient(90deg, #0A6870, #14A8B4)" }} />
+          <div className="mt-3 flex gap-1">
+            {["Values", "Goals", "Lifestyle"].map((label, i) => (
+              <div key={label} className="flex-1">
+                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{ width: ["94%", "91%", "88%"][i], background: "var(--primary)", opacity: 0.7 + i * 0.1 }}
+                  />
                 </div>
               </div>
             ))}
@@ -180,33 +193,15 @@ function HeroCard() {
         </div>
       </div>
 
-      {/* Floating badge — New Match */}
-      <div className="absolute glass rounded-2xl px-3 py-2 shadow-lg flex items-center gap-2" style={{ top: "16px", right: "0", boxShadow: "var(--shadow-lg)" }}>
-        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-          <Heart size={12} className="text-primary fill-primary" />
-        </div>
-        <div>
-          <p style={{ fontSize: "0.6875rem", fontWeight: 700 }}>New Match!</p>
-          <p className="text-muted-foreground" style={{ fontSize: "0.625rem" }}>Just now</p>
-        </div>
-      </div>
-
-      {/* Floating badge — Verified */}
-      <div className="absolute glass rounded-2xl px-3 py-2 shadow-lg flex items-center gap-1.5" style={{ bottom: "40px", left: "0", boxShadow: "var(--shadow-lg)" }}>
+      {/* Verified badge — left edge */}
+      <div
+        className="absolute top-4 left-4 bg-card/90 backdrop-blur-sm rounded-xl border border-border/50 flex items-center gap-2 px-3 py-2"
+        style={{ boxShadow: "var(--shadow-md)" }}
+      >
         <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center">
           <Check size={11} className="text-green-600" />
         </div>
-        <span style={{ fontSize: "0.75rem", fontWeight: 700 }}>Verified Profile</span>
-      </div>
-
-      {/* Floating badge — Active members */}
-      <div className="absolute glass rounded-2xl px-3 py-2 shadow-lg flex items-center gap-1.5" style={{ bottom: "80px", right: "-8px", boxShadow: "var(--shadow-lg)" }}>
-        <div className="flex -space-x-1.5">
-          {["#0A6870","#C5733F","#4A8DB8"].map((c, i) => (
-            <div key={i} className="w-5 h-5 rounded-full border-2 border-white" style={{ background: c }} />
-          ))}
-        </div>
-        <span style={{ fontSize: "0.6875rem", fontWeight: 600 }}>12k+ active</span>
+        <span style={{ fontSize: "0.6875rem", fontWeight: 600 }}>Verified Profile</span>
       </div>
     </div>
   );
@@ -254,7 +249,6 @@ export function Landing({ onStart, onLogin }: LandingProps) {
     return (
       <BlogDetail
         articleId={selectedArticle}
-
         onBack={() => { setSelectedArticle(null); setTimeout(() => scrollTo("blog"), 80); }}
         onStart={onStart}
       />
@@ -270,17 +264,17 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       <nav
         className="sticky top-0 z-50 transition-all duration-300"
         style={{
-          background: scrolled ? "rgba(244,247,250,0.92)" : "transparent",
+          background: scrolled ? "rgba(247,244,239,0.92)" : "transparent",
           backdropFilter: scrolled ? "blur(20px)" : "none",
           WebkitBackdropFilter: scrolled ? "blur(20px)" : "none",
-          borderBottom: scrolled ? "1px solid rgba(12,20,34,0.08)" : "1px solid transparent",
-          boxShadow: scrolled ? "0 1px 12px rgba(12,20,34,0.06)" : "none",
+          borderBottom: scrolled ? "1px solid rgba(28,21,16,0.09)" : "1px solid transparent",
+          boxShadow: scrolled ? "0 1px 12px rgba(28,21,16,0.06)" : "none",
         }}
       >
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--primary)" }}>
               <Heart size={15} className="text-white fill-white" />
             </div>
             <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.125rem", letterSpacing: "-0.01em" }}>Ma3moni</span>
@@ -288,32 +282,35 @@ export function Landing({ onStart, onLogin }: LandingProps) {
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-0.5">
-            <button onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
-              className="px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all"
-              style={{ fontSize: "0.9rem" }}>Home</button>
+            <button
+              onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+              className="px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+              style={{ fontSize: "0.9rem" }}
+            >Home</button>
             {SCROLL_NAV.map(({ id, label }) => (
               <button key={id} onClick={() => scrollTo(id)}
-                className="px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all"
+                className="px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                 style={{ fontSize: "0.9rem" }}>{label}</button>
             ))}
             <Link to="/blog"
-              className="px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/60 transition-all"
+              className="px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
               style={{ fontSize: "0.9rem" }}>Blog</Link>
           </div>
 
           {/* CTA buttons */}
           <div className="flex items-center gap-2">
             <button onClick={onLogin}
-              className="hidden sm:flex items-center px-4 py-2 rounded-xl border border-border bg-white hover:bg-muted/40 transition-all"
-              style={{ fontSize: "0.875rem", fontWeight: 600, boxShadow: "var(--shadow-sm)", color: "#0C1422" }}>
+              className="hidden sm:flex items-center px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted/60 transition-all"
+              style={{ fontSize: "0.875rem", fontWeight: 600, boxShadow: "var(--shadow-sm)" }}>
               Sign In
             </button>
             <button onClick={onStart}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white transition-all"
-              style={{ fontSize: "0.875rem", fontWeight: 700, background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: "0 4px 12px rgba(10,104,112,0.30)" }}>
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white transition-all active:scale-[0.97]"
+              style={{ fontSize: "0.875rem", fontWeight: 600, background: "var(--primary)", boxShadow: "var(--shadow-primary)" }}>
               Get Started <ArrowRight size={14} />
             </button>
-            <button className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            <button
+              className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               onClick={() => setMobileOpen(o => !o)} aria-label="Toggle menu">
               {mobileOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -335,8 +332,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
               className="flex px-4 py-3 rounded-xl text-foreground hover:bg-muted/60 transition-colors"
               style={{ fontSize: "0.9375rem" }}>Blog</Link>
             <div className="pt-2 pb-1 flex gap-2">
-              <button onClick={onLogin} className="flex-1 py-3 rounded-xl border border-border bg-white text-center" style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#0C1422" }}>Sign In</button>
-              <button onClick={onStart} className="flex-1 py-3 rounded-xl text-white text-center" style={{ fontSize: "0.9375rem", fontWeight: 700, background: "linear-gradient(135deg, #0A6870, #0E8A95)" }}>Get Started</button>
+              <button onClick={onLogin} className="flex-1 py-3 rounded-xl border border-border bg-card text-center" style={{ fontSize: "0.9375rem", fontWeight: 600 }}>Sign In</button>
+              <button onClick={onStart} className="flex-1 py-3 rounded-xl text-white text-center" style={{ fontSize: "0.9375rem", fontWeight: 600, background: "var(--primary)" }}>Get Started</button>
             </div>
           </div>
         )}
@@ -344,27 +341,34 @@ export function Landing({ onStart, onLogin }: LandingProps) {
 
       {/* ══════════════════════ HERO ═══════════════════════════════ */}
       <section className="relative overflow-hidden" style={{ minHeight: "92vh", display: "flex", alignItems: "center" }}>
-        {/* Background — dot grid + ambient blobs */}
-        <div className="absolute inset-0 dot-grid" />
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(10,104,112,0.10) 0%, transparent 65%)", transform: "translate(20%, -20%)" }} />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full blur-3xl pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(197,115,63,0.07) 0%, transparent 65%)", transform: "translate(-20%, 20%)" }} />
+        {/* Clean warm surface — no dot-grid, no blobs */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 70% 40%, rgba(11,94,102,0.06) 0%, transparent 60%)" }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse at 20% 80%, rgba(166,78,42,0.05) 0%, transparent 55%)" }}
+        />
 
-        <div className="relative max-w-6xl mx-auto px-6 py-20 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+        <div className="relative max-w-6xl mx-auto px-6 py-20 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left — copy */}
           <div className="view-enter">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 border border-primary/20 bg-secondary px-3.5 py-1.5 rounded-full mb-6"
-              style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              <span style={{ color: "var(--primary)" }}>Marriage-first · Values-led · Private</span>
+            {/* Eyebrow — editorial label, not pill */}
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-5 h-px bg-primary" />
+              <span className="text-primary" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                Marriage-first · Values-led · Private
+              </span>
             </div>
 
-            {/* Headline */}
-            <h1 style={{ fontSize: "clamp(2.5rem, 5.5vw, 4.25rem)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-0.04em" }}>
+            {/* Headline — Instrument Serif for editorial weight */}
+            <h1
+              className="display-serif"
+              style={{ fontSize: "clamp(2.75rem, 5.5vw, 4.5rem)", color: "var(--foreground)" }}
+            >
               Where Intentional<br />
-              <span className="text-gradient">Connections</span><br />
+              <em>Connections</em><br />
               Begin
             </h1>
 
@@ -373,16 +377,16 @@ export function Landing({ onStart, onLogin }: LandingProps) {
             </p>
 
             {/* CTA row */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <div className="mt-9 flex flex-col sm:flex-row gap-3">
               <button onClick={onStart}
-                className="group flex items-center justify-center gap-2 text-white px-8 py-4 rounded-2xl transition-all active:scale-[0.97]"
-                style={{ fontSize: "1rem", fontWeight: 700, background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: "0 8px 24px rgba(10,104,112,0.30)" }}>
+                className="group flex items-center justify-center gap-2 text-white px-8 py-4 rounded-xl transition-all active:scale-[0.97]"
+                style={{ fontSize: "0.9375rem", fontWeight: 600, background: "var(--primary)", boxShadow: "var(--shadow-primary)" }}>
                 Begin Your Journey
-                <ArrowRight size={18} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                <ArrowRight size={17} className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
               <button onClick={() => scrollTo("about")}
-                className="flex items-center justify-center gap-2 bg-white border border-border px-8 py-4 rounded-2xl hover:bg-muted/40 transition-all"
-                style={{ fontSize: "1rem", fontWeight: 600, boxShadow: "var(--shadow-sm)", color: "#0C1422" }}>
+                className="flex items-center justify-center gap-2 bg-card border border-border px-8 py-4 rounded-xl hover:bg-muted/40 transition-all"
+                style={{ fontSize: "0.9375rem", fontWeight: 600, boxShadow: "var(--shadow-sm)" }}>
                 Learn More
               </button>
             </div>
@@ -398,14 +402,14 @@ export function Landing({ onStart, onLogin }: LandingProps) {
             </div>
           </div>
 
-          {/* Right — hero card visual */}
+          {/* Right — cinematic photo visual */}
           <div className="flex items-center justify-center view-enter-up">
-            <HeroCard />
+            <HeroVisual />
           </div>
         </div>
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-muted-foreground opacity-60">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-muted-foreground opacity-50">
           <div className="w-5 h-8 rounded-full border-2 border-current flex items-start justify-center pt-1.5">
             <div className="w-1 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
           </div>
@@ -413,14 +417,13 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       </section>
 
       {/* ══════════════════════ STATS BAR ══════════════════════════ */}
-      <div className="border-y border-border bg-white">
+      <div className="border-y border-border bg-card">
         <div className="max-w-6xl mx-auto px-6 py-10">
           <div className="grid grid-cols-3 gap-8 md:gap-16 text-center">
             <StatCard value="12,400" suffix="+" label="Verified Members" />
             <StatCard value="4,200" suffix="+" label="Successful Matches" />
             <StatCard value="98" suffix="%" label="Satisfaction Score" />
           </div>
-          {/* Trust indicators */}
           <div className="mt-8 pt-6 border-t border-border flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
             {TRUST_ITEMS.map(item => (
               <div key={item} className="flex items-center gap-1.5 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
@@ -435,11 +438,10 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       {/* ══════════════════════ FEATURES ═══════════════════════════ */}
       <section className="max-w-6xl mx-auto px-6 py-24">
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3.5 py-1.5 rounded-full mb-5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-            <Sparkles size={12} className="text-primary" />
+          <p className="text-primary mb-3" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
             Why Ma3moni is different
-          </div>
-          <h2 style={{ fontSize: "clamp(1.875rem, 4vw, 2.75rem)", fontWeight: 900, letterSpacing: "-0.035em" }}>
+          </p>
+          <h2 className="display-serif" style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", color: "var(--foreground)" }}>
             Built for the most important<br />decision of your life
           </h2>
           <p className="text-muted-foreground mt-4 max-w-xl mx-auto" style={{ fontSize: "1.0625rem", lineHeight: 1.7 }}>
@@ -450,13 +452,13 @@ export function Landing({ onStart, onLogin }: LandingProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             {
-              icon: Star, color: "#0A6870", bg: "#E6F2F3",
+              icon: Star, color: "var(--primary)", bg: "var(--secondary)",
               title: "Deep Compatibility Engine",
               desc: "Our algorithm analyses 40+ dimensions — values, lifestyle, communication style, life goals — to surface genuinely aligned matches.",
               highlight: "40+ compatibility factors",
             },
             {
-              icon: Shield, color: "#C5733F", bg: "#FBF2EB",
+              icon: Shield, color: "var(--accent)", bg: "#F5EBE3",
               title: "Verified & Trusted Platform",
               desc: "Every profile is manually reviewed before activation. Verification badges, moderation tools, and trust indicators keep the community safe.",
               highlight: "100% manual verification",
@@ -469,18 +471,17 @@ export function Landing({ onStart, onLogin }: LandingProps) {
             },
           ].map(({ icon: Icon, color, bg, title, desc, highlight }) => (
             <div key={title}
-              className="group bg-card rounded-3xl border border-border p-7 hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden"
+              className="group bg-card rounded-2xl border border-border p-7 hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
               style={{ boxShadow: "var(--shadow-sm)" }}>
-              <div className="absolute top-0 left-0 right-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }} />
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-105"
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-5 transition-transform duration-300 group-hover:scale-105"
                 style={{ background: bg }}>
-                <Icon size={22} style={{ color }} />
+                <Icon size={20} style={{ color }} />
               </div>
-              <h3 style={{ fontWeight: 800, fontSize: "1.0625rem", marginBottom: "0.625rem", letterSpacing: "-0.015em" }}>{title}</h3>
+              <h3 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.625rem", letterSpacing: "-0.01em" }}>{title}</h3>
               <p className="text-muted-foreground" style={{ fontSize: "0.9375rem", lineHeight: 1.7 }}>{desc}</p>
               <div className="mt-5 pt-4 border-t border-border">
                 <span className="inline-flex items-center gap-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700, color }}>
-                  <TrendingUp size={13} /> {highlight}
+                  <TrendingUp size={12} /> {highlight}
                 </span>
               </div>
             </div>
@@ -489,15 +490,13 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       </section>
 
       {/* ══════════════════════ HOW IT WORKS ═══════════════════════ */}
-      <section className="relative overflow-hidden bg-white border-y border-border py-24 px-6">
-        <div className="absolute inset-0 dot-grid opacity-40" />
-        <div className="relative max-w-6xl mx-auto">
+      <section className="border-y border-border py-24 px-6" style={{ background: "var(--card)" }}>
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3.5 py-1.5 rounded-full mb-5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              <Award size={12} className="text-primary" />
+            <p className="text-primary mb-3" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               Your journey
-            </div>
-            <h2 style={{ fontSize: "clamp(1.875rem, 4vw, 2.75rem)", fontWeight: 900, letterSpacing: "-0.035em" }}>
+            </p>
+            <h2 className="display-serif" style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", color: "var(--foreground)" }}>
               From sign-up to<br />meaningful connection
             </h2>
             <p className="text-muted-foreground mt-4" style={{ fontSize: "1.0625rem" }}>Four thoughtful steps — no shortcuts, no pressure.</p>
@@ -505,8 +504,10 @@ export function Landing({ onStart, onLogin }: LandingProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative">
             {/* Connector line (desktop) */}
-            <div className="absolute top-10 left-[12.5%] right-[12.5%] h-px hidden lg:block"
-              style={{ background: "linear-gradient(90deg, transparent, rgba(10,104,112,0.15), rgba(10,104,112,0.15), rgba(10,104,112,0.15), transparent)" }} />
+            <div
+              className="absolute top-10 left-[12.5%] right-[12.5%] h-px hidden lg:block"
+              style={{ background: "linear-gradient(90deg, transparent, rgba(11,94,102,0.18), rgba(11,94,102,0.18), rgba(11,94,102,0.18), transparent)" }}
+            />
 
             {[
               { step: "01", title: "Create Your Profile", desc: "Share who you are — values, goals, life vision, and what you're genuinely looking for.", icon: "✍️" },
@@ -515,15 +516,14 @@ export function Landing({ onStart, onLogin }: LandingProps) {
               { step: "04", title: "Connect with Purpose", desc: "Start a conversation when you're ready. No pressure, no timers, no games.", icon: "💬" },
             ].map(({ step, title, desc, icon }, i) => (
               <div key={step} className="relative group">
-                <div className="bg-card rounded-3xl border border-border p-6 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 h-full"
+                <div className="bg-background rounded-2xl border border-border p-6 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 h-full"
                   style={{ boxShadow: "var(--shadow-sm)" }}>
-                  {/* Step number */}
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 relative"
-                    style={{ background: i === 0 ? "linear-gradient(135deg, #0A6870, #14A8B4)" : "var(--secondary)" }}>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 900, color: i === 0 ? "white" : "var(--primary)", letterSpacing: "0.01em" }}>{step}</span>
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: i === 0 ? "var(--primary)" : "var(--secondary)" }}>
+                    <span style={{ fontSize: "0.75rem", fontWeight: 800, color: i === 0 ? "white" : "var(--primary)", letterSpacing: "0.01em" }}>{step}</span>
                   </div>
                   <div className="text-2xl mb-3">{icon}</div>
-                  <h4 style={{ fontWeight: 800, fontSize: "1rem", marginBottom: "0.5rem", letterSpacing: "-0.01em" }}>{title}</h4>
+                  <h4 style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "0.5rem", letterSpacing: "-0.01em" }}>{title}</h4>
                   <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.7 }}>{desc}</p>
                 </div>
               </div>
@@ -533,8 +533,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
           {/* CTA */}
           <div className="text-center mt-12">
             <button onClick={onStart}
-              className="inline-flex items-center gap-2 text-white px-8 py-4 rounded-2xl transition-all active:scale-[0.97]"
-              style={{ fontSize: "1rem", fontWeight: 700, background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: "0 8px 24px rgba(10,104,112,0.28)" }}>
+              className="inline-flex items-center gap-2 text-white px-8 py-4 rounded-xl transition-all active:scale-[0.97]"
+              style={{ fontSize: "0.9375rem", fontWeight: 600, background: "var(--primary)", boxShadow: "var(--shadow-primary)" }}>
               Start Your Profile <ArrowRight size={17} />
             </button>
           </div>
@@ -545,11 +545,10 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       <section id="about" className="py-24 px-6 scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3.5 py-1.5 rounded-full mb-5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              <Heart size={12} className="text-primary" />
+            <p className="text-primary mb-3" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               About Ma3moni
-            </div>
-            <h2 style={{ fontSize: "clamp(1.875rem, 4vw, 2.75rem)", fontWeight: 900, letterSpacing: "-0.035em", maxWidth: "680px", margin: "0 auto" }}>
+            </p>
+            <h2 className="display-serif" style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", color: "var(--foreground)", maxWidth: "680px", margin: "0 auto" }}>
               We built Ma3moni because this mattered too much to get wrong
             </h2>
             <p className="text-muted-foreground mt-5 max-w-2xl mx-auto" style={{ fontSize: "1.0625rem", lineHeight: 1.8 }}>
@@ -559,30 +558,29 @@ export function Landing({ onStart, onLogin }: LandingProps) {
 
           {/* Vision + Mission */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-14">
-            <div className="rounded-3xl p-8 relative overflow-hidden"
-              style={{ background: "linear-gradient(135deg, #0A6870 0%, #0D8A95 100%)", boxShadow: "0 16px 48px rgba(10,104,112,0.25)" }}>
-              <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full opacity-10" style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }} />
-              <div className="absolute -left-4 -bottom-4 w-32 h-32 rounded-full opacity-5" style={{ background: "radial-gradient(circle, white 0%, transparent 70%)" }} />
+            {/* Vision — sophisticated dark, private-club quality */}
+            <div className="rounded-2xl p-8 relative overflow-hidden editorial-dark">
               <div className="flex items-center gap-2 mb-5 relative">
-                <div className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
-                  <Eye size={15} className="text-white" />
+                <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center">
+                  <Eye size={14} className="text-white/80" />
                 </div>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(255,255,255,0.75)" }}>Our Vision</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "rgba(255,255,255,0.55)" }}>Our Vision</span>
               </div>
-              <p style={{ fontSize: "1.25rem", fontWeight: 800, lineHeight: 1.5, color: "white", position: "relative" }}>
+              <p className="display-serif text-white" style={{ fontSize: "1.375rem", lineHeight: 1.5 }}>
                 A world where every individual who seeks a lifelong partner can find them with clarity, dignity, and intention.
               </p>
             </div>
 
-            <div className="rounded-3xl p-8 border border-primary/15 bg-secondary relative overflow-hidden"
-              style={{ boxShadow: "var(--shadow-sm)" }}>
+            {/* Mission — warm tinted surface */}
+            <div className="rounded-2xl p-8 border border-primary/15 relative overflow-hidden"
+              style={{ background: "var(--secondary)", boxShadow: "var(--shadow-sm)" }}>
               <div className="flex items-center gap-2 mb-5">
-                <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Target size={15} className="text-primary" />
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Target size={14} className="text-primary" />
                 </div>
-                <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--primary)" }}>Our Mission</span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--primary)" }}>Our Mission</span>
               </div>
-              <p style={{ fontSize: "1.25rem", fontWeight: 800, lineHeight: 1.5, color: "var(--primary)" }}>
+              <p className="display-serif text-primary" style={{ fontSize: "1.375rem", lineHeight: 1.5 }}>
                 To build a compatibility-first platform that prioritises meaningful, lasting relationships — guided by shared values and genuine human connection.
               </p>
             </div>
@@ -591,20 +589,20 @@ export function Landing({ onStart, onLogin }: LandingProps) {
           {/* Core Values */}
           <div className="text-center mb-10">
             <div className="inline-flex items-center gap-2 mb-3">
-              <Zap size={15} className="text-primary" />
-              <span style={{ fontSize: "0.75rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--primary)" }}>Core Values</span>
+              <Zap size={14} className="text-primary" />
+              <span style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--primary)" }}>Core Values</span>
             </div>
-            <h3 style={{ fontSize: "1.75rem", fontWeight: 900, letterSpacing: "-0.03em" }}>Six principles behind every decision</h3>
+            <h3 className="display-serif" style={{ fontSize: "1.875rem", color: "var(--foreground)" }}>Six principles behind every decision</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {CORE_VALUES.map(({ icon: Icon, title, desc }) => (
               <div key={title}
-                className="bg-white rounded-2xl border border-border p-6 hover:border-primary/25 hover:shadow-md transition-all duration-300 group"
+                className="bg-card rounded-xl border border-border p-6 hover:border-primary/25 hover:shadow-md transition-all duration-300 group"
                 style={{ boxShadow: "var(--shadow-sm)" }}>
-                <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center mb-4 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                  <Icon size={18} />
+                <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center mb-4 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                  <Icon size={17} />
                 </div>
-                <p style={{ fontWeight: 800, fontSize: "1rem", marginBottom: "0.375rem", letterSpacing: "-0.01em" }}>{title}</p>
+                <p style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.375rem", letterSpacing: "-0.01em" }}>{title}</p>
                 <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.7 }}>{desc}</p>
               </div>
             ))}
@@ -613,34 +611,33 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       </section>
 
       {/* ══════════════════════ STORIES ════════════════════════════ */}
-      <section id="stories" className="bg-white border-y border-border py-24 px-6 scroll-mt-16">
+      <section id="stories" className="border-y border-border py-24 px-6 scroll-mt-16" style={{ background: "var(--card)" }}>
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3.5 py-1.5 rounded-full mb-5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              <Heart size={12} className="text-primary fill-primary" />
+            <p className="text-primary mb-3" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               Real Couples
-            </div>
-            <h2 style={{ fontSize: "clamp(1.875rem, 4vw, 2.75rem)", fontWeight: 900, letterSpacing: "-0.035em" }}>
-              Stories that began with a{" "}
-              <span className="text-gradient">compatibility score</span>
+            </p>
+            <h2 className="display-serif" style={{ fontSize: "clamp(2rem, 4vw, 2.75rem)", color: "var(--foreground)" }}>
+              Stories that began with a<br />
+              <em>compatibility score</em>
             </h2>
           </div>
 
           <div className="space-y-6">
             {STORIES.map((s, i) => (
               <div key={s.id}
-                className={`grid grid-cols-1 lg:grid-cols-2 gap-0 rounded-3xl overflow-hidden border border-border hover:shadow-xl transition-all duration-300 ${i % 2 === 1 ? "lg:[direction:rtl]" : ""}`}
+                className={`grid grid-cols-1 lg:grid-cols-2 gap-0 rounded-2xl overflow-hidden border border-border hover:shadow-lg transition-all duration-300 ${i % 2 === 1 ? "lg:[direction:rtl]" : ""}`}
                 style={{ boxShadow: "var(--shadow-md)" }}>
                 {/* Photo */}
-                <div className="relative overflow-hidden" style={{ minHeight: "280px", direction: "ltr" }}>
+                <div className="relative overflow-hidden bg-muted" style={{ minHeight: "280px", direction: "ltr" }}>
                   <img src={s.photo} alt={s.names} loading="lazy" decoding="async"
                     className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
                     style={{ minHeight: 280 }} />
-                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(12,20,34,0.35) 0%, transparent 50%)" }} />
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(12,20,34,0.38) 0%, transparent 50%)" }} />
                   {/* Score badge */}
-                  <div className="absolute top-4 left-4 flex items-center gap-2 rounded-xl px-3 py-1.5 shadow-lg glass">
+                  <div className="absolute top-4 left-4 flex items-center gap-2 rounded-xl px-3 py-1.5 glass">
                     <Sparkles size={12} className="text-primary" />
-                    <span style={{ fontSize: "0.8125rem", fontWeight: 800, color: "var(--primary)" }}>{s.score}% Compatible</span>
+                    <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--primary)" }}>{s.score}% Compatible</span>
                   </div>
                   {/* Location */}
                   <div className="absolute bottom-4 left-4 flex items-center gap-1.5 text-white" style={{ fontSize: "0.8125rem" }}>
@@ -650,15 +647,15 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                 </div>
 
                 {/* Content */}
-                <div className="bg-card p-8 lg:p-10 flex flex-col justify-center" style={{ direction: "ltr" }}>
-                  <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center mb-5">
-                    <Quote size={15} className="text-primary" />
+                <div className="bg-background p-8 lg:p-10 flex flex-col justify-center" style={{ direction: "ltr" }}>
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center mb-5">
+                    <Quote size={14} className="text-primary" />
                   </div>
-                  <blockquote style={{ fontSize: "1.125rem", lineHeight: 1.7, fontStyle: "italic", marginBottom: "1.5rem", fontWeight: 500 }}>
+                  <blockquote className="display-serif-italic" style={{ fontSize: "1.125rem", lineHeight: 1.65, marginBottom: "1.5rem", color: "var(--foreground)" }}>
                     "{s.quote}"
                   </blockquote>
                   <div className="h-px bg-border mb-4" />
-                  <h3 style={{ fontWeight: 900, fontSize: "1.125rem", letterSpacing: "-0.02em", marginBottom: "0.375rem" }}>{s.names}</h3>
+                  <h3 style={{ fontWeight: 700, fontSize: "1rem", letterSpacing: "-0.015em", marginBottom: "0.375rem" }}>{s.names}</h3>
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-4">
                     <Calendar size={12} />
                     <span style={{ fontSize: "0.875rem" }}>Married {s.married}</span>
@@ -671,8 +668,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
 
           <div className="text-center mt-12">
             <button onClick={onStart}
-              className="inline-flex items-center gap-2 text-white px-9 py-4 rounded-2xl transition-all active:scale-[0.97]"
-              style={{ fontSize: "1rem", fontWeight: 700, background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: "0 8px 24px rgba(10,104,112,0.28)" }}>
+              className="inline-flex items-center gap-2 text-white px-9 py-4 rounded-xl transition-all active:scale-[0.97]"
+              style={{ fontSize: "0.9375rem", fontWeight: 600, background: "var(--primary)", boxShadow: "var(--shadow-primary)" }}>
               Begin Your Story <ArrowRight size={17} />
             </button>
           </div>
@@ -684,19 +681,17 @@ export function Landing({ onStart, onLogin }: LandingProps) {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-12">
             <div>
-              <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3.5 py-1.5 rounded-full mb-5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-                <Tag size={12} className="text-primary" />
+              <p className="text-primary mb-3" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 Ma3moni Journal
-              </div>
-              <h2 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 900, letterSpacing: "-0.035em" }}>
-                Insights on{" "}
-                <span className="text-gradient">intentional</span> relationships
+              </p>
+              <h2 className="display-serif" style={{ fontSize: "clamp(1.875rem, 4vw, 2.5rem)", color: "var(--foreground)" }}>
+                Insights on intentional relationships
               </h2>
-              <p className="text-muted-foreground mt-3" style={{ fontSize: "1.0625rem" }}>Research, advice, and real stories for those seeking a lasting partnership.</p>
+              <p className="text-muted-foreground mt-3" style={{ fontSize: "1rem" }}>Research, advice, and real stories for those seeking a lasting partnership.</p>
             </div>
             <Link to="/blog"
               className="flex-shrink-0 flex items-center gap-2 border border-primary text-primary px-5 py-2.5 rounded-xl hover:bg-primary hover:text-white transition-all"
-              style={{ fontSize: "0.9rem", fontWeight: 700 }}>
+              style={{ fontSize: "0.875rem", fontWeight: 600 }}>
               All articles <ArrowRight size={15} />
             </Link>
           </div>
@@ -705,8 +700,9 @@ export function Landing({ onStart, onLogin }: LandingProps) {
             {landingArticles.length === 0 ? (
               <p className="text-muted-foreground col-span-3 text-center py-8" style={{ fontSize: "0.9375rem" }}>Articles coming soon.</p>
             ) : landingArticles.map((post, idx) => (
-              <button key={post.id} onClick={() => { setSelectedArticle(post.slug); scrollRef.current?.scrollTo({ top: 0 }); }}
-                className={`text-left bg-card rounded-3xl border border-border overflow-hidden hover:border-primary/25 hover:shadow-lg transition-all duration-300 group ${idx === 0 ? "md:col-span-1" : ""}`}
+              <button key={post.id}
+                onClick={() => { setSelectedArticle(post.slug); scrollRef.current?.scrollTo({ top: 0 }); }}
+                className={`text-left bg-card rounded-2xl border border-border overflow-hidden hover:border-primary/25 hover:shadow-lg transition-all duration-300 group ${idx === 0 ? "md:col-span-1" : ""}`}
                 style={{ boxShadow: "var(--shadow-sm)" }}>
                 <div className="relative overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
                   {post.cover_image ? (
@@ -715,21 +711,22 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                   ) : (
                     <div className="absolute inset-0 bg-secondary" />
                   )}
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(12,20,34,0.2) 0%, transparent 50%)" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(to top, rgba(28,21,16,0.18) 0%, transparent 50%)" }} />
                   {post.category && (
-                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-full text-white" style={{ fontSize: "0.6875rem", fontWeight: 800, background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
+                    <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-white"
+                      style={{ fontSize: "0.6875rem", fontWeight: 700, background: "var(--primary)" }}>
                       {post.category.name}
                     </span>
                   )}
                 </div>
                 <div className="p-5">
-                  <h3 style={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.45, marginBottom: "0.625rem", letterSpacing: "-0.01em" }}>{post.title}</h3>
+                  <h3 style={{ fontWeight: 700, fontSize: "1rem", lineHeight: 1.45, marginBottom: "0.625rem", letterSpacing: "-0.01em" }}>{post.title}</h3>
                   <p className="text-muted-foreground" style={{ fontSize: "0.875rem", lineHeight: 1.65, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {firstParagraphText(post.content || "")}
                   </p>
                   <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
                     <div>
-                      <p style={{ fontWeight: 700, fontSize: "0.8125rem" }}>{post.author?.full_name ?? "Ma3moni Team"}</p>
+                      <p style={{ fontWeight: 600, fontSize: "0.8125rem" }}>{post.author?.full_name ?? "Ma3moni Team"}</p>
                       {post.published_at && (
                         <div className="flex items-center gap-1.5 text-muted-foreground mt-0.5">
                           <Clock size={11} />
@@ -737,8 +734,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                         </div>
                       )}
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center transition-all duration-200 group-hover:bg-primary group-hover:shadow-md">
-                      <ArrowRight size={14} className="text-primary group-hover:text-white transition-colors" />
+                    <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center transition-all duration-200 group-hover:bg-primary group-hover:shadow-sm">
+                      <ArrowRight size={13} className="text-primary group-hover:text-white transition-colors" />
                     </div>
                   </div>
                 </div>
@@ -749,27 +746,29 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       </section>
 
       {/* ══════════════════════ CONTACT / FAQ ══════════════════════ */}
-      <section id="contact" className="bg-white border-y border-border py-24 px-6 scroll-mt-16">
+      <section id="contact" className="border-y border-border py-24 px-6 scroll-mt-16" style={{ background: "var(--card)" }}>
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
           {/* Contact form */}
           <div>
-            <div className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-3.5 py-1.5 rounded-full mb-6" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              <Mail size={12} className="text-primary" />
+            <p className="text-primary mb-4" style={{ fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
               Contact & Support
-            </div>
-            <h2 style={{ fontSize: "2rem", fontWeight: 900, letterSpacing: "-0.035em", marginBottom: "0.75rem" }}>We're here to help</h2>
+            </p>
+            <h2 className="display-serif" style={{ fontSize: "2rem", color: "var(--foreground)", marginBottom: "0.75rem" }}>
+              We're here to help
+            </h2>
             <p className="text-muted-foreground mb-7" style={{ fontSize: "1rem" }}>Our team responds within 4 business hours.</p>
 
             {contactSent ? (
-              <div className="bg-secondary rounded-3xl border border-primary/15 p-10 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-5">
-                  <Check size={24} className="text-primary" />
+              <div className="bg-secondary rounded-2xl border border-primary/15 p-10 text-center">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-5">
+                  <Check size={22} className="text-primary" />
                 </div>
-                <h3 style={{ fontWeight: 800, fontSize: "1.25rem", letterSpacing: "-0.02em" }}>Message received!</h3>
+                <h3 style={{ fontWeight: 700, fontSize: "1.25rem", letterSpacing: "-0.02em" }}>Message received!</h3>
                 <p className="text-muted-foreground mt-2 mb-6" style={{ fontSize: "0.9375rem" }}>
                   We'll reply to <strong style={{ color: "var(--foreground)" }}>{contactForm.email}</strong> within 4 business hours.
                 </p>
-                <button onClick={() => { setContactSent(false); setContactForm({ name: "", email: "", subject: "", message: "" }); }}
+                <button
+                  onClick={() => { setContactSent(false); setContactForm({ name: "", email: "", subject: "", message: "" }); }}
                   className="px-6 py-2.5 rounded-xl border border-primary/30 text-primary hover:bg-primary/5 transition-colors"
                   style={{ fontSize: "0.875rem", fontWeight: 600 }}>
                   Send another message
@@ -783,19 +782,19 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                     { label: "Email", key: "email", type: "email", placeholder: "you@example.com" },
                   ].map(({ label, key, type, placeholder }) => (
                     <div key={key}>
-                      <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700 }}>{label}</label>
+                      <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>{label}</label>
                       <input type={type} value={contactForm[key as keyof typeof contactForm]}
                         onChange={e => setContactForm(p => ({ ...p, [key]: e.target.value }))}
                         placeholder={placeholder} required
-                        className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
+                        className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/35 transition-all"
                         style={{ fontSize: "0.9rem" }} />
                     </div>
                   ))}
                 </div>
                 <div>
-                  <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700 }}>Subject</label>
+                  <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Subject</label>
                   <select value={contactForm.subject} onChange={e => setContactForm(p => ({ ...p, subject: e.target.value }))} required
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 appearance-none"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
                     style={{ fontSize: "0.9rem" }}>
                     <option value="">Select topic…</option>
                     <option>Account & Profile</option>
@@ -808,15 +807,15 @@ export function Landing({ onStart, onLogin }: LandingProps) {
                   </select>
                 </div>
                 <div>
-                  <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700 }}>Message</label>
+                  <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Message</label>
                   <textarea value={contactForm.message} onChange={e => setContactForm(p => ({ ...p, message: e.target.value }))}
                     placeholder="Describe your question or issue in detail…" rows={4} required
-                    className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all resize-none"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/35 transition-all resize-none"
                     style={{ fontSize: "0.9rem" }} />
                 </div>
                 <button type="submit"
                   className="flex items-center gap-2 text-white px-7 py-3.5 rounded-xl transition-all active:scale-[0.97]"
-                  style={{ fontWeight: 700, fontSize: "1rem", background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: "0 4px 12px rgba(10,104,112,0.25)" }}>
+                  style={{ fontWeight: 600, fontSize: "0.9375rem", background: "var(--primary)", boxShadow: "var(--shadow-primary)" }}>
                   <Send size={15} /> Send Message
                 </button>
               </form>
@@ -837,19 +836,19 @@ export function Landing({ onStart, onLogin }: LandingProps) {
 
           {/* FAQ */}
           <div>
-            <h3 style={{ fontWeight: 800, fontSize: "1.375rem", letterSpacing: "-0.02em", marginBottom: "1.25rem" }}>
+            <h3 className="display-serif" style={{ fontSize: "1.625rem", color: "var(--foreground)", marginBottom: "1.5rem" }}>
               Frequently Asked Questions
             </h3>
             <div className="space-y-2">
               {FAQS.map((faq, i) => (
-                <div key={i} className="bg-background rounded-2xl border border-border overflow-hidden transition-all">
+                <div key={i} className="bg-background rounded-xl border border-border overflow-hidden transition-all">
                   <button onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white transition-colors gap-3">
-                    <span style={{ fontWeight: 700, fontSize: "0.9375rem", flex: 1 }}>{faq.q}</span>
-                    <div className={`w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 transition-all ${openFaq === i ? "bg-primary border-primary" : "bg-white"}`}>
+                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-card transition-colors gap-3">
+                    <span style={{ fontWeight: 600, fontSize: "0.9375rem", flex: 1 }}>{faq.q}</span>
+                    <div className={`w-6 h-6 rounded-full border border-border flex items-center justify-center flex-shrink-0 transition-all ${openFaq === i ? "bg-primary border-primary" : "bg-card"}`}>
                       {openFaq === i
-                        ? <ChevronUp size={13} className="text-white" />
-                        : <ChevronDown size={13} className="text-muted-foreground" />}
+                        ? <ChevronUp size={12} className="text-white" />
+                        : <ChevronDown size={12} className="text-muted-foreground" />}
                     </div>
                   </button>
                   {openFaq === i && (
@@ -865,36 +864,49 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       </section>
 
       {/* ══════════════════════ FINAL CTA ══════════════════════════ */}
-      <section className="relative overflow-hidden py-24 px-6" style={{ background: "linear-gradient(135deg, #0A6870 0%, #0D8A95 50%, #0E9EA8 100%)" }}>
-        {/* Texture */}
-        <div className="absolute inset-0 dot-grid opacity-[0.07]" />
-        <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full blur-3xl" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full blur-3xl" style={{ background: "rgba(255,255,255,0.06)" }} />
+      {/* Dark editorial — private-club sophistication */}
+      <section className="relative overflow-hidden py-24 px-6 editorial-dark">
+        {/* Warm ambient light from below — tasteful, not blobby */}
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none"
+          style={{ width: 600, height: 250, background: "radial-gradient(ellipse at 50% 100%, rgba(166,78,42,0.16) 0%, transparent 65%)" }}
+        />
+        <div
+          className="absolute top-0 right-0 pointer-events-none"
+          style={{ width: 400, height: 300, background: "radial-gradient(ellipse at 100% 0%, rgba(11,94,102,0.14) 0%, transparent 65%)" }}
+        />
 
         <div className="relative text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 px-3.5 py-1.5 rounded-full mb-6" style={{ fontSize: "0.8125rem", fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>
-            <Heart size={12} className="text-white/80 fill-white/50" />
-            Join thousands of intentional individuals
+          <div className="flex items-center justify-center gap-3 mb-7">
+            <div className="h-px w-12 bg-white/20" />
+            <span style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)" }}>
+              Begin your journey
+            </span>
+            <div className="h-px w-12 bg-white/20" />
           </div>
-          <h2 style={{ fontSize: "clamp(2rem, 5vw, 3rem)", fontWeight: 900, letterSpacing: "-0.04em", color: "white", lineHeight: 1.1 }}>
-            Ready to begin<br />your journey?
+          <h2
+            className="display-serif text-white"
+            style={{ fontSize: "clamp(2.25rem, 5vw, 3.25rem)", lineHeight: 1.12 }}
+          >
+            Ready to begin<br />
+            <em>your</em> journey?
           </h2>
-          <p className="mt-4 mb-9" style={{ fontSize: "1.0625rem", color: "rgba(255,255,255,0.75)", lineHeight: 1.7 }}>
+          <p className="mt-4 mb-9" style={{ fontSize: "1.0625rem", color: "rgba(255,255,255,0.58)", lineHeight: 1.75 }}>
             Join a growing community of serious individuals who chose depth over speed, and found their person on Ma3moni.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button onClick={onStart}
-              className="inline-flex items-center justify-center gap-2 bg-white px-9 py-4 rounded-2xl hover:bg-white/92 transition-all active:scale-[0.97]"
-              style={{ fontWeight: 800, fontSize: "1rem", color: "#0A6870", boxShadow: "0 8px 32px rgba(0,0,0,0.20)" }}>
-              Get Started — It's Free <ArrowRight size={18} />
+              className="inline-flex items-center justify-center gap-2 bg-white px-9 py-4 rounded-xl hover:bg-white/92 transition-all active:scale-[0.97]"
+              style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--primary)", boxShadow: "0 8px 32px rgba(0,0,0,0.30)" }}>
+              Get Started — It's Free <ArrowRight size={17} />
             </button>
             <button onClick={onLogin}
-              className="inline-flex items-center justify-center gap-2 border border-white/30 bg-white/10 text-white px-9 py-4 rounded-2xl hover:bg-white/15 transition-all"
-              style={{ fontWeight: 700, fontSize: "1rem" }}>
+              className="inline-flex items-center justify-center gap-2 border border-white/20 bg-white/8 text-white px-9 py-4 rounded-xl hover:bg-white/12 transition-all"
+              style={{ fontWeight: 600, fontSize: "0.9375rem" }}>
               Already a member? Sign In
             </button>
           </div>
-          <p className="mt-5" style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.55)" }}>No credit card required · Free to browse matches</p>
+          <p className="mt-5" style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.38)" }}>No credit card required · Free to browse matches</p>
         </div>
       </section>
 
@@ -904,7 +916,7 @@ export function Landing({ onStart, onLogin }: LandingProps) {
           {/* Brand */}
           <div className="col-span-2">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--primary)" }}>
                 <Heart size={14} className="text-white fill-white" />
               </div>
               <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.0625rem" }}>Ma3moni</span>
@@ -914,7 +926,7 @@ export function Landing({ onStart, onLogin }: LandingProps) {
             </p>
             <div className="flex gap-2">
               {["integrity", "dignity", "privacy"].map(tag => (
-                <span key={tag} className="px-2.5 py-1 bg-secondary text-secondary-foreground rounded-full capitalize" style={{ fontSize: "0.6875rem", fontWeight: 700 }}>
+                <span key={tag} className="px-2.5 py-1 bg-secondary text-muted-foreground rounded-lg capitalize" style={{ fontSize: "0.6875rem", fontWeight: 600 }}>
                   {tag}
                 </span>
               ))}
@@ -948,7 +960,7 @@ export function Landing({ onStart, onLogin }: LandingProps) {
             },
           ].map(({ heading, links }) => (
             <div key={heading}>
-              <p style={{ fontWeight: 800, fontSize: "0.8125rem", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>{heading}</p>
+              <p style={{ fontWeight: 700, fontSize: "0.75rem", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--foreground)" }}>{heading}</p>
               <div className="space-y-2.5">
                 {links.map(({ label, action }) => (
                   <button key={label} onClick={action}

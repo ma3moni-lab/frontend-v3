@@ -3,75 +3,73 @@
 :root {
   --font-size: 16px;
 
-  /* ── Brand surfaces ──────────────────────── */
-  --background: #F4F7FA;
-  --foreground: #0C1422;
-  --card: #FFFFFF;
-  --card-foreground: #0C1422;
-  --popover: #FFFFFF;
-  --popover-foreground: #0C1422;
+  /* ── Brand surfaces — warm cream, not cold blue-gray ──────── */
+  --background: #F7F4EF;
+  --foreground: #1C1510;
+  --card: #FEFCF9;
+  --card-foreground: #1C1510;
+  --popover: #FEFCF9;
+  --popover-foreground: #1C1510;
 
-  /* ── Teal primary ────────────────────────── */
-  --primary: #0A6870;
+  /* ── Refined teal primary — deeper, more sophisticated ─────── */
+  --primary: #0B5E66;
   --primary-foreground: #FFFFFF;
 
-  /* ── Supporting UI ───────────────────────── */
-  --secondary: #E6F2F3;
-  --secondary-foreground: #0A6870;
-  --muted: #ECF0F5;
-  --muted-foreground: #64737F;
-  --accent: #C5733F;
+  /* ── Warm stone secondary ─────────────────────────────────── */
+  --secondary: #EDE8DE;
+  --secondary-foreground: #1C1510;
+  --muted: #EAE5DB;
+  --muted-foreground: #7A6C61;
+  --accent: #A64E2A;
   --accent-foreground: #FFFFFF;
-  --destructive: #D41F3A;
+  --destructive: #C41E37;
   --destructive-foreground: #FFFFFF;
 
-  /* ── Form & input ────────────────────────── */
-  --border: rgba(12, 20, 34, 0.08);
+  /* ── Form & input — warm tones ────────────────────────────── */
+  --border: rgba(28, 21, 16, 0.09);
   --input: transparent;
-  --input-background: #EEF2F8;
-  --switch-background: #BFC8D4;
-  --ring: rgba(10, 104, 112, 0.30);
+  --input-background: #EBE7DF;
+  --switch-background: #C5BDB4;
+  --ring: rgba(11, 94, 102, 0.25);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
 
-  /* ── Shadows ─────────────────────────────── */
-  --shadow-sm: 0 1px 2px rgba(12,20,34,0.06), 0 1px 4px rgba(12,20,34,0.04);
-  --shadow-md: 0 4px 12px rgba(12,20,34,0.08), 0 2px 4px rgba(12,20,34,0.05);
-  --shadow-lg: 0 10px 32px rgba(12,20,34,0.10), 0 4px 8px rgba(12,20,34,0.06);
-  --shadow-xl: 0 20px 48px rgba(12,20,34,0.13), 0 8px 16px rgba(12,20,34,0.06);
-  --shadow-primary: 0 8px 24px rgba(10,104,112,0.22);
+  /* ── Shadows — warm undertone ─────────────────────────────── */
+  --shadow-sm: 0 1px 3px rgba(28,21,16,0.07), 0 1px 2px rgba(28,21,16,0.04);
+  --shadow-md: 0 4px 14px rgba(28,21,16,0.09), 0 2px 4px rgba(28,21,16,0.05);
+  --shadow-lg: 0 10px 32px rgba(28,21,16,0.10), 0 4px 8px rgba(28,21,16,0.05);
+  --shadow-xl: 0 20px 48px rgba(28,21,16,0.12), 0 8px 16px rgba(28,21,16,0.06);
+  --shadow-primary: 0 6px 18px rgba(11,94,102,0.22);
 
-  /* ── Charts ──────────────────────────────── */
-  --chart-1: #0A6870;
-  --chart-2: #C5733F;
+  /* ── Charts ──────────────────────────────────────────────── */
+  --chart-1: #0B5E66;
+  --chart-2: #A64E2A;
   --chart-3: #4A8DB8;
-  --chart-4: #6B9E78;
-  --chart-5: #9B6DAF;
+  --chart-4: #5D8E6A;
+  --chart-5: #8B5DAF;
 
-  /* ── Radius scale (8 px grid) ────────────── */
-  --radius: 0.75rem;
+  /* ── Radius — more refined, less pill-heavy ───────────────── */
+  --radius: 0.625rem;
 
-  /* ── Sidebar ─────────────────────────────── */
-  --sidebar: #0B1627;
-  --sidebar-foreground: #CBD5E0;
-  --sidebar-primary: #14A8B4;
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  --sidebar: #0B1A20;
+  --sidebar-foreground: #C8D3D8;
+  --sidebar-primary: #14A0AC;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #162436;
-  --sidebar-accent-foreground: #E8EDF4;
-  --sidebar-border: rgba(255, 255, 255, 0.07);
-  --sidebar-ring: #0A6870;
+  --sidebar-accent: #142430;
+  --sidebar-accent-foreground: #E6EDF2;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #0B5E66;
 }
 
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  /* Card sits slightly above the background for separation. */
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  /* Keep the brand teal as primary in dark mode (not near-white). */
-  --primary: #12808A;
+  --primary: #14919E;
   --primary-foreground: #FFFFFF;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -83,7 +81,6 @@
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.269 0 0);
   --input: oklch(0.4 0 0);
-  /* Elevated field surface so text is readable when typing (was missing → stayed light). */
   --input-background: oklch(0.269 0 0);
   --ring: oklch(0.439 0 0);
   --font-weight-medium: 500;
@@ -152,6 +149,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern" 1, "liga" 1;
   }
 
   /* View transition animations */
@@ -160,7 +160,7 @@
   @keyframes slideInRight { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
   @keyframes slideInLeft  { from { opacity:0; transform:translateX(-24px); } to { opacity:1; transform:translateX(0); } }
   @keyframes countUp   { from { opacity:0; transform:translateY(12px) scale(0.9); } to { opacity:1; transform:translateY(0) scale(1); } }
-  @keyframes float     { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+  @keyframes float     { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-6px); } }
 
   .view-enter       { animation: fadeIn       0.22s ease forwards; }
   .view-enter-up    { animation: fadeUp       0.26s ease forwards; }
@@ -169,35 +169,47 @@
   .count-up         { animation: countUp      0.6s cubic-bezier(0.34,1.56,0.64,1) forwards; }
   .float-animation  { animation: float        3s ease-in-out infinite; }
 
+  /* ── Logo font ──────────────────────────────────────────── */
   .logo-font {
     font-family: 'Gugi', 'Plus Jakarta Sans', sans-serif;
     letter-spacing: -0.01em;
   }
 
-  /* Overlay nav button (e.g. back arrow on top of photos/heroes).
-     A dark scrim + blur + ring + drop-shadow keeps the icon visible on ANY
-     background — light or dark, busy or plain. */
+  /* ── Display serif — Instrument Serif for editorial moments ─ */
+  .display-serif {
+    font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+
+  .display-serif-italic {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+  }
+
+  /* ── Overlay nav button ──────────────────────────────────── */
   .overlay-nav-btn {
-    background: rgba(12, 20, 34, 0.45);
+    background: rgba(28, 21, 16, 0.42);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.30), inset 0 0 0 1px rgba(255, 255, 255, 0.20);
     color: #ffffff;
-    transition: background 0.2s ease, transform 0.15s ease;
+    transition: background 0.18s ease, transform 0.14s ease;
   }
-  .overlay-nav-btn:hover { background: rgba(12, 20, 34, 0.62); }
+  .overlay-nav-btn:hover { background: rgba(28, 21, 16, 0.60); }
   .overlay-nav-btn:active { transform: scale(0.94); }
-  /* Extra insurance: the icon itself carries a drop-shadow so it never merges
-     into the button or an unusually light photo behind a thin scrim. */
-  .overlay-nav-btn svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55)); }
+  .overlay-nav-btn svg { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.50)); }
 
-  /* ── PWA / mobile full-screen fit ───────────────── */
+  /* ── PWA / mobile full-screen fit ───────────────────────── */
   html {
     font-size: var(--font-size);
     height: 100%;
     height: 100dvh;
     overflow: hidden;
-    /* Stop iOS Safari elastic bounce that makes the whole PWA shell jitter */
     overscroll-behavior: none;
     -webkit-overflow-scrolling: auto;
   }
@@ -207,7 +219,6 @@
     overflow: hidden;
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
-    /* Safe-area padding for notches & gesture bars */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -219,7 +230,6 @@
     overflow: hidden;
     overscroll-behavior: none;
   }
-  /* Scrollable containers: allow inner panning, contain overscroll bounce */
   .overflow-y-auto,
   .overflow-y-scroll,
   .overflow-auto,
@@ -231,19 +241,19 @@
   h1 {
     font-size: var(--text-2xl);
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    line-height: 1.4;
   }
 
   h2 {
     font-size: var(--text-xl);
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    line-height: 1.4;
   }
 
   h3 {
     font-size: var(--text-lg);
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    line-height: 1.45;
   }
 
   h4 {
@@ -270,30 +280,24 @@
     line-height: 1.5;
   }
 
-  /* ── Full justification (Word Ctrl+J style) ──────────── */
-  /* Applied to <p> tags — not headings, buttons, or nav items. */
   p {
     text-align: justify;
     text-justify: inter-word;
     hyphens: auto;
     -webkit-hyphens: auto;
     -ms-hyphens: auto;
-    /* Require at least 6-char words to hyphenate; keep ≥3 chars before/after break */
     hyphenate-limit-chars: 6 3 3;
-    /* Allow long words to wrap before overflowing their container */
     overflow-wrap: break-word;
     word-break: normal;
     margin-bottom: 0;
     margin-top: 0;
   }
 
-  /* Last line of a justified block should be left-aligned, not stretched. */
   p:last-child,
   p:only-child {
     text-align-last: left;
   }
 
-  /* ── Blog / article body — restore paragraph spacing for prose ── */
   .blog-body p {
     margin-bottom: 1.25rem;
     margin-top: 0;
@@ -304,51 +308,57 @@
 
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(12,20,34,0.15); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(12,20,34,0.25); }
+  ::-webkit-scrollbar-thumb { background: rgba(28,21,16,0.12); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(28,21,16,0.22); }
 
-  /* ── Dot-grid hero background pattern ────────────── */
-  .dot-grid {
-    background-image: radial-gradient(circle, rgba(10,104,112,0.07) 1.5px, transparent 1.5px);
-    background-size: 28px 28px;
+  /* ── Editorial dark section — premium/private-club moments ── */
+  .editorial-dark {
+    background: #0C1E26;
+    color: #F7F4EF;
   }
 
-  /* ── Gradient text ───────────────────────────────── */
+  /* ── Premium ink surface ─────────────────────────────────── */
+  .ink-card {
+    background: linear-gradient(140deg, #0C1E26 0%, #0E2530 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+
+  /* ── Gradient card border (top accent) ───────────────────── */
+  .card-accent-border {
+    border-top: 2px solid var(--primary);
+  }
+
+  /* ── Glass surface — use sparingly ──────────────────────── */
+  .glass {
+    background: rgba(254,252,249,0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(254,252,249,0.60);
+  }
+  .glass-dark {
+    background: rgba(12,30,38,0.68);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.07);
+  }
+
+  /* ── Dot pattern — very subtle, editorial use only ────────── */
+  .dot-grid {
+    background-image: radial-gradient(circle, rgba(11,94,102,0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* ── Gradient text — teal brand moments only ─────────────── */
   .text-gradient {
-    background: linear-gradient(135deg, var(--primary) 0%, #14A8B4 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, #149BA8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
   .text-gradient-warm {
-    background: linear-gradient(135deg, #C5733F 0%, #E09050 100%);
+    background: linear-gradient(135deg, #A64E2A 0%, #C97040 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-  }
-
-  /* ── Glass card surface ──────────────────────────── */
-  .glass {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.55);
-  }
-  .glass-dark {
-    background: rgba(11,22,39,0.65);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.08);
-  }
-
-  /* ── Gradient card border (top accent) ───────────── */
-  .card-accent-border {
-    border-top: 2px solid var(--primary);
-  }
-
-  /* ── Ink shadow — dark premium card ─────────────── */
-  .ink-card {
-    background: linear-gradient(135deg, #0B1E2D 0%, #0D2538 100%);
-    border: 1px solid rgba(255,255,255,0.06);
   }
 }
