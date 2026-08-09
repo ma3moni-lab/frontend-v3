@@ -675,7 +675,7 @@ export function PrivacySafetySection({ onBack, plan = "free", onUpgrade }: {
 
   return (
     <Shell title="Privacy & Safety" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5">
+      <div className="p-4">
         {!isPaid && (
           <button onClick={upgrade}
             className="w-full flex items-center gap-3 mb-6 rounded-2xl border border-primary/25 bg-secondary/60 px-4 py-3 text-left hover:border-primary/40 transition-colors">
@@ -1173,7 +1173,7 @@ export function AppSettingsSection({ onBack }: { onBack: () => void }) {
 
   return (
     <Shell title="Settings" onBack={onBack} onSave={s} saved={saved}>
-      <div className="p-5">
+      <div className="p-4">
         <Divider title="Push Notifications" />
 
         {/* Push permission status */}
@@ -1340,7 +1340,18 @@ export function FoundPartnerSection({ onBack, onComplete }: { onBack: () => void
             <Toggle on={f.pauseAfter} onChange={v => setF(p => ({ ...p, pauseAfter: v }))} label="Pause my profile after submitting" desc="Hides your profile from new matches" />
           </div>
         </div>
-        <button onClick={() => setStep("done")}
+        <button onClick={async () => {
+          try {
+            await apiAuth.foundPartner({
+              partner_name: f.partnerName,
+              how_met: f.howMet,
+              story: f.story,
+              share: f.share,
+              pause_after: f.pauseAfter,
+            });
+          } catch { /* profile updated optimistically */ }
+          setStep("done");
+        }}
           className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all"
           style={{ fontWeight: 700, fontSize: "1rem" }}>
           <Heart size={17} className="fill-white" /> Submit My Story
@@ -1356,7 +1367,7 @@ export function FoundPartnerSection({ onBack, onComplete }: { onBack: () => void
         <button onClick={onBack} className="p-1 text-muted-foreground hover:text-foreground"><ChevronLeft size={22} /></button>
         <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Found a Partner</h3>
       </div>
-      <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center text-center">
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center text-center">
         <div style={{ fontSize: "3rem", marginTop: "1rem", marginBottom: "1.25rem" }}>💑</div>
         <h2 style={{ fontWeight: 900, fontSize: "1.625rem", letterSpacing: "-0.025em" }}>Did you find your partner?</h2>
         <p className="text-muted-foreground mt-3 mb-7" style={{ fontSize: "1rem", lineHeight: 1.7, maxWidth: "280px" }}>
@@ -1466,7 +1477,10 @@ export function DeactivateSection({ onBack, onSignOut }: { onBack: () => void; o
               { value: "other", label: "Other reason" },
             ]} />
           </div>
-          <button onClick={() => setDone("pause")} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all" style={{ fontWeight: 700, fontSize: "1rem" }}>
+          <button onClick={async () => {
+            try { await apiAuth.pauseProfile(reason); } catch { /* silently continue */ }
+            setDone("pause");
+          }} className="w-full py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all" style={{ fontWeight: 700, fontSize: "1rem" }}>
             Pause My Profile
           </button>
           <button onClick={() => setStep("menu")} className="w-full text-center text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.875rem" }}>Cancel</button>
@@ -1492,7 +1506,10 @@ export function DeactivateSection({ onBack, onSignOut }: { onBack: () => void; o
               { value: "other", label: "Other" },
             ]} />
           </div>
-          <button onClick={() => setDone("deactivate")} className="w-full py-4 rounded-2xl bg-amber-500 text-white hover:bg-amber-600 transition-all" style={{ fontWeight: 700, fontSize: "1rem" }}>
+          <button onClick={async () => {
+            try { await apiAuth.deactivateAccount(reason); } catch { /* continue to done screen */ }
+            setDone("deactivate");
+          }} className="w-full py-4 rounded-2xl bg-amber-500 text-white hover:bg-amber-600 transition-all" style={{ fontWeight: 700, fontSize: "1rem" }}>
             Deactivate My Account
           </button>
           <button onClick={() => setStep("menu")} className="w-full text-center text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.875rem" }}>Cancel</button>

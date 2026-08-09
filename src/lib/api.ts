@@ -409,6 +409,23 @@ export const auth = {
   adminForgotPassword: (email: string) =>
     post<{ detail: string }>("/api/auth/admin-forgot-password/", { email }),
 
+  pauseProfile: (reason?: string) =>
+    post<{ detail: string }>("/api/auth/pause/", { reason: reason ?? "" }),
+
+  resumeProfile: () =>
+    post<{ detail: string }>("/api/auth/resume/"),
+
+  deactivateAccount: (reason?: string) =>
+    post<{ detail: string }>("/api/auth/deactivate/", { reason: reason ?? "" }),
+
+  foundPartner: (data: {
+    partner_name?: string;
+    how_met?: string;
+    story?: string;
+    share?: boolean;
+    pause_after?: boolean;
+  }) => post<{ detail: string; paused: boolean }>("/api/auth/found-partner/", data),
+
   /**
    * Submit a suspension appeal.  Tries the dedicated appeal endpoint first;
    * falls back to creating a support ticket so the appeal always reaches staff.
