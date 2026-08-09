@@ -695,10 +695,21 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
   const milestones = useMemo(() => buildMilestones(plan, profileStrength, foundPartner ?? false), [plan, profileStrength, foundPartner]);
   const [homeArticles, setHomeArticles] = useState<import("../../lib/api").BlogArticle[]>([]);
   const [referralBonus, setReferralBonus] = useState<number>(10);
+  const [referralBonusNgn, setReferralBonusNgn] = useState<number>(5000);
+  const isNigerianHome = (() => {
+    try {
+      const r = localStorage.getItem("ma3moni_onboarding_progress");
+      const phone: string = r ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? "" : "";
+      return phone.startsWith("+234") || phone.startsWith("234");
+    } catch { return false; }
+  })();
   useEffect(() => {
     import("../../lib/api").then(({ blog, publicApi }) => {
       blog.articles().then(r => setHomeArticles(r.results.slice(0, 5))).catch(() => {});
-      publicApi.settings().then(s => { if (s?.referral_bonus_points) setReferralBonus(s.referral_bonus_points); }).catch(() => {});
+      publicApi.settings().then(s => {
+        if (s?.referral_bonus_points) setReferralBonus(s.referral_bonus_points);
+        if (s?.referral_bonus_ngn) setReferralBonusNgn(s.referral_bonus_ngn);
+      }).catch(() => {});
     });
   }, []);
 
@@ -844,7 +855,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
               : plan === "basic"
                 ? { icon: <Star size={18} />,     label: "My Subscription", sub: "Basic — upgrade to Premium for all features",         action: () => setSubView("subscription") }
                 : { icon: <Star size={18} />,     label: "My Subscription", sub: "Premium — you're on our top plan",                    action: () => setSubView("subscription") },
-            { icon: <Gift size={18} />, label: "Refer & Earn", sub: `Earn $${referralBonus} per referral`, action: () => setSubView("referral") },
+            { icon: <Gift size={18} />, label: "Refer & Earn", sub: `Earn ${isNigerianHome ? `₦${referralBonusNgn.toLocaleString()}` : `$${referralBonus}`} per referral`, action: () => setSubView("referral") },
           ].map(({ icon, label, sub, action }) => (
             <button key={label} onClick={action}
               className="bg-card rounded-2xl border border-border p-4 text-left hover:border-primary/20 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 transition-all">
@@ -1992,9 +2003,20 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
   const goalsSub    = [pf.marriageTimeline as string, pf.wantsChildren as string].filter(Boolean).join(" · ") || "Add life goals";
 
   const [referralBonus, setReferralBonus] = useState<number>(10);
+  const [referralBonusNgn, setReferralBonusNgn] = useState<number>(5000);
+  const isNigerianProfile = (() => {
+    try {
+      const r = localStorage.getItem("ma3moni_onboarding_progress");
+      const phone: string = r ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? "" : "";
+      return phone.startsWith("+234") || phone.startsWith("234");
+    } catch { return false; }
+  })();
   useEffect(() => {
     import("../../lib/api").then(({ publicApi }) =>
-      publicApi.settings().then(s => { if (s?.referral_bonus_points) setReferralBonus(s.referral_bonus_points); }).catch(() => {})
+      publicApi.settings().then(s => {
+        if (s?.referral_bonus_points) setReferralBonus(s.referral_bonus_points);
+        if (s?.referral_bonus_ngn) setReferralBonusNgn(s.referral_bonus_ngn);
+      }).catch(() => {})
     );
   }, []);
 
@@ -2071,7 +2093,7 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
 
   const ACCOUNT_ROWS: { icon: ReactNode; label: string; sub: string; view: SubView; color: string }[] = [
     { icon: <BookOpen size={15} />,label: "Guidance & Articles", sub: "Reading on values, faith & marriage", view: "blog-list",      color: "#6B9E78" },
-    { icon: <Gift size={15} />,    label: "Refer & Earn",    sub: `Earn $${referralBonus} per referral`, view: "referral",       color: "#C5733F" },
+    { icon: <Gift size={15} />,    label: "Refer & Earn",    sub: `Earn ${isNigerianProfile ? `₦${referralBonusNgn.toLocaleString()}` : `$${referralBonus}`} per referral`, view: "referral",       color: "#C5733F" },
     { icon: <Bell size={15} />,    label: "Notifications",   sub: "Manage your alerts",                 view: "notifications",    color: "#4A8DB8" },
     { icon: <Shield size={15} />,  label: "Privacy & Safety",sub: "Visibility, blocked users, data",    view: "privacy-safety",   color: "#0A6870" },
     { icon: <Flag size={15} />,    label: "Support & Appeals",sub: "Tickets, report status, appeals",   view: "support-center",   color: "#C5733F" },
@@ -3663,7 +3685,16 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
   const [copied, setCopied] = useState(false);
   const [apiStats, setApiStats] = useState<ReferralStats | null>(null);
   const [bonusPoints, setBonusPoints] = useState<number>(10);
+  const [bonusPointsNgn, setBonusPointsNgn] = useState<number>(5000);
   const [loading, setLoading] = useState(true);
+  const isNigerianReferral = (() => {
+    try {
+      const r = localStorage.getItem("ma3moni_onboarding_progress");
+      const phone: string = r ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? "" : "";
+      return phone.startsWith("+234") || phone.startsWith("234");
+    } catch { return false; }
+  })();
+  const bonusDisplay = isNigerianReferral ? `₦${bonusPointsNgn.toLocaleString()}` : `$${bonusPoints}`;
 
   useEffect(() => {
     Promise.all([
@@ -3672,6 +3703,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
     ]).then(([stats, settings]) => {
       if (stats) setApiStats(stats);
       if (settings?.referral_bonus_points) setBonusPoints(settings.referral_bonus_points);
+      if (settings?.referral_bonus_ngn) setBonusPointsNgn(settings.referral_bonus_ngn);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -3689,7 +3721,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
       try {
         await navigator.share({
           title: "Join Ma3moni — Marriage Platform",
-          text: `Use my referral code ${code} when you sign up and we both earn $${bonusPoints}!`,
+          text: `Use my referral code ${code} when you sign up and we both earn ${bonusDisplay}!`,
           url: shareUrl,
         });
         return;
@@ -3722,7 +3754,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
         <div className="bg-primary rounded-2xl p-6 text-white text-center mb-6">
           <Gift size={36} className="mx-auto mb-3 opacity-80" />
           <h2 style={{ fontWeight: 800, fontSize: "1.5rem" }}>
-            Earn ${bonusPoints} per referral
+            Earn {bonusDisplay} per referral
           </h2>
           <p style={{ fontSize: "0.9rem", opacity: 0.8, marginTop: 8 }}>
             Share your unique code with friends and earn when they subscribe.
@@ -3798,7 +3830,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
           {[
             { step: "1", text: "Share your code with friends looking for a partner" },
             { step: "2", text: "They sign up and enter your referral code" },
-            { step: "3", text: `When they subscribe, you earn $${bonusPoints} instantly` },
+            { step: "3", text: `When they subscribe, you earn ${bonusDisplay} instantly` },
           ].map(({ step, text }) => (
             <div key={step} className="flex items-start gap-3 mb-3 last:mb-0">
               <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">

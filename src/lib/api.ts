@@ -939,6 +939,7 @@ export const adminBlog = {
 // ═══════════════════════════════════════════════════════════════
 export interface PublicSettings {
   referral_bonus_points:   number;
+  referral_bonus_ngn?:     number;
   maintenance_mode:        boolean;
   max_daily_matches_free:  number;
   max_daily_matches_basic: number;
@@ -1068,6 +1069,7 @@ export interface PlatformSettings {
   max_photos:                   number;
   match_expiry_days:            number;
   referral_bonus_points:        number;
+  referral_bonus_ngn?:          number;
   maintenance_mode:             boolean;
   revenue_permission_for_admin: boolean;
   email_verification_enabled:   boolean;
