@@ -364,7 +364,7 @@ export const auth = {
     post<{ detail: string }>("/api/auth/forgot-password/", { email }),
 
   resetPassword: (token: string, new_password: string) =>
-    post<{ detail: string }>("/api/auth/reset-password/", { token, new_password }),
+    post<{ detail: string }>("/api/auth/reset-password/", { token, password: new_password }),
 
   changePassword: (old_password: string, new_password: string) =>
     post<{ detail: string }>("/api/auth/change-password/", { old_password, new_password }),
