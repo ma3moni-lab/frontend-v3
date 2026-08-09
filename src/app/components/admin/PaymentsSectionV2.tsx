@@ -356,15 +356,49 @@ function CredoSettingsPanel() {
       {/* Environment */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
         <h3 className="font-bold text-sm flex items-center gap-2"><Settings2 size={15} /> Environment & Channels</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Environment</label>
-            <select className={inpPlain} value={form.environment}
-              onChange={e => f("environment", e.target.value as "production" | "sandbox")}>
-              <option value="production">Production (live)</option>
-              <option value="sandbox">Sandbox (testing)</option>
-            </select>
+
+        {/* Environment cards */}
+        <div className="grid grid-cols-2 gap-3">
+          {(["sandbox", "production"] as const).map(env => (
+            <button
+              key={env}
+              type="button"
+              onClick={() => f("environment", env)}
+              className={`text-left rounded-xl border-2 px-4 py-3 transition-all ${
+                form.environment === env
+                  ? env === "sandbox"
+                    ? "border-amber-400 bg-amber-50"
+                    : "border-teal-600 bg-teal-50"
+                  : "border-gray-100 bg-gray-50 hover:border-gray-300"
+              }`}
+            >
+              <div className="font-bold text-sm">
+                {env === "sandbox" ? "🧪 Sandbox" : "🚀 Production"}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {env === "sandbox"
+                  ? "Test keys · api.credodemo.com · no real charges"
+                  : "Live keys · api.credocentral.com · real payments"}
+              </div>
+              <div className="text-xs font-mono text-gray-400 mt-1">
+                {env === "sandbox" ? "https://api.credodemo.com" : "https://api.credocentral.com"}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {form.environment === "sandbox" && (
+          <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <strong>Sandbox mode:</strong> Enter your Credo <em>test</em> keys (from Credo dashboard → Sandbox). Transactions are simulated — no real money moves. Switch to Production when going live.
           </div>
+        )}
+        {form.environment === "production" && (
+          <div className="text-xs text-teal-800 bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+            <strong>Production mode:</strong> Enter your Credo <em>live</em> keys (from Credo dashboard → API Keys). Real charges will be processed. Ensure keys match the environment.
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Transaction fee bearer</label>
             <select className={inpPlain} value={form.bearer}
@@ -373,20 +407,12 @@ function CredoSettingsPanel() {
               <option value="1">1 — Customer pays fee</option>
             </select>
           </div>
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Payment channels (comma-separated)</label>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Payment channels</label>
             <input className={inpPlain} value={form.channels}
               placeholder="CARD,BANK"
               onChange={e => f("channels", e.target.value)} />
-            <p className="text-xs text-gray-400 mt-1">e.g. CARD,BANK — enables those Credo checkout methods</p>
-          </div>
-          {/* API URL — read-only, derived from environment */}
-          <div className="col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">API URL (auto-configured)</label>
-            <div className="w-full px-3 py-2 rounded-lg border border-gray-100 bg-gray-50 text-sm font-mono text-gray-500">
-              {cfg?.api_url || (form.environment === "sandbox" ? "https://api.credodemo.com" : "https://api.credocentral.com")}
-            </div>
-            <p className="text-xs text-gray-400 mt-1">Auto-set from Environment — override via CREDO_API_URL env var only if needed.</p>
+            <p className="text-xs text-gray-400 mt-1">CARD, BANK, USSD, WALLET</p>
           </div>
         </div>
       </div>
@@ -395,15 +421,18 @@ function CredoSettingsPanel() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
         <h3 className="font-bold text-sm flex items-center gap-2">
           <span>🔑</span> API Keys
-          <span className="ml-auto text-xs text-gray-400 font-normal">dashboard.credocentral.com → Settings → API Keys</span>
+          <span className="ml-auto text-xs text-gray-400 font-normal">
+            {form.environment === "sandbox" ? "Credo Dashboard → Sandbox → API Keys" : "Credo Dashboard → API Keys"}
+          </span>
         </h3>
-        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-          Credo does <strong>not</strong> require a Merchant ID — authentication uses Public Key + Secret Key only.
+        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <strong>Key pairing rule:</strong> Sandbox keys only work on Sandbox · Live keys only work on Production. Mixing them causes a 401 error.
         </p>
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Public key</label>
-            <input className={inp} value={form.public_key} placeholder="0PUB…"
+            <input className={inp} value={form.public_key}
+              placeholder={form.environment === "sandbox" ? "test_pk_… (from Credo Sandbox)" : "pk_live_… (from Credo Production)"}
               onChange={e => f("public_key", e.target.value)} />
           </div>
           <div>
@@ -411,7 +440,7 @@ function CredoSettingsPanel() {
               Secret key {cfg?.secret_key_set && <span className="text-green-600">(currently set ✓)</span>}
             </label>
             <input type="password" className={inp} value={form.secret_key}
-              placeholder={cfg?.secret_key_set ? "Leave blank to keep existing key" : "sk_live_…"}
+              placeholder={cfg?.secret_key_set ? "Leave blank to keep existing key" : form.environment === "sandbox" ? "test_sk_… (from Credo Sandbox)" : "sk_live_… (from Credo Production)"}
               onChange={e => f("secret_key", e.target.value)} />
             <p className="text-xs text-red-500/80 mt-1">Never share this key. It never appears in responses — only a "set / not set" indicator is returned.</p>
           </div>
@@ -420,7 +449,7 @@ function CredoSettingsPanel() {
               Webhook signing secret {cfg?.webhook_secret_set && <span className="text-green-600">(currently set ✓)</span>}
             </label>
             <input type="password" className={inp} value={form.webhook_secret}
-              placeholder={cfg?.webhook_secret_set ? "Leave blank to keep existing secret" : "whsec_…"}
+              placeholder={cfg?.webhook_secret_set ? "Leave blank to keep existing secret" : "whsec_… (generated in Credo → Webhooks)"}
               onChange={e => f("webhook_secret", e.target.value)} />
           </div>
         </div>

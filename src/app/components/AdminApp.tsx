@@ -3070,6 +3070,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     publicKey:     "",
     secretKey:     "",
     webhookSecret: "",
+    environment:   "sandbox" as "sandbox" | "production",
   });
   const [credoSaved, setCredoSaved] = useState({ secretKeySet: false, webhookSecretSet: false });
   const [credoSaving, setCredoSaving] = useState(false);
@@ -3097,7 +3098,8 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         // Pre-fill non-secret Credo fields; show masked indicator for secrets
         setCredoKeys(prev => ({
           ...prev,
-          publicKey:  s.credo_public_key  ?? "",
+          publicKey:   s.credo_public_key   ?? "",
+          environment: (s.credo_environment as "sandbox" | "production") ?? "sandbox",
         }));
         setCredoSaved({
           secretKeySet:     s.credo_secret_key_set     ?? false,
@@ -3153,6 +3155,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     setCredoSaving(true);
     try {
       const payload: Record<string, string> = {};
+      payload.credo_environment                                        = credoKeys.environment;
       if (credoKeys.publicKey.trim())     payload.credo_public_key     = credoKeys.publicKey.trim();
       if (credoKeys.secretKey.trim())     payload.credo_secret_key     = credoKeys.secretKey.trim();
       if (credoKeys.webhookSecret.trim()) payload.credo_webhook_secret = credoKeys.webhookSecret.trim();
@@ -3387,30 +3390,65 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
 
         {/* Payment Gateway — Credo by eTranzact */}
         {isSuperAdmin && (
-          <div className="bg-card rounded-2xl border border-border p-4">
-            <div className="flex items-center gap-3 mb-1">
+          <div className="bg-card rounded-2xl border border-border p-4 space-y-5">
+            <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <CreditCard size={18} className="text-primary" />
               </div>
               <div>
                 <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Payment Gateway — Credo by eTranzact</h3>
-                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Keys are stored securely in the database. Secret keys are write-only and never returned after saving.</p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Secret keys are write-only and never returned after saving.</p>
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-1 gap-4">
+            {/* Environment toggle */}
+            <div>
+              <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Environment</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["sandbox", "production"] as const).map(env => (
+                  <button
+                    key={env}
+                    type="button"
+                    onClick={() => setCredoKeys(p => ({ ...p, environment: env }))}
+                    className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                      credoKeys.environment === env
+                        ? env === "sandbox"
+                          ? "border-amber-400 bg-amber-50 text-amber-900"
+                          : "border-primary bg-primary/5 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/30"
+                    }`}
+                  >
+                    <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>
+                      {env === "sandbox" ? "🧪 Sandbox" : "🚀 Production"}
+                    </span>
+                    <span style={{ fontSize: "0.75rem", marginTop: "2px" }}>
+                      {env === "sandbox"
+                        ? "Test keys · api.credodemo.com · no real charges"
+                        : "Live keys · api.credocentral.com · real payments"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                {credoKeys.environment === "sandbox"
+                  ? "Use your Credo sandbox/test keys below. Find them at dashboard.credocentral.com → Sandbox."
+                  : "Use your Credo live keys below. Find them at dashboard.credocentral.com → API Keys."}
+              </p>
+            </div>
+
+            {/* Key fields */}
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Public Key</label>
+                <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                  Public Key
+                </label>
                 <input
                   value={credoKeys.publicKey}
                   onChange={e => setCredoKeys(p => ({ ...p, publicKey: e.target.value }))}
-                  placeholder="pk_live_xxxxxxxxxxxx"
+                  placeholder={credoKeys.environment === "sandbox" ? "test_pk_…" : "pk_live_…"}
                   className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
                   style={{ fontSize: "0.8125rem" }}
                 />
-                <p className="mt-1 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
-                  Credo uses Public Key + Secret Key only — no Merchant ID required.
-                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -3424,7 +3462,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
                     type="password"
                     value={credoKeys.secretKey}
                     onChange={e => setCredoKeys(p => ({ ...p, secretKey: e.target.value }))}
-                    placeholder={credoSaved.secretKeySet ? "Leave blank to keep existing key" : "sk_live_xxxxxxxxxxxx"}
+                    placeholder={credoSaved.secretKeySet ? "Leave blank to keep" : credoKeys.environment === "sandbox" ? "test_sk_…" : "sk_live_…"}
                     className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
                     style={{ fontSize: "0.8125rem" }}
                     autoComplete="new-password"
@@ -3441,29 +3479,37 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
                     type="password"
                     value={credoKeys.webhookSecret}
                     onChange={e => setCredoKeys(p => ({ ...p, webhookSecret: e.target.value }))}
-                    placeholder={credoSaved.webhookSecretSet ? "Leave blank to keep existing secret" : "whsec_xxxxxxxxxxxx"}
+                    placeholder={credoSaved.webhookSecretSet ? "Leave blank to keep" : "whsec_…"}
                     className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
                     style={{ fontSize: "0.8125rem" }}
                     autoComplete="new-password"
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-border">
-                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
-                  Callback URL: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground" style={{ fontSize: "0.75rem" }}>/payment/verify</code>
-                  &nbsp;·&nbsp;
-                  Webhook URL: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground" style={{ fontSize: "0.75rem" }}>/api/payments/webhook/credo/</code>
-                </p>
-                <button
-                  onClick={saveCredoKeys}
-                  disabled={credoSaving}
-                  className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors flex-shrink-0 ml-4"
-                  style={{ fontSize: "0.875rem", fontWeight: 600 }}
-                >
-                  {credoSaving ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Save Keys"}
-                </button>
-              </div>
+            {/* URLs reference */}
+            <div className="bg-muted/50 rounded-xl p-3 space-y-1.5" style={{ fontSize: "0.75rem" }}>
+              <p className="font-semibold text-foreground">Credo dashboard — paste these URLs:</p>
+              <p className="text-muted-foreground">
+                <span className="font-semibold">Callback URL:</span>{" "}
+                <code className="bg-card px-1.5 py-0.5 rounded border border-border text-foreground">https://ma3moni-backend26.onrender.com/api/payments/credo/callback/</code>
+              </p>
+              <p className="text-muted-foreground">
+                <span className="font-semibold">Webhook URL:</span>{" "}
+                <code className="bg-card px-1.5 py-0.5 rounded border border-border text-foreground">https://ma3moni-backend26.onrender.com/api/payments/credo/webhook/</code>
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button
+                onClick={saveCredoKeys}
+                disabled={credoSaving}
+                className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                style={{ fontSize: "0.875rem", fontWeight: 600 }}
+              >
+                {credoSaving ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Save Settings"}
+              </button>
             </div>
           </div>
         )}
