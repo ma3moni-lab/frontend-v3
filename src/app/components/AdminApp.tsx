@@ -3069,7 +3069,6 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
   const [credoKeys, setCredoKeys] = useState({
     publicKey:     "",
     secretKey:     "",
-    merchantId:    "",
     webhookSecret: "",
   });
   const [credoSaved, setCredoSaved] = useState({ secretKeySet: false, webhookSecretSet: false });
@@ -3099,7 +3098,6 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         setCredoKeys(prev => ({
           ...prev,
           publicKey:  s.credo_public_key  ?? "",
-          merchantId: s.credo_merchant_id ?? "",
         }));
         setCredoSaved({
           secretKeySet:     s.credo_secret_key_set     ?? false,
@@ -3156,7 +3154,6 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     try {
       const payload: Record<string, string> = {};
       if (credoKeys.publicKey.trim())     payload.credo_public_key     = credoKeys.publicKey.trim();
-      if (credoKeys.merchantId.trim())    payload.credo_merchant_id    = credoKeys.merchantId.trim();
       if (credoKeys.secretKey.trim())     payload.credo_secret_key     = credoKeys.secretKey.trim();
       if (credoKeys.webhookSecret.trim()) payload.credo_webhook_secret = credoKeys.webhookSecret.trim();
       const updated = await adminApi.updateSettings(payload);
@@ -3402,27 +3399,18 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Public Key</label>
-                  <input
-                    value={credoKeys.publicKey}
-                    onChange={e => setCredoKeys(p => ({ ...p, publicKey: e.target.value }))}
-                    placeholder="pk_live_xxxxxxxxxxxx"
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
-                    style={{ fontSize: "0.8125rem" }}
-                  />
-                </div>
-                <div>
-                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Merchant ID</label>
-                  <input
-                    value={credoKeys.merchantId}
-                    onChange={e => setCredoKeys(p => ({ ...p, merchantId: e.target.value }))}
-                    placeholder="MER_xxxxxxxxxxxx"
-                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
-                    style={{ fontSize: "0.8125rem" }}
-                  />
-                </div>
+              <div>
+                <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Public Key</label>
+                <input
+                  value={credoKeys.publicKey}
+                  onChange={e => setCredoKeys(p => ({ ...p, publicKey: e.target.value }))}
+                  placeholder="pk_live_xxxxxxxxxxxx"
+                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                  style={{ fontSize: "0.8125rem" }}
+                />
+                <p className="mt-1 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                  Credo uses Public Key + Secret Key only — no Merchant ID required.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

@@ -868,6 +868,15 @@ export function UsersSectionV2() {
   const [apiError, setApiError]   = useState<string | null>(null);
   const [apiLoading, setApiLoading] = useState(true);
 
+  // Filter panel
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "suspended" | "pending">("all");
+  const [filterGender, setFilterGender] = useState<"all" | "male" | "female">("all");
+  const [filterSub, setFilterSub] = useState<"all" | "free" | "basic" | "premium">("all");
+  const [filterVerified, setFilterVerified] = useState<"all" | "yes" | "no">("all");
+
+  const activeFiltersCount = [filterStatus, filterGender, filterSub, filterVerified].filter(v => v !== "all").length;
+
   useEffect(() => {
     loadUsers();
   }, []);
@@ -930,11 +939,16 @@ export function UsersSectionV2() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const base = q
+    let base = q
       ? liveUsers.filter(u =>
           u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
         )
       : liveUsers;
+    if (filterStatus !== "all") base = base.filter(u => u.status === filterStatus);
+    if (filterGender  !== "all") base = base.filter(u => u.gender === filterGender);
+    if (filterSub     !== "all") base = base.filter(u => u.subscription === filterSub);
+    if (filterVerified === "yes") base = base.filter(u => u.verified);
+    if (filterVerified === "no")  base = base.filter(u => !u.verified);
     return [...base].sort((a, b) => {
       let cmp = 0;
       if (sortKey === "name") cmp = a.name.localeCompare(b.name);
@@ -942,7 +956,7 @@ export function UsersSectionV2() {
       else if (sortKey === "joined") cmp = new Date(a.joined).getTime() - new Date(b.joined).getTime();
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [liveUsers, search, sortKey, sortDir]);
+  }, [liveUsers, search, sortKey, sortDir, filterStatus, filterGender, filterSub, filterVerified]);
 
   const toggleSelect = (id: string) =>
     setSelected(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
@@ -1026,15 +1040,79 @@ export function UsersSectionV2() {
         )}
 
         {/* Toolbar */}
-        <div className="flex gap-3 mb-4 flex-shrink-0">
+        <div className="flex gap-3 mb-2 flex-shrink-0">
           <div className="flex-1 flex items-center gap-2 bg-card border border-border rounded-xl px-4">
             <Search size={14} className="text-muted-foreground" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name or email…" className="flex-1 py-2.5 bg-transparent focus:outline-none" style={{ fontSize: "0.875rem" }} />
+            {search && <button onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground"><X size={13} /></button>}
           </div>
-          <button className="flex items-center gap-1.5 bg-card border border-border px-4 py-2.5 rounded-xl hover:border-primary/30 transition-colors text-muted-foreground" style={{ fontSize: "0.875rem" }}>
+          <button
+            onClick={() => setShowFilterPanel(v => !v)}
+            className={`relative flex items-center gap-1.5 px-4 py-2.5 rounded-xl border transition-colors ${showFilterPanel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:border-primary/30 text-muted-foreground"}`}
+            style={{ fontSize: "0.875rem" }}
+          >
             <Filter size={13} /> Filter
+            {activeFiltersCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-white flex items-center justify-center" style={{ fontSize: "0.6rem", fontWeight: 700 }}>
+                {activeFiltersCount}
+              </span>
+            )}
           </button>
         </div>
+
+        {/* Filter panel */}
+        {showFilterPanel && (
+          <div className="mb-4 p-4 bg-card border border-border rounded-xl flex-shrink-0 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div>
+              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Status</label>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as typeof filterStatus)}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Gender</label>
+              <select value={filterGender} onChange={e => setFilterGender(e.target.value as typeof filterGender)}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="all">All genders</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Subscription</label>
+              <select value={filterSub} onChange={e => setFilterSub(e.target.value as typeof filterSub)}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="all">All plans</option>
+                <option value="free">Free</option>
+                <option value="basic">Basic</option>
+                <option value="premium">Premium</option>
+              </select>
+            </div>
+            <div>
+              <label className="block mb-1" style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--muted-foreground)" }}>Verified</label>
+              <select value={filterVerified} onChange={e => setFilterVerified(e.target.value as typeof filterVerified)}
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
+                <option value="all">All</option>
+                <option value="yes">Verified</option>
+                <option value="no">Unverified</option>
+              </select>
+            </div>
+            {activeFiltersCount > 0 && (
+              <div className="col-span-2 sm:col-span-4 flex justify-end">
+                <button
+                  onClick={() => { setFilterStatus("all"); setFilterGender("all"); setFilterSub("all"); setFilterVerified("all"); }}
+                  className="text-xs text-destructive hover:text-destructive/80 font-semibold flex items-center gap-1"
+                >
+                  <X size={11} /> Clear all filters
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bulk action bar */}
         {selected.length > 0 && (

@@ -1242,8 +1242,8 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
       const matchGender = (m as MatchItem & { gender?: string }).gender;
       if (matchGender && matchGender !== oppositeGender) return false;
     }
-    // "best" = high compatibility; "new" = not yet expressed interest
-    if (filter === "high" && m.score < 88) return false;
+    // "best" = high compatibility (≥75%); "new" = not yet expressed interest
+    if (filter === "high" && m.score < 75) return false;
     if (filter === "new" && sentInterests.includes(m.id)) return false;
     if (canFilter) {
       if (m.age < adv.minAge || m.age > adv.maxAge) return false;
@@ -1260,7 +1260,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   const limitReached = dailyLimit !== Infinity && filtered.length > dailyLimit;
 
   // ── Profile completion gate (after all hooks) ──────────────────────────────
-  if (profileStrength < 100) {
+  if (profileStrength < 70) {
     const circ = 2 * Math.PI * 45;
     const offset = circ - (profileStrength / 100) * circ;
     const remaining = incompleteFields.length;
@@ -1383,8 +1383,33 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
 
   const persistAdv = (next: typeof adv) => { try { sessionStorage.setItem("ma3_madv", JSON.stringify(next)); } catch {} setAdv(next); };
   const persistFilter = (f: "all" | "high" | "new") => { try { sessionStorage.setItem("ma3_mfilter", f); } catch {} setFilter(f); };
-  const resetAdv = () => persistAdv({ minAge: 18, maxAge: 60, country: "any", minRelig: 0 });
+  const resetAdv = () => { persistAdv({ minAge: 18, maxAge: 60, country: "any", minRelig: 0 }); persistFilter("all"); setPassed([]); };
   const sc = (s: number) => s >= 90 ? "#0A6870" : s >= 85 ? "#C5733F" : "#68747F";
+
+  // Show a loading skeleton while waiting for the first API response
+  if (matchesList === undefined) {
+    return (
+      <div className="flex flex-col h-full bg-background">
+        <div className="px-5 pt-5 pb-3 border-b border-border bg-card flex-shrink-0">
+          <h2 style={{ fontWeight: 800, fontSize: "1.125rem" }}>Discover Matches</h2>
+        </div>
+        <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+          {[1,2,3].map(i => (
+            <div key={i} className="rounded-2xl border border-border bg-card p-4 animate-pulse space-y-3">
+              <div className="flex gap-3">
+                <div className="w-14 h-14 rounded-xl bg-muted" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 bg-muted rounded w-1/3" />
+                  <div className="h-3 bg-muted rounded w-1/2" />
+                  <div className="h-3 bg-muted rounded w-1/4" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-6">
@@ -1604,7 +1629,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
               Try widening your criteria or reset your passes.
             </p>
             <button
-              onClick={() => { setPassed([]); resetAdv(); setFilter("all"); }}
+              onClick={() => resetAdv()}
               className="mt-4 text-primary hover:text-primary/80 transition-colors"
               style={{ fontSize: "0.875rem", fontWeight: 600 }}>
               Reset everything
@@ -3496,8 +3521,9 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
         setCheckout({ currency: res.currency ?? currency, country: res.country ?? "", amount: res.amount ?? 0 });
         setPaying(true);
       }
-    } catch {
-      toast.error("Could not initiate payment. Please try again.");
+    } catch (err) {
+      const detail = (err as { data?: { detail?: string } })?.data?.detail;
+      toast.error(detail ?? "Could not initiate payment. Please check your connection and try again.");
     } finally {
       setInitiating(false);
     }
@@ -3546,16 +3572,15 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
             <span style={{ fontSize: "0.75rem" }}>Secured by Credo · 256-bit SSL encryption</span>
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
               const tier = selected as "basic" | "premium";
-              onUpgrade(tier);
-              toast.success(`You're now on the ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan!`);
+              await onUpgrade(tier);
               onBack();
             }}
             className="w-full bg-primary text-primary-foreground py-4 rounded-2xl hover:bg-primary/90 transition-all active:scale-[0.98]"
             style={{ fontWeight: 700, fontSize: "1rem" }}
           >
-            Pay Securely with Credo
+            Confirm &amp; Activate Plan
           </button>
         </div>
       </div>
