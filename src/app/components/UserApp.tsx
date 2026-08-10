@@ -4837,22 +4837,27 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const _initGender = (() => { try { const r = localStorage.getItem("ma3moni_onboarding_progress"); return r ? (JSON.parse(r) as { form: Record<string,string> }).form?.gender ?? "" : ""; } catch { return ""; } })();
   const _initMocks  = genderAwareMocks(_initGender);
 
-  const CONV_CACHE_KEY    = "ma3moni_conv_cache";
-  const MATCHES_CACHE_KEY = "ma3_matches_cache";
-  const NOTIF_CACHE_KEY   = "ma3_notifs_cache";
+  // Cache keys are scoped to the logged-in user so switching accounts on the
+  // same browser never bleeds one user's matches/conversations into another's.
+  const _cacheUid         = (() => { try { return localStorage.getItem("ma3_uid") ?? "anon"; } catch { return "anon"; } })();
+  const CONV_CACHE_KEY    = `ma3_conv_${_cacheUid}`;
+  const MATCHES_CACHE_KEY = `ma3_matches_${_cacheUid}`;
+  const NOTIF_CACHE_KEY   = `ma3_notifs_${_cacheUid}`;
 
   // undefined = still waiting for first response (shows skeleton); [] = loaded empty; [...] = real data
   // Initialise from cache so returning users see their last known matches instantly.
   const [liveMatches, setLiveMatches] = useState<MatchItem[] | undefined>(() => {
     try {
-      const raw = localStorage.getItem("ma3_matches_cache");
+      const uid = localStorage.getItem("ma3_uid") ?? "anon";
+      const raw = localStorage.getItem(`ma3_matches_${uid}`);
       return raw ? (JSON.parse(raw) as MatchItem[]) : undefined;
     } catch { return undefined; }
   });
   // Boot conversations from localStorage cache so the list renders instantly on launch
   const [liveConversations, setLiveConversations] = useState<ConvItem[]>(() => {
     try {
-      const raw = localStorage.getItem(CONV_CACHE_KEY);
+      const uid = localStorage.getItem("ma3_uid") ?? "anon";
+      const raw = localStorage.getItem(`ma3_conv_${uid}`);
       return raw ? (JSON.parse(raw) as ConvItem[]) : [];
     } catch { return []; }
   });
@@ -5058,7 +5063,8 @@ export function UserApp({ onSignOut }: UserAppProps) {
   // Initialise from cache so the bell badge and notification list render instantly.
   const [notifItems, setNotifItems] = useState<NotifItem[]>(() => {
     try {
-      const raw = localStorage.getItem("ma3_notifs_cache");
+      const uid = localStorage.getItem("ma3_uid") ?? "anon";
+      const raw = localStorage.getItem(`ma3_notifs_${uid}`);
       return raw ? (JSON.parse(raw) as NotifItem[]) : [];
     } catch { return []; }
   });
