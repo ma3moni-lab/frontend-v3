@@ -66,6 +66,26 @@ type SubView =
 const p = (id: string, w = 600, h = 750) =>
   `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&auto=format`;
 
+/**
+ * Resolve the user's display currency without a network call.
+ * Priority: (1) API-confirmed value cached in localStorage, (2) phone prefix.
+ * UpgradeView writes "ma3_currency" whenever it gets a confirmed value from
+ * the subscription-status API, so subsequent renders are always accurate.
+ */
+function getStoredCurrency(): "NGN" | "USD" {
+  try {
+    const cached = localStorage.getItem("ma3_currency");
+    if (cached === "NGN" || cached === "USD") return cached;
+    const r = localStorage.getItem("ma3moni_onboarding_progress");
+    const phone: string = r
+      ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? ""
+      : "";
+    return phone.startsWith("+234") || phone.startsWith("234") ? "NGN" : "USD";
+  } catch {
+    return "USD";
+  }
+}
+
 /** Calculate age from a DOB string (YYYY-MM-DD or YYYY) — returns null if unknown/zero */
 function calcAge(dob: string | null | undefined): number | null {
   if (!dob) return null;
@@ -431,23 +451,29 @@ const NOTIFICATIONS = [
   { id: "n5", type: "referral",targetId: "",   text: "Your referral Khalid A. joined Ma3moni! You've earned $10",         time: "1d ago",    read: true  },
 ];
 
-const PLANS = [
-  {
-    id: "free", name: "Free", price: "$0", period: "", highlight: false,
-    features: ["View 2 matches/day", "Basic profile", "Limited messaging"],
-    cta: "Current Plan",
-  },
-  {
-    id: "basic", name: "Basic", price: "$19", period: "/month", highlight: false,
-    features: ["View 5 matches/day", "Full profile features", "Unlimited messaging", "Read receipts"],
-    cta: "Upgrade",
-  },
-  {
-    id: "premium", name: "Premium", price: "$49", period: "/month", highlight: true,
-    features: ["Unlimited matches", "Priority visibility", "Advanced filters", "Profile boost", "Dedicated support"],
-    cta: "Go Premium",
-  },
-];
+// Plan fallback prices — symbol is determined at runtime so a Nigerian user
+// never briefly sees a dollar sign while waiting for the API response.
+function makePlans(sym: "₦" | "$") {
+  const ngn = sym === "₦";
+  return [
+    {
+      id: "free", name: "Free", price: `${sym}0`, period: "", highlight: false,
+      features: ["View 2 matches/day", "Basic profile", "Limited messaging"],
+      cta: "Current Plan",
+    },
+    {
+      id: "basic", name: "Basic", price: ngn ? "₦—" : "$19", period: "/month", highlight: false,
+      features: ["View 5 matches/day", "Full profile features", "Unlimited messaging", "Read receipts"],
+      cta: "Upgrade",
+    },
+    {
+      id: "premium", name: "Premium", price: ngn ? "₦—" : "$49", period: "/month", highlight: true,
+      features: ["Unlimited matches", "Priority visibility", "Advanced filters", "Profile boost", "Dedicated support"],
+      cta: "Go Premium",
+    },
+  ];
+}
+const PLANS = makePlans("$");
 
 // ── API → local shape mappers ─────────────────────────────
 type MatchItem    = typeof MATCHES[0];
@@ -696,13 +722,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
   const [homeArticles, setHomeArticles] = useState<import("../../lib/api").BlogArticle[]>([]);
   const [referralBonus, setReferralBonus] = useState<number>(10);
   const [referralBonusNgn, setReferralBonusNgn] = useState<number>(5000);
-  const isNigerianHome = (() => {
-    try {
-      const r = localStorage.getItem("ma3moni_onboarding_progress");
-      const phone: string = r ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? "" : "";
-      return phone.startsWith("+234") || phone.startsWith("234");
-    } catch { return false; }
-  })();
+  const isNigerianHome = getStoredCurrency() === "NGN";
   useEffect(() => {
     import("../../lib/api").then(({ blog, publicApi }) => {
       blog.articles().then(r => setHomeArticles(r.results.slice(0, 5))).catch(() => {});
@@ -2004,13 +2024,7 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
 
   const [referralBonus, setReferralBonus] = useState<number>(10);
   const [referralBonusNgn, setReferralBonusNgn] = useState<number>(5000);
-  const isNigerianProfile = (() => {
-    try {
-      const r = localStorage.getItem("ma3moni_onboarding_progress");
-      const phone: string = r ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? "" : "";
-      return phone.startsWith("+234") || phone.startsWith("234");
-    } catch { return false; }
-  })();
+  const isNigerianProfile = getStoredCurrency() === "NGN";
   useEffect(() => {
     import("../../lib/api").then(({ publicApi }) =>
       publicApi.settings().then(s => {
@@ -3508,15 +3522,18 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
   // Checkout summary filled once backend responds to create()
   const [checkout, setCheckout] = useState<{ currency: string; country: string; amount: number } | null>(null);
 
-  // Currency detected from backend (profile.location_country → phone → USD)
-  const [currency, setCurrency] = useState<"NGN" | "USD">("USD");
-  const [livePlans, setLivePlans] = useState(PLANS);
+  // Currency: start from localStorage so the correct symbol shows immediately,
+  // then confirm (and update the cache) once the subscription-status API responds.
+  const initCurrency = getStoredCurrency();
+  const [currency, setCurrency] = useState<"NGN" | "USD">(initCurrency);
+  const [livePlans, setLivePlans] = useState(() => makePlans(initCurrency === "NGN" ? "₦" : "$"));
 
   useEffect(() => {
     import("../../lib/api").then(({ subscriptions: subApi }) => {
       Promise.all([subApi.plans(), subApi.status().catch(() => null)]).then(([apiPlans, status]) => {
-        const detected = ((status as { currency?: string } | null)?.currency ?? "USD") as "NGN" | "USD";
+        const detected = ((status as { currency?: string } | null)?.currency ?? initCurrency) as "NGN" | "USD";
         setCurrency(detected);
+        try { localStorage.setItem("ma3_currency", detected); } catch {}
         setLivePlans(PLANS.map(p => {
           const live = apiPlans.find((a: { name: string }) => a.name === p.id);
           if (!live) return p;
@@ -3687,13 +3704,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
   const [bonusPoints, setBonusPoints] = useState<number>(10);
   const [bonusPointsNgn, setBonusPointsNgn] = useState<number>(5000);
   const [loading, setLoading] = useState(true);
-  const isNigerianReferral = (() => {
-    try {
-      const r = localStorage.getItem("ma3moni_onboarding_progress");
-      const phone: string = r ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? "" : "";
-      return phone.startsWith("+234") || phone.startsWith("234");
-    } catch { return false; }
-  })();
+  const isNigerianReferral = getStoredCurrency() === "NGN";
   const bonusDisplay = isNigerianReferral ? `₦${bonusPointsNgn.toLocaleString()}` : `$${bonusPoints}`;
 
   useEffect(() => {
@@ -3797,7 +3808,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
           ) : [
             { value: String(apiStats?.total_signups ?? 0),           label: "Signups" },
             { value: String(apiStats?.total_converted ?? 0),         label: "Converted" },
-            { value: `$${apiStats?.total_points ?? 0}`,               label: "Earned" },
+            { value: isNigerianReferral ? `₦${(apiStats?.total_points ?? 0).toLocaleString()}` : `$${apiStats?.total_points ?? 0}`, label: "Earned" },
           ].map(({ value, label }) => (
             <div key={label} className="bg-card rounded-2xl border border-border p-4 text-center">
               <p style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--primary)" }}>{value}</p>
