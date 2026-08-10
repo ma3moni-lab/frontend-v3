@@ -713,7 +713,7 @@ function HomeTab({ onOpenMatch, onOpenChat, onOpenNotif, setSubView, setTab, onO
 }) {
   const [showJourney, setShowJourney] = useState(false);
   const activeConvs = useMemo(() => {
-    const all = (conversations ?? CONVERSATIONS).filter(c => c.status === "active");
+    const all = (conversations ?? []).filter(c => c.status === "active");
     // Deduplicate by partnerId — only show the most recent conversation per partner.
     const seen = new Set<string>();
     return all.filter(c => { if (seen.has(c.partnerId)) return false; seen.add(c.partnerId); return true; }).slice(0, 2);
@@ -1237,7 +1237,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   onCompleteProfile?: (section: SubView) => void;
 }) {
   // ── All hooks must be declared before any conditional return (Rules of Hooks) ──
-  const DATA = matchesList ?? MATCHES;
+  const DATA = matchesList ?? [];
 
   // Persist filter state in sessionStorage so it survives tab switches
   const [filter, setFilter] = useState<"all" | "high" | "new">(() => {
@@ -4837,10 +4837,18 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const _initGender = (() => { try { const r = localStorage.getItem("ma3moni_onboarding_progress"); return r ? (JSON.parse(r) as { form: Record<string,string> }).form?.gender ?? "" : ""; } catch { return ""; } })();
   const _initMocks  = genderAwareMocks(_initGender);
 
-  const CONV_CACHE_KEY = "ma3moni_conv_cache";
+  const CONV_CACHE_KEY    = "ma3moni_conv_cache";
+  const MATCHES_CACHE_KEY = "ma3_matches_cache";
+  const NOTIF_CACHE_KEY   = "ma3_notifs_cache";
 
-  // undefined = not yet loaded (shows mock data); [] = loaded but empty; [...] = real data
-  const [liveMatches,       setLiveMatches]       = useState<MatchItem[] | undefined>(undefined);
+  // undefined = still waiting for first response (shows skeleton); [] = loaded empty; [...] = real data
+  // Initialise from cache so returning users see their last known matches instantly.
+  const [liveMatches, setLiveMatches] = useState<MatchItem[] | undefined>(() => {
+    try {
+      const raw = localStorage.getItem("ma3_matches_cache");
+      return raw ? (JSON.parse(raw) as MatchItem[]) : undefined;
+    } catch { return undefined; }
+  });
   // Boot conversations from localStorage cache so the list renders instantly on launch
   const [liveConversations, setLiveConversations] = useState<ConvItem[]>(() => {
     try {
@@ -4969,8 +4977,13 @@ export function UserApp({ onSignOut }: UserAppProps) {
   // ── Bootstrap: fetch live data on mount ──────────────────────
   useEffect(() => {
     matchesApi.discover().then(res => {
-      setLiveMatches(res.results.map(mapApiMatch));
-    }).catch(() => { setLiveMatches([]); });
+      const mapped = res.results.map(mapApiMatch);
+      setLiveMatches(mapped);
+      try { localStorage.setItem(MATCHES_CACHE_KEY, JSON.stringify(mapped)); } catch {}
+    }).catch(() => {
+      // Keep cached data if available; only fall to empty if there's no cache at all.
+      setLiveMatches(prev => prev ?? []);
+    });
 
     messagingApi.list().then(res => {
       const convs = dedupeConvs(res.results.map(mapApiConversation));
@@ -4987,7 +5000,11 @@ export function UserApp({ onSignOut }: UserAppProps) {
 
     matchesApi.sentInterests().then(res => { setSentInterests(res.results.map(r => r.receiver.id)); }).catch(() => {});
     moderationApi.blocks().then(res => { setBlocked(res.results.map(b => b.blocked.id)); }).catch(() => {});
-    notifsApi.list().then(res => { if (res.results.length) setNotifItems(res.results.map(mapApiNotif)); }).catch(() => {});
+    notifsApi.list().then(res => {
+      const mapped = res.results.map(mapApiNotif);
+      setNotifItems(mapped);
+      try { localStorage.setItem(NOTIF_CACHE_KEY, JSON.stringify(mapped)); } catch {}
+    }).catch(() => {});
   }, []);
 
   // ── Poll support tickets every 60s for unread admin messages ─
@@ -5037,8 +5054,14 @@ export function UserApp({ onSignOut }: UserAppProps) {
     try { await matchesApi.sendInterest(matchId); } catch {}
   }, []);
 
-  // #7 — lifted so bell badge + NotificationsView share the same state
-  const [notifItems, setNotifItems] = useState<NotifItem[]>([]);
+  // #7 — lifted so bell badge + NotificationsView share the same state.
+  // Initialise from cache so the bell badge and notification list render instantly.
+  const [notifItems, setNotifItems] = useState<NotifItem[]>(() => {
+    try {
+      const raw = localStorage.getItem("ma3_notifs_cache");
+      return raw ? (JSON.parse(raw) as NotifItem[]) : [];
+    } catch { return []; }
+  });
   const unreadNotifs = useMemo(() => notifItems.filter(n => !n.read).length, [notifItems]);
 
   // ── In-app notification sound via Web Audio API ───────────────
@@ -5097,7 +5120,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
       // 2. Sync notifications
       try {
         const res = await notifsApi.list();
-        setNotifItems(res.results.map(mapApiNotif));
+        const mapped = res.results.map(mapApiNotif);
+        setNotifItems(mapped);
+        try { localStorage.setItem(NOTIF_CACHE_KEY, JSON.stringify(mapped)); } catch {};
         // Also check for subscription notification as fallback plan source
         const subNotif = res.results.find(n =>
           n.type === "subscription" &&
@@ -5455,7 +5480,11 @@ export function UserApp({ onSignOut }: UserAppProps) {
           {subView === "subscription" && <SubscriptionView onBack={goBack} onUpgrade={upgradePlan} currentPlan={userPlan} displayName={displayName} />}
           {subView === "referral" && <ReferralView onBack={goBack} userEmail={(() => { try { return localStorage.getItem("ma3moni_login_email") ?? undefined; } catch { return undefined; } })()} />}
           {subView === "notifications" && <NotificationsView onBack={goBack} items={notifItems}
-            onRefresh={() => notifsApi.list().then(r => { if (r.results.length) setNotifItems(r.results.map(mapApiNotif)); }).catch(() => {})}
+            onRefresh={() => notifsApi.list().then(r => {
+              const mapped = r.results.map(mapApiNotif);
+              setNotifItems(mapped);
+              try { localStorage.setItem(NOTIF_CACHE_KEY, JSON.stringify(mapped)); } catch {}
+            }).catch(() => {})}
             onMarkAllRead={() => { setNotifItems(prev => prev.map(n => ({ ...n, read: true }))); notifsApi.markAllRead().catch(() => {}); }} onDeepLink={(type, targetId) => {
               if (type === "match" && targetId) {
                 // Open the specific match's full profile
