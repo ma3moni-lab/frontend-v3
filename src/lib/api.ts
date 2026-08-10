@@ -25,7 +25,7 @@ export async function wakeUpServer(): Promise<void> {
 }
 
 // ── Token storage keys ────────────────────────────────────────
-// Admin and user tokens are COMPLETELY ISOLATED — they never share a slot.
+// Admin and user tokenas are COMPLETELY ISOLATED — they never share a slot.
 // ACCESS_KEY / REFRESH_KEY are legacy keys kept only as a read-fallback for
 // user sessions created before USER_ACCESS_KEY was introduced. Nothing writes
 // to them anymore, so they cannot be overwritten by an admin or user login.
@@ -366,8 +366,14 @@ export const auth = {
   resetPassword: (token: string, new_password: string) =>
     post<{ detail: string }>("/api/auth/reset-password/", { token, password: new_password }),
 
-  changePassword: (old_password: string, new_password: string) =>
-    post<{ detail: string }>("/api/auth/change-password/", { old_password, new_password }),
+  changePassword: async (old_password: string, new_password: string) => {
+    const result = await post<{ detail: string }>("/api/auth/change-password/", { old_password, new_password });
+    // Drop local tokens immediately — backend has blacklisted all refresh tokens,
+    // so keeping the current access token in localStorage would let the old
+    // session continue until it naturally expires (up to 30 min).
+    clearTokens();
+    return result;
+  },
 
   me: () => get<MeResponse>("/api/auth/me/"),
 

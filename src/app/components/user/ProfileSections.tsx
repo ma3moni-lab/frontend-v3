@@ -6,7 +6,7 @@ import {
   Globe, UserX, Star, BookOpen, Briefcase, Target,
   Heart, PartyPopper, Camera, Download, LogOut, KeyRound,
 } from "lucide-react";
-import { auth as apiAuth } from "../../../lib/api";
+import { auth as apiAuth, clearTokens } from "../../../lib/api";
 import {
   applyTheme as applyThemePref,
   applyLanguage as applyLanguagePref,
@@ -982,6 +982,15 @@ function DocView({ docKey, onBack }: { docKey: DocKey; onBack: () => void }) {
 
 // ═══════════════════════════════════════════════════════
 // 6. SETTINGS
+// Password complexity rules — kept in sync with backend PasswordComplexityValidator
+const PW_RULES = [
+  { label: "At least 8 characters",      test: (p: string) => p.length >= 8 },
+  { label: "One uppercase letter (A–Z)",  test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter (a–z)",  test: (p: string) => /[a-z]/.test(p) },
+  { label: "One number (0–9)",            test: (p: string) => /[0-9]/.test(p) },
+  { label: "One symbol (!@#$% …)",        test: (p: string) => /[!@#$%^&*()\-_=+[\]{}|;:'",.<>?/\\`~]/.test(p) },
+];
+
 // ═══════════════════════════════════════════════════════
 function ChangePasswordView({ onBack }: { onBack: () => void }) {
   const [f, setF] = useState({ oldPw: "", newPw: "", confirmPw: "" });
@@ -991,17 +1000,25 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
+  const pwPassed = PW_RULES.map(r => r.test(f.newPw));
+  const allPassed = pwPassed.every(Boolean);
+
   const submit = async () => {
     setError("");
     if (!f.oldPw) { setError("Enter your current password."); return; }
-    if (f.newPw.length < 8) { setError("New password must be at least 8 characters."); return; }
+    if (!allPassed) { setError("New password does not meet all requirements below."); return; }
     if (f.newPw !== f.confirmPw) { setError("Passwords do not match."); return; }
     setLoading(true);
     try {
       await apiAuth.changePassword(f.oldPw, f.newPw);
+      // clearTokens() is called inside changePassword — all local tokens are gone.
       setDone(true);
-      toast.success("Password changed successfully");
-      setTimeout(onBack, 1500);
+      toast.success("Password changed. Please log in again.");
+      // Give the user a moment to read the success message, then force re-login.
+      setTimeout(() => {
+        clearTokens();
+        window.location.href = "/";
+      }, 2000);
     } catch (err: unknown) {
       const msg = (err as { data?: { old_password?: string[]; detail?: string } })?.data;
       setError(msg?.old_password?.[0] ?? msg?.detail ?? "Failed to change password. Check your current password.");
@@ -1023,7 +1040,8 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
         <div>
           <FL>Current Password</FL>
           <div className="relative">
-            <input type={showOld ? "text" : "password"} value={f.oldPw} onChange={e => { setF(p => ({ ...p, oldPw: e.target.value })); setError(""); }}
+            <input type={showOld ? "text" : "password"} value={f.oldPw}
+              onChange={e => { setF(p => ({ ...p, oldPw: e.target.value })); setError(""); }}
               placeholder="Enter current password" autoComplete="current-password"
               className="w-full px-4 py-3.5 pr-12 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
               style={{ fontSize: "0.9375rem" }} />
@@ -1035,7 +1053,8 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
         <div>
           <FL>New Password</FL>
           <div className="relative">
-            <input type={showNew ? "text" : "password"} value={f.newPw} onChange={e => { setF(p => ({ ...p, newPw: e.target.value })); setError(""); }}
+            <input type={showNew ? "text" : "password"} value={f.newPw}
+              onChange={e => { setF(p => ({ ...p, newPw: e.target.value })); setError(""); }}
               placeholder="Min. 8 characters" autoComplete="new-password"
               className="w-full px-4 py-3.5 pr-12 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
               style={{ fontSize: "0.9375rem" }} />
@@ -1043,13 +1062,32 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
               {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+          {/* Live complexity checklist — only visible once the user starts typing */}
+          {f.newPw.length > 0 && (
+            <div className="mt-2.5 rounded-xl border border-border bg-card p-3 space-y-1.5">
+              {PW_RULES.map((r, i) => (
+                <div key={r.label} className="flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${pwPassed[i] ? "bg-green-500" : "bg-muted"}`}>
+                    {pwPassed[i] && <Check size={10} className="text-white" />}
+                  </div>
+                  <span style={{ fontSize: "0.8125rem", color: pwPassed[i] ? "var(--foreground)" : "var(--muted-foreground)" }}>
+                    {r.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <FL>Confirm New Password</FL>
-          <input type={showNew ? "text" : "password"} value={f.confirmPw} onChange={e => { setF(p => ({ ...p, confirmPw: e.target.value })); setError(""); }}
+          <input type={showNew ? "text" : "password"} value={f.confirmPw}
+            onChange={e => { setF(p => ({ ...p, confirmPw: e.target.value })); setError(""); }}
             placeholder="Re-enter new password" autoComplete="new-password"
-            className="w-full px-4 py-3.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            className={`w-full px-4 py-3.5 rounded-xl border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all ${f.confirmPw && f.confirmPw !== f.newPw ? "border-destructive" : "border-border"}`}
             style={{ fontSize: "0.9375rem" }} />
+          {f.confirmPw && f.confirmPw !== f.newPw && (
+            <p style={{ fontSize: "0.75rem", color: "var(--destructive)", marginTop: 4 }}>Passwords do not match.</p>
+          )}
         </div>
         {error && (
           <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
@@ -1065,11 +1103,11 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
           {loading
             ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Updating…</>
             : done
-              ? <><Check size={16} /> Changed!</>
+              ? <><Check size={16} /> Done — redirecting to login…</>
               : <><KeyRound size={16} /> Change Password</>}
         </button>
         <p className="text-muted-foreground text-center" style={{ fontSize: "0.8125rem" }}>
-          You'll stay logged in after changing your password.
+          For security, you will be logged out on all devices after changing your password.
         </p>
       </div>
     </div>
