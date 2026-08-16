@@ -68,19 +68,34 @@ const p = (id: string, w = 600, h = 750) =>
 
 /**
  * Resolve the user's display currency without a network call.
- * Priority: (1) API-confirmed value cached in localStorage, (2) phone prefix.
- * UpgradeView writes "ma3_currency" whenever it gets a confirmed value from
- * the subscription-status API, so subsequent renders are always accurate.
+ * Priority: (1) user-scoped API-confirmed cache, (2) phone prefix from current user.
+ * Keyed by ma3_uid so different users on the same browser never share a currency.
+ * Defaults to "USD" when no per-user cache exists (API response will correct it).
  */
+function _currencyCacheKey(): string {
+  try {
+    const uid = localStorage.getItem("ma3_uid") ?? "anon";
+    return `ma3_currency_${uid}`;
+  } catch {
+    return "ma3_currency_anon";
+  }
+}
+
 function getStoredCurrency(): "NGN" | "USD" {
   try {
-    const cached = localStorage.getItem("ma3_currency");
+    // Always use user-scoped key — never read the legacy global "ma3_currency"
+    const cached = localStorage.getItem(_currencyCacheKey());
     if (cached === "NGN" || cached === "USD") return cached;
+    // Phone-prefix fallback only when the onboarding data is for THIS user
+    // (ma3_uid is set before UpgradeView mounts so the scoped key is preferred above)
+    const uid = localStorage.getItem("ma3_uid") ?? "";
     const r = localStorage.getItem("ma3moni_onboarding_progress");
-    const phone: string = r
-      ? (JSON.parse(r) as { form?: { phone?: string } }).form?.phone ?? ""
-      : "";
-    return phone.startsWith("+234") || phone.startsWith("234") ? "NGN" : "USD";
+    const progress = r ? (JSON.parse(r) as { uid?: string; form?: { phone?: string } }) : null;
+    if (progress && progress.uid === uid) {
+      const phone: string = progress.form?.phone ?? "";
+      if (phone.startsWith("+234") || phone.startsWith("234")) return "NGN";
+    }
+    return "USD"; // safe default — API response will override immediately
   } catch {
     return "USD";
   }
@@ -3531,9 +3546,11 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
   useEffect(() => {
     import("../../lib/api").then(({ subscriptions: subApi }) => {
       Promise.all([subApi.plans(), subApi.status().catch(() => null)]).then(([apiPlans, status]) => {
-        const detected = ((status as { currency?: string } | null)?.currency ?? initCurrency) as "NGN" | "USD";
+        // Use API-confirmed currency; if API failed, default to USD (never inherit stale cache)
+        const apiCurrency = (status as { currency?: string } | null)?.currency;
+        const detected = (apiCurrency === "NGN" || apiCurrency === "USD" ? apiCurrency : "USD") as "NGN" | "USD";
         setCurrency(detected);
-        try { localStorage.setItem("ma3_currency", detected); } catch {}
+        try { localStorage.setItem(_currencyCacheKey(), detected); } catch {}
         setLivePlans(PLANS.map(p => {
           const live = apiPlans.find((a: { name: string }) => a.name === p.id);
           if (!live) return p;
@@ -4506,8 +4523,10 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
       const raw = localStorage.getItem("ma3moni_onboarding_progress");
       const existing = raw ? (JSON.parse(raw) as { form: Record<string, unknown> }).form : {};
       // Only update the editable fields — name and gender are locked
+      const currentUid = localStorage.getItem("ma3_uid") ?? "";
       localStorage.setItem("ma3moni_onboarding_progress", JSON.stringify({
         step: 8,
+        uid:  currentUid,
         form: { ...existing, dob: form.dob, city: form.city, country: form.country, nationality: form.nationality, bio: form.bio, phone: form.phone },
       }));
     } catch {}
@@ -4947,7 +4966,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
             hydrated.goals = (p as Record<string,unknown>).interests;
           if (p.pref_age_min && !hydrated.prefAgeMin) hydrated.prefAgeMin = p.pref_age_min;
           if (p.pref_age_max && !hydrated.prefAgeMax) hydrated.prefAgeMax = p.pref_age_max;
-          localStorage.setItem(PROFILE_KEY, JSON.stringify({ step: 8, form: hydrated }));
+          // Stamp uid so getStoredCurrency() can safely use phone-prefix fallback
+          const stampedUid = localStorage.getItem("ma3_uid") ?? "";
+          localStorage.setItem(PROFILE_KEY, JSON.stringify({ step: 8, uid: stampedUid, form: hydrated }));
           setProfileVersion(v => v + 1);
         } catch {}
       }).catch(() => {});

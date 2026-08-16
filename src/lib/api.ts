@@ -106,6 +106,11 @@ export function clearTokens() {
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem("ma3moni_user_session");
+    // Clear currency cache for the current user and the legacy unscoped key so the
+    // next user on this browser never inherits a stale NGN/USD value.
+    const uid = localStorage.getItem("ma3_uid") ?? "";
+    if (uid) localStorage.removeItem(`ma3_currency_${uid}`);
+    localStorage.removeItem("ma3_currency");
   } catch {}
 }
 
