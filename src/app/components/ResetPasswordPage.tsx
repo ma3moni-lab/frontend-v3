@@ -1,23 +1,32 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import {
-  Eye, EyeOff, Heart, CheckCircle2, XCircle, Loader2, AlertCircle, ArrowRight,
+  Eye, EyeOff, Heart, CheckCircle2, XCircle, Loader2, AlertCircle, ArrowRight, X,
 } from "lucide-react";
 import { auth as apiAuth, ApiError } from "../../lib/api";
+
+// Kept in sync with backend PasswordComplexityValidator
+const PW_RULES = [
+  { label: "At least 8 characters",         test: (p: string) => p.length >= 8 },
+  { label: "One uppercase letter (A–Z)",     test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter (a–z)",     test: (p: string) => /[a-z]/.test(p) },
+  { label: "One number (0–9)",               test: (p: string) => /[0-9]/.test(p) },
+  { label: "One special character (!@#$…)",  test: (p: string) => /[!@#$%^&*()\-_=+\[\]{}|;:'",.<>?/\\`~]/.test(p) },
+];
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const navigate       = useNavigate();
   const token          = searchParams.get("token") ?? "";
 
-  const [password,    setPassword]    = useState("");
-  const [confirm,     setConfirm]     = useState("");
-  const [showPw,      setShowPw]      = useState(false);
-  const [loading,     setLoading]     = useState(false);
-  const [error,       setError]       = useState("");
-  const [done,        setDone]        = useState(false);
+  const [password,  setPassword]  = useState("");
+  const [confirm,   setConfirm]   = useState("");
+  const [showPw,    setShowPw]    = useState(false);
+  const [showCf,    setShowCf]    = useState(false);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState("");
+  const [done,      setDone]      = useState(false);
 
-  // If no token in URL redirect to home after a moment
   useEffect(() => {
     if (!token) {
       const t = setTimeout(() => navigate("/"), 3000);
@@ -25,18 +34,18 @@ export function ResetPasswordPage() {
     }
   }, [token, navigate]);
 
+  const pwPassed        = PW_RULES.map(r => r.test(password));
+  const allPwPass       = pwPassed.every(Boolean);
+  const showRules       = password.length > 0;
+  const confirmMismatch = confirm.length > 0 && confirm !== password;
+  const canSubmit       = allPwPass && !confirmMismatch && !loading;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (password !== confirm) {
-      setError("Passwords don't match.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
+    if (!allPwPass) { setError("Please meet all password requirements below."); return; }
+    if (password !== confirm) { setError("Passwords don't match."); return; }
 
     setLoading(true);
     try {
@@ -45,11 +54,16 @@ export function ResetPasswordPage() {
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.data as Record<string, unknown> | undefined;
-        setError(
-          typeof data?.detail === "string"
-            ? data.detail
-            : "Could not reset password. The link may have expired. Please request a new one.",
-        );
+        // Show the specific server message (e.g. complexity rule from backend)
+        // fall back to a generic message only when no parseable detail
+        const detail = typeof data?.detail === "string" ? data.detail : null;
+        if (detail) {
+          setError(detail);
+        } else if (err.status === 400) {
+          setError("Invalid or expired reset link. Please request a new one.");
+        } else {
+          setError("Could not reset password — please try again or request a new link.");
+        }
       } else {
         setError("Network error — please check your connection and try again.");
       }
@@ -98,7 +112,6 @@ export function ResetPasswordPage() {
   // ── Form ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-center px-6 py-4 border-b border-border bg-white/80 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
@@ -118,6 +131,7 @@ export function ResetPasswordPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* New password + live checklist */}
             <div>
               <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700 }}>New password</label>
               <div className="relative">
@@ -125,11 +139,16 @@ export function ResetPasswordPage() {
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={e => { setPassword(e.target.value); setError(""); }}
-                  placeholder="At least 8 characters"
+                  placeholder="Create a strong password"
                   required
                   autoComplete="new-password"
-                  className="w-full px-4 py-3.5 pr-12 rounded-2xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
-                  style={{ fontSize: "0.9375rem" }}
+                  className="w-full px-4 py-3.5 pr-12 rounded-2xl border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
+                  style={{
+                    fontSize: "0.9375rem",
+                    borderColor: showRules
+                      ? (allPwPass ? "var(--primary)" : "var(--destructive)")
+                      : "var(--border)",
+                  }}
                 />
                 <button
                   type="button"
@@ -140,41 +159,60 @@ export function ResetPasswordPage() {
                   {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+
+              {/* Live rule checklist */}
+              {showRules && (
+                <div className="mt-2.5 px-3.5 py-3 rounded-xl border border-border bg-muted/40 space-y-1.5">
+                  {PW_RULES.map((rule, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      {pwPassed[i]
+                        ? <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+                        : <X size={13} className="text-muted-foreground flex-shrink-0" />
+                      }
+                      <span style={{
+                        fontSize: "0.8125rem",
+                        color: pwPassed[i] ? "var(--foreground)" : "var(--muted-foreground)",
+                        fontWeight: pwPassed[i] ? 500 : 400,
+                      }}>
+                        {rule.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* Confirm password */}
             <div>
               <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 700 }}>Confirm password</label>
-              <input
-                type={showPw ? "text" : "password"}
-                value={confirm}
-                onChange={e => { setConfirm(e.target.value); setError(""); }}
-                placeholder="Repeat your new password"
-                required
-                autoComplete="new-password"
-                className="w-full px-4 py-3.5 rounded-2xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
-                style={{ fontSize: "0.9375rem" }}
-              />
-            </div>
-
-            {/* Password strength hint */}
-            {password.length > 0 && (
-              <div className="flex gap-1.5">
-                {[8, 12, 16].map(len => (
-                  <div
-                    key={len}
-                    className="h-1 flex-1 rounded-full transition-colors"
-                    style={{
-                      background: password.length >= len
-                        ? len === 8 ? "#f59e0b" : len === 12 ? "#0A6870" : "#059669"
-                        : "var(--border)",
-                    }}
-                  />
-                ))}
-                <span className="text-xs text-muted-foreground ml-1">
-                  {password.length < 8 ? "Too short" : password.length < 12 ? "Fair" : password.length < 16 ? "Good" : "Strong"}
-                </span>
+              <div className="relative">
+                <input
+                  type={showCf ? "text" : "password"}
+                  value={confirm}
+                  onChange={e => { setConfirm(e.target.value); setError(""); }}
+                  placeholder="Repeat your new password"
+                  required
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3.5 pr-12 rounded-2xl border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary/40 transition-all"
+                  style={{
+                    fontSize: "0.9375rem",
+                    borderColor: confirmMismatch ? "var(--destructive)" : "var(--border)",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCf(v => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showCf ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-            )}
+              {confirmMismatch && (
+                <p className="mt-1" style={{ fontSize: "0.75rem", color: "var(--destructive)" }}>
+                  Passwords do not match.
+                </p>
+              )}
+            </div>
 
             {error && (
               <div className="flex items-start gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-2xl">
@@ -185,9 +223,13 @@ export function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={!canSubmit}
               className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white transition-all active:scale-[0.97] disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-              style={{ fontWeight: 700, fontSize: "1rem", background: "linear-gradient(135deg, #0A6870, #0E8A95)", boxShadow: loading ? "none" : "0 6px 20px rgba(10,104,112,0.28)" }}
+              style={{
+                fontWeight: 700, fontSize: "1rem",
+                background: "linear-gradient(135deg, #0A6870, #0E8A95)",
+                boxShadow: canSubmit ? "0 6px 20px rgba(10,104,112,0.28)" : "none",
+              }}
             >
               {loading ? <><Loader2 size={17} className="animate-spin" /> Saving…</> : <>Reset Password <ArrowRight size={17} /></>}
             </button>
