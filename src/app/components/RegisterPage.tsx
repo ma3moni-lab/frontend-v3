@@ -1,9 +1,18 @@
 import { useState, useRef, useEffect } from "react";
-import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Mail, Shield, Gift, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Mail, Shield, Gift, CheckCircle2, X } from "lucide-react";
 import { auth as apiAuth, setUserTokens, ApiError, referrals as referralsApi } from "../../lib/api";
 import type { UserPlan } from "./LoginPage";
 
 const PENDING_REF_KEY = "ma3moni_pending_ref";
+
+// Kept in sync with backend PasswordComplexityValidator
+const PW_RULES = [
+  { label: "At least 8 characters",         test: (p: string) => p.length >= 8 },
+  { label: "One uppercase letter (A–Z)",     test: (p: string) => /[A-Z]/.test(p) },
+  { label: "One lowercase letter (a–z)",     test: (p: string) => /[a-z]/.test(p) },
+  { label: "One number (0–9)",               test: (p: string) => /[0-9]/.test(p) },
+  { label: "One special character (!@#$…)",  test: (p: string) => /[!@#$%^&*()\-_=+\[\]{}|;:'",.<>?/\\`~]/.test(p) },
+];
 
 interface RegisterPageProps {
   onVerified: (plan: UserPlan, profileComplete: boolean, identifier: string) => void;
@@ -101,7 +110,6 @@ function OtpScreen({ identifier, onVerified, onBack }: {
             Check your inbox (and spam folder).
           </p>
 
-          {/* OTP digit boxes */}
           <div className="flex gap-2.5 justify-center mb-6" onPaste={handlePaste}>
             {digits.map((d, i) => (
               <input
@@ -157,10 +165,10 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
   const [confirm, setConfirm]     = useState("");
   const [showPw, setShowPw]       = useState(false);
   const [showCf, setShowCf]       = useState(false);
+  const [agreedToS, setAgreedToS] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState("");
   const [otpIdentifier, setOtpId] = useState("");
-  // Referral code — pre-filled from URL param or localStorage, editable by user
   const [referralCode, setReferralCode] = useState<string>(() => {
     try { return localStorage.getItem(PENDING_REF_KEY) ?? ""; } catch { return ""; }
   });
@@ -168,13 +176,24 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
 
   const identifier = mode === "email" ? email.toLowerCase().trim() : phone.trim();
 
+  // Live password rule checks
+  const pwPassed   = PW_RULES.map(r => r.test(password));
+  const allPwPass  = pwPassed.every(Boolean);
+  const showRules  = password.length > 0;
+  const confirmMismatch = confirm.length > 0 && confirm !== password;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!allPwPass) {
+      setError("Please meet all password requirements before continuing.");
+      return;
+    }
     if (password !== confirm) { setError("Passwords do not match."); return; }
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     if (mode === "email" && !email.includes("@")) { setError("Enter a valid email address."); return; }
     if (mode === "phone" && phone.length < 7) { setError("Enter a valid phone number."); return; }
+    if (!agreedToS) { setError("You must agree to the Terms of Service and Privacy Policy to continue."); return; }
 
     setLoading(true);
     try {
@@ -184,7 +203,6 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
         mode === "phone" ? phone.trim() : undefined,
       );
       setUserTokens(res.access, res.refresh);
-      // Persist phone immediately so PersonalInfoEdit is pre-populated before first me() hydration
       if (mode === "phone" && phone.trim()) {
         try {
           const raw = localStorage.getItem("ma3moni_onboarding_progress");
@@ -203,9 +221,6 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
       if (err instanceof ApiError) {
         const data = err.data as Record<string, unknown> | null;
         if (data) {
-          // Field names like "email" / "phone" / "password" are suppressed — the
-          // message is already self-explanatory ("An account with this email already
-          // exists."). Only "non_field_errors" would have needed stripping before.
           const SILENT_KEYS = new Set(["email", "phone", "password", "non_field_errors"]);
           const msgs: string[] = [];
           Object.entries(data).forEach(([k, v]) => {
@@ -222,19 +237,14 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
     }
   };
 
-  // After registration succeeds, show OTP screen
   if (otpIdentifier) {
     return (
       <OtpScreen
         identifier={otpIdentifier}
         onVerified={async (_access, _refresh, plan, profileComplete) => {
-          // Apply referral code now that tokens are set (best-effort, never blocks flow)
           const code = referralCode.trim().toUpperCase();
           if (code) {
-            try {
-              await referralsApi.apply(code);
-            } catch {}
-            // Always clear — even if apply failed (invalid code, already used, own code, etc.)
+            try { await referralsApi.apply(code); } catch {}
             try { localStorage.removeItem(PENDING_REF_KEY); } catch {}
           }
           onVerified(plan, profileComplete, otpIdentifier);
@@ -311,22 +321,48 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
             </div>
           )}
 
-          {/* Password */}
+          {/* Password with live complexity checklist */}
           <div>
             <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Password</label>
             <div className="relative">
               <input
                 type={showPw ? "text" : "password"} value={password}
                 onChange={e => { setPassword(e.target.value); setError(""); }}
-                placeholder="At least 8 characters" required autoComplete="new-password"
-                className="w-full px-4 py-3.5 pr-12 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                style={{ fontSize: "0.9375rem" }}
+                placeholder="Create a strong password" required autoComplete="new-password"
+                className="w-full px-4 py-3.5 pr-12 rounded-xl border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                style={{
+                  fontSize: "0.9375rem",
+                  borderColor: showRules
+                    ? (allPwPass ? "var(--primary)" : "var(--destructive)")
+                    : "var(--border)",
+                }}
               />
               <button type="button" onClick={() => setShowPw(v => !v)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                 {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+
+            {/* Live rule checklist */}
+            {showRules && (
+              <div className="mt-2.5 px-3.5 py-3 rounded-xl border border-border bg-muted/40 space-y-1.5">
+                {PW_RULES.map((rule, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    {pwPassed[i]
+                      ? <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+                      : <X size={13} className="text-muted-foreground flex-shrink-0" />
+                    }
+                    <span style={{
+                      fontSize: "0.8125rem",
+                      color: pwPassed[i] ? "var(--foreground)" : "var(--muted-foreground)",
+                      fontWeight: pwPassed[i] ? 500 : 400,
+                    }}>
+                      {rule.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Confirm password */}
@@ -337,14 +373,22 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
                 type={showCf ? "text" : "password"} value={confirm}
                 onChange={e => { setConfirm(e.target.value); setError(""); }}
                 placeholder="Repeat your password" required autoComplete="new-password"
-                className="w-full px-4 py-3.5 pr-12 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                style={{ fontSize: "0.9375rem" }}
+                className="w-full px-4 py-3.5 pr-12 rounded-xl border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                style={{
+                  fontSize: "0.9375rem",
+                  borderColor: confirmMismatch ? "var(--destructive)" : "var(--border)",
+                }}
               />
               <button type="button" onClick={() => setShowCf(v => !v)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                 {showCf ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {confirmMismatch && (
+              <p className="mt-1" style={{ fontSize: "0.75rem", color: "var(--destructive)" }}>
+                Passwords do not match.
+              </p>
+            )}
           </div>
 
           {/* Referral code — optional */}
@@ -391,6 +435,49 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
             )}
           </div>
 
+          {/* Terms of Service + Privacy Policy checkbox */}
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <div className="relative flex-shrink-0 mt-0.5">
+              <input
+                type="checkbox"
+                checked={agreedToS}
+                onChange={e => { setAgreedToS(e.target.checked); setError(""); }}
+                className="sr-only"
+              />
+              <div
+                className="w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all"
+                style={{
+                  borderColor: agreedToS ? "var(--primary)" : "var(--border)",
+                  background: agreedToS ? "var(--primary)" : "transparent",
+                }}
+              >
+                {agreedToS && <CheckCircle2 size={13} className="text-primary-foreground" strokeWidth={3} />}
+              </div>
+            </div>
+            <span style={{ fontSize: "0.8125rem", color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+              I have read and agree to the{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary font-semibold hover:underline"
+                onClick={e => e.stopPropagation()}
+              >
+                Terms of Service
+              </a>
+              {" "}and{" "}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary font-semibold hover:underline"
+                onClick={e => e.stopPropagation()}
+              >
+                Privacy Policy
+              </a>
+            </span>
+          </label>
+
           {error && (
             <div className="flex items-center gap-2.5 px-4 py-3 bg-red-50 border border-red-100 rounded-xl">
               <AlertCircle size={15} className="text-destructive flex-shrink-0" />
@@ -398,17 +485,15 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
             </div>
           )}
 
-          <button type="submit" disabled={loading}
+          <button
+            type="submit"
+            disabled={loading || !allPwPass || confirmMismatch || !agreedToS}
             className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-4 rounded-xl hover:bg-primary/90 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ fontWeight: 700, fontSize: "1rem" }}>
             {loading
               ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
               : <><ArrowRight size={17} /> Create Account</>}
           </button>
-
-          <p className="text-muted-foreground text-center" style={{ fontSize: "0.8125rem", lineHeight: 1.6 }}>
-            By creating an account you agree to our Terms of Service and Privacy Policy.
-          </p>
         </form>
 
         <p className="text-center mt-6 text-muted-foreground" style={{ fontSize: "0.9375rem" }}>
