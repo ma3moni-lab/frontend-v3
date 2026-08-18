@@ -170,7 +170,11 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
   const [error, setError]         = useState("");
   const [otpIdentifier, setOtpId] = useState("");
   const [referralCode, setReferralCode] = useState<string>(() => {
-    try { return localStorage.getItem(PENDING_REF_KEY) ?? ""; } catch { return ""; }
+    try {
+      const stored = localStorage.getItem(PENDING_REF_KEY) ?? "";
+      // Store only suffix; strip MA3- prefix if the full code was stored previously
+      return stored.startsWith("MA3-") ? stored.slice(4) : stored;
+    } catch { return ""; }
   });
   const [refStatus, setRefStatus] = useState<"idle" | "valid" | "invalid">("idle");
 
@@ -242,9 +246,10 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
       <OtpScreen
         identifier={otpIdentifier}
         onVerified={async (_access, _refresh, plan, profileComplete) => {
-          const code = referralCode.trim().toUpperCase();
-          if (code) {
-            try { await referralsApi.apply(code); } catch {}
+          const suffix = referralCode.trim().toUpperCase();
+          if (suffix) {
+            const full = "MA3-" + suffix;
+            try { await referralsApi.apply(full); } catch {}
             try { localStorage.removeItem(PENDING_REF_KEY); } catch {}
           }
           onVerified(plan, profileComplete, otpIdentifier);
@@ -396,30 +401,48 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
             <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
               Referral code <span className="text-muted-foreground" style={{ fontWeight: 400 }}>(optional)</span>
             </label>
-            <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <Gift size={15} />
+            <div
+              className="flex rounded-xl border border-border bg-input-background overflow-hidden focus-within:ring-2 focus-within:ring-primary/30 transition-all"
+              style={{
+                borderColor: refStatus === "valid" ? "var(--primary)" : refStatus === "invalid" ? "var(--destructive)" : undefined,
+              }}
+            >
+              {/* Fixed MA3- prefix */}
+              <div className="flex items-center gap-1.5 px-3.5 bg-muted border-r border-border shrink-0 select-none">
+                <Gift size={14} className="text-muted-foreground" />
+                <span className="font-mono font-semibold text-foreground/60" style={{ fontSize: "0.9375rem", letterSpacing: "0.06em" }}>
+                  MA3-
+                </span>
               </div>
+              {/* User types only the suffix */}
               <input
                 type="text"
                 value={referralCode}
                 onChange={e => {
-                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 12);
+                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
                   setReferralCode(val);
                   setRefStatus("idle");
-                  try { if (val) localStorage.setItem(PENDING_REF_KEY, val); else localStorage.removeItem(PENDING_REF_KEY); } catch {}
+                  const full = val ? "MA3-" + val : "";
+                  try { if (full) localStorage.setItem(PENDING_REF_KEY, full); else localStorage.removeItem(PENDING_REF_KEY); } catch {}
                 }}
-                placeholder="MA3-XXXXXX"
+                onPaste={e => {
+                  const pasted = e.clipboardData.getData("text").toUpperCase().replace(/\s/g, "");
+                  const raw = pasted.startsWith("MA3-") ? pasted.slice(4) : pasted;
+                  const val = raw.replace(/[^A-Z0-9]/g, "").slice(0, 6);
+                  e.preventDefault();
+                  setReferralCode(val);
+                  setRefStatus("idle");
+                  const full = val ? "MA3-" + val : "";
+                  try { if (full) localStorage.setItem(PENDING_REF_KEY, full); else localStorage.removeItem(PENDING_REF_KEY); } catch {}
+                }}
+                placeholder="XXXXXX"
                 autoComplete="off"
-                className="w-full pl-10 pr-10 py-3.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                style={{
-                  fontSize: "0.9375rem", letterSpacing: "0.06em",
-                  borderColor: refStatus === "valid" ? "var(--primary)" : refStatus === "invalid" ? "var(--destructive)" : undefined,
-                }}
+                className="flex-1 px-3.5 py-3.5 bg-transparent focus:outline-none font-mono"
+                style={{ fontSize: "0.9375rem", letterSpacing: "0.1em" }}
               />
               {refStatus === "valid" && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primary">
-                  <CheckCircle2 size={16} />
+                <div className="flex items-center pr-3.5">
+                  <CheckCircle2 size={16} className="text-primary" />
                 </div>
               )}
             </div>
