@@ -4496,6 +4496,10 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
     } catch { return ""; }
   })();
 
+  // Lock each field only if it already has a value from registration
+  const nameLocked   = !!fullName.trim();
+  const genderLocked = !!(pf.gender as string);
+
   const [form, setForm] = useState({
     firstName:   parts[0] ?? "",
     lastName:    parts.slice(1).join(" ") ?? "",
@@ -4515,7 +4519,6 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
     try {
       const raw = localStorage.getItem("ma3moni_onboarding_progress");
       const existing = raw ? (JSON.parse(raw) as { form: Record<string, unknown> }).form : {};
-      // Only update the editable fields — name and gender are locked
       const currentUid = localStorage.getItem("ma3_uid") ?? "";
       localStorage.setItem("ma3moni_onboarding_progress", JSON.stringify({
         step: 8,
@@ -4523,7 +4526,6 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
         form: { ...existing, dob: form.dob, city: form.city, country: form.country, nationality: form.nationality, bio: form.bio, phone: form.phone },
       }));
     } catch {}
-    // Persist editable fields to backend — name/gender remain as-is
     try {
       const { auth: apiAuth } = await import("../../lib/api");
       const patch: Record<string, unknown> = {
@@ -4533,6 +4535,13 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
         bio:              form.bio.trim() || undefined,
       };
       if (form.dob) patch.date_of_birth = form.dob;
+      // Save name if it wasn't locked (was empty at registration)
+      if (!nameLocked) {
+        const fullName = [form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(" ");
+        if (fullName) patch.full_name = fullName;
+      }
+      // Save gender if it wasn't locked
+      if (!genderLocked && form.gender) patch.gender = form.gender;
       // Phone users can add a real email address
       if (isPhoneUser && form.email.trim() && form.email.includes("@") && !form.email.endsWith("@phone.ma3moni")) {
         patch.update_email = form.email.trim().toLowerCase();
@@ -4561,51 +4570,66 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* ── Locked fields notice ─────────────────────────────── */}
-        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2.5">
-          <Lock size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#92400e" }}>Name, gender &amp; email are locked</p>
-            <p className="text-amber-700 mt-0.5" style={{ fontSize: "0.75rem", lineHeight: 1.5 }}>
-              These cannot be changed to keep Ma3moni safe and trustworthy. To request a correction,{" "}
-              <a href="mailto:support@ma3moni.com" className="underline font-semibold">contact our team</a>.
-            </p>
+        {/* ── Locked fields notice — only show when something is actually locked */}
+        {(nameLocked || genderLocked || !isPhoneUser) && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex gap-2.5">
+            <Lock size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "#92400e" }}>
+                {[nameLocked && "Name", genderLocked && "gender", !isPhoneUser && "email"].filter(Boolean).join(", ")} {nameLocked || genderLocked ? "are" : "is"} locked
+              </p>
+              <p className="text-amber-700 mt-0.5" style={{ fontSize: "0.75rem", lineHeight: 1.5 }}>
+                These cannot be changed to keep Ma3moni safe and trustworthy. To request a correction,{" "}
+                <a href="mailto:support@ma3moni.com" className="underline font-semibold">contact our team</a>.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Name — read-only */}
+        {/* Name — locked if provided at registration, editable otherwise */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              First Name <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+              First Name {nameLocked && <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>}
             </label>
-            <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
-              {form.firstName || <span className="opacity-50">—</span>}
-            </div>
+            {nameLocked ? (
+              <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
+                {form.firstName || <span className="opacity-50">—</span>}
+              </div>
+            ) : (
+              <input value={form.firstName} onChange={e => u("firstName", e.target.value)} placeholder="First name" className={inputCls} style={{ fontSize: "0.9375rem" }} />
+            )}
           </div>
           <div>
             <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-              Last Name <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+              Last Name {nameLocked && <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>}
             </label>
-            <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
-              {form.lastName || <span className="opacity-50">—</span>}
-            </div>
+            {nameLocked ? (
+              <div className={`${inputCls} bg-muted/50 cursor-not-allowed select-none flex items-center`} style={{ fontSize: "0.9375rem", color: "var(--muted-foreground)" }}>
+                {form.lastName || <span className="opacity-50">—</span>}
+              </div>
+            ) : (
+              <input value={form.lastName} onChange={e => u("lastName", e.target.value)} placeholder="Last name" className={inputCls} style={{ fontSize: "0.9375rem" }} />
+            )}
           </div>
         </div>
 
-        {/* Gender — read-only */}
+        {/* Gender — locked if provided at registration, editable otherwise */}
         <div>
           <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-            Gender <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>
+            Gender {genderLocked && <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(locked)</span>}
           </label>
-          <div className="grid grid-cols-2 gap-3 opacity-60 pointer-events-none select-none">
+          <div className={`grid grid-cols-2 gap-3 ${genderLocked ? "opacity-60 pointer-events-none select-none" : ""}`}>
             {[
               { value: "male",   label: "Male",   icon: "♂" },
               { value: "female", label: "Female", icon: "♀" },
             ].map(g => (
               <div
                 key={g.value}
-                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 ${
+                onClick={() => !genderLocked && u("gender", g.value)}
+                className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all ${
+                  genderLocked ? "" : "cursor-pointer hover:border-primary/50"
+                } ${
                   form.gender === g.value
                     ? "border-primary bg-primary/8 text-primary"
                     : "border-border bg-card text-muted-foreground"
