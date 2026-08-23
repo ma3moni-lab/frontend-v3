@@ -4478,7 +4478,7 @@ function ProfilePhotoGrid() {
 }
 
 // ── Personal Info edit (controlled + persisted) ───────────
-function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { onBack: () => void; profileData: Record<string, unknown> | null; onSaved?: () => void; userEmail?: string }) {
+function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "", completionScore = 0 }: { onBack: () => void; profileData: Record<string, unknown> | null; onSaved?: () => void; userEmail?: string; completionScore?: number }) {
   const isPhoneUser = userEmail.endsWith("@phone.ma3moni");
   const pf = profileData ?? {};
   const fullName = (pf.fullName as string) ?? "";
@@ -4496,9 +4496,13 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
     } catch { return ""; }
   })();
 
-  // Lock each field only if it already has a value from registration
-  const nameLocked   = !!fullName.trim();
-  const genderLocked = !!(pf.gender as string);
+  // Lock is only enforced when ALL 3 fields have values AND completion score >= 60%
+  const nameFilled    = !!fullName.trim();
+  const genderFilled  = !!(pf.gender as string);
+  const emailFilled   = !isPhoneUser; // phone users have no real email yet
+  const lockEnforced  = nameFilled && genderFilled && emailFilled && completionScore >= 60;
+  const nameLocked    = lockEnforced && nameFilled;
+  const genderLocked  = lockEnforced && genderFilled;
 
   const [form, setForm] = useState({
     firstName:   parts[0] ?? "",
@@ -5448,7 +5452,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           )}
 
           {subView === "edit-profile" && (
-            <PersonalInfoEdit onBack={goBack} profileData={profileData} userEmail={backendEmail} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />
+            <PersonalInfoEdit onBack={goBack} profileData={profileData} userEmail={backendEmail} completionScore={profileStrength} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />
           )}
           {subView === "photos" && (
             <div className="flex flex-col h-full bg-background">
