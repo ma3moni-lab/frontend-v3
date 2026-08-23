@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Shield, CheckCircle, Loader2, Sparkles } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowRight, ChevronLeft, Phone, Shield, CheckCircle, Loader2, Sparkles } from "lucide-react";
 import { auth as apiAuth, setUserTokens, ApiError } from "../../lib/api";
+import { Logo } from "./Logo";
 
 export type UserPlan = "free" | "basic" | "premium";
 
@@ -175,12 +176,7 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
         >
           <ChevronLeft size={18} /> Back
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--primary)" }}>
-            <Heart size={13} className="text-white fill-white" />
-          </div>
-          <span className="logo-font" style={{ fontWeight: 800, fontSize: "1rem" }}>Ma3moni</span>
-        </div>
+        <Logo variant="full" size="sm" />
         <div style={{ width: 60 }} />
       </div>
 
@@ -212,18 +208,8 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
               />
 
               {/* Logo — top left, over photo */}
-              <div className="relative p-10 flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{
-                    background: "rgba(255,255,255,0.12)",
-                    border: "1px solid rgba(255,255,255,0.20)",
-                    backdropFilter: "blur(8px)",
-                  }}
-                >
-                  <Heart size={14} className="text-white fill-white" />
-                </div>
-                <span className="logo-font text-white" style={{ fontWeight: 800, fontSize: "1rem" }}>Ma3moni</span>
+              <div className="relative p-10">
+                <Logo variant="wordmark" theme="dark" size="md" />
               </div>
 
               {/* Bottom — headline + trust signals */}

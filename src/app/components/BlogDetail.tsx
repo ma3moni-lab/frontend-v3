@@ -1,5 +1,6 @@
 import { useState, useEffect, type CSSProperties } from "react";
-import { ArrowLeft, Clock, Calendar, Heart, ArrowRight, ThumbsUp, ThumbsDown, Eye, BookOpen } from "lucide-react";
+import { ArrowLeft, Clock, Calendar, ArrowRight, ThumbsUp, ThumbsDown, Eye, BookOpen } from "lucide-react";
+import { Logo } from "./Logo";
 import type { BlogArticle } from "../../lib/api";
 
 // ─── Content renderer ──────────────────────────────────────
@@ -253,12 +254,7 @@ export function BlogDetail({ articleId, onBack, onStart, backLabel = "Back to Ho
           >
             <ArrowLeft size={17} /> {backLabel}
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
-              <Heart size={11} className="text-primary-foreground fill-primary-foreground" />
-            </div>
-            <span className="logo-font" style={{ fontWeight: 800, fontSize: "0.9375rem" }}>Ma3moni</span>
-          </div>
+          <Logo variant="full" size="xs" />
         </div>
       </div>
 

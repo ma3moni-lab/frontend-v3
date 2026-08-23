@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Heart, ShieldOff, Send, CheckCircle, LogOut, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
+import { ShieldOff, Send, CheckCircle, LogOut, ChevronDown, ChevronUp, AlertCircle } from "lucide-react";
+import { Logo } from "./Logo";
 import { auth as apiAuth } from "../../lib/api";
 
 interface SuspendedViewProps {
@@ -33,12 +34,7 @@ export function SuspendedView({ reason, suspendedAt, userEmail, onSignOut }: Sus
     <div className="size-full bg-background flex flex-col overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
-            <Heart size={13} className="text-white fill-white" />
-          </div>
-          <span className="logo-font" style={{ fontWeight: 800, fontSize: "1rem" }}>Ma3moni</span>
-        </div>
+        <Logo variant="full" size="sm" />
         <button
           onClick={onSignOut}
           className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"

@@ -35,6 +35,8 @@ import {
 import { BlogDetail } from "./BlogDetail";
 import { SupportCenterView, getUnreadTickets, markTicketRead } from "./user/SupportCenterView";
 import { PaymentResultOverlay } from "./PaymentResultOverlay";
+import { Logo } from "./Logo";
+import { SearchableCountrySelect } from "./SearchableCountrySelect";
 
 interface UserAppProps {
   onSignOut: () => void;
@@ -4507,16 +4509,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
     email:       "",  // real email for phone users to fill in
   });
   const [saved, setSaved] = useState(false);
-  const [phoneVerified, setPhoneVerified] = useState(() => {
-    try { return localStorage.getItem("ma3moni_phone_verified") === "true"; } catch { return false; }
-  });
-  // Phone OTP flow states
-  const [phoneOtpStep, setPhoneOtpStep] = useState<"idle" | "sending" | "verifying" | "done">("idle");
-  const [phoneOtpDigits, setPhoneOtpDigits] = useState(["", "", "", "", "", ""]);
-  const [phoneOtpError, setPhoneOtpError] = useState("");
-  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
-
-  const u = <K extends keyof typeof form>(k: K, v: string) => setForm(p => ({ ...p, [k]: v }));
+  const u =<K extends keyof typeof form>(k: K, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   const save = async () => {
     try {
@@ -4551,39 +4544,6 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
     setTimeout(() => { setSaved(false); onSaved ? onSaved() : onBack(); }, 900);
   };
 
-  const sendPhoneOtp = async () => {
-    if (!form.phone.trim()) { toast.error("Enter your phone number first."); return; }
-    setPhoneOtpStep("sending");
-    setPhoneOtpError("");
-    setPhoneOtpDigits(["", "", "", "", "", ""]);
-    try {
-      const { auth: apiAuth } = await import("../../lib/api");
-      await apiAuth.sendOtp(form.phone.trim());
-      setPhoneOtpStep("verifying");
-      setTimeout(() => otpRefs.current[0]?.focus(), 100);
-    } catch {
-      setPhoneOtpStep("idle");
-      toast.error("Could not send OTP. Check the number and try again.");
-    }
-  };
-
-  const verifyPhoneOtp = async () => {
-    const code = phoneOtpDigits.join("");
-    if (code.length !== 6) { setPhoneOtpError("Enter all 6 digits."); return; }
-    setPhoneOtpStep("sending");
-    setPhoneOtpError("");
-    try {
-      const { auth: apiAuth } = await import("../../lib/api");
-      await apiAuth.verifyOtp(form.phone.trim(), code);
-      setPhoneVerified(true);
-      try { localStorage.setItem("ma3moni_phone_verified", "true"); } catch {}
-      setPhoneOtpStep("done");
-      toast.success("Phone number verified! +5% to your compatibility score.");
-    } catch {
-      setPhoneOtpStep("verifying");
-      setPhoneOtpError("Invalid or expired code. Try again.");
-    }
-  };
 
   const inputCls = "w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all";
   const labelCls = "block mb-1.5 text-foreground";
@@ -4699,19 +4659,13 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
         {/* Nationality dropdown */}
         <div>
           <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Nationality</label>
-          <div className="relative">
-            <select
-              value={form.nationality}
-              onChange={e => u("nationality", e.target.value)}
-              className={`${inputCls} appearance-none pr-10`}
-              style={{ fontSize: "0.9375rem" }}>
-              <option value="">Select nationality…</option>
-              {COUNTRIES_LIST.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <ChevronRight size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none rotate-90" />
-          </div>
+          <SearchableCountrySelect
+            value={form.nationality}
+            onChange={v => u("nationality", v)}
+            options={COUNTRIES_LIST}
+            placeholder="Select nationality…"
+            inputClassName={inputCls}
+          />
           {detectedCountry && !form.nationality && (
             <button
               type="button"
@@ -4730,19 +4684,13 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
           </div>
           <div>
             <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Country</label>
-            <div className="relative">
-              <select
-                value={form.country}
-                onChange={e => u("country", e.target.value)}
-                className={`${inputCls} appearance-none pr-10`}
-                style={{ fontSize: "0.9375rem" }}>
-                <option value="">Select country…</option>
-                {COUNTRIES_LIST.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-              <ChevronRight size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none rotate-90" />
-            </div>
+            <SearchableCountrySelect
+              value={form.country}
+              onChange={v => u("country", v)}
+              options={COUNTRIES_LIST}
+              placeholder="Select country…"
+              inputClassName={inputCls}
+            />
           </div>
         </div>
         <div>
@@ -4752,89 +4700,20 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "" }: { on
             className={`${inputCls} resize-none`} style={{ fontSize: "0.9375rem" }} />
         </div>
 
-        {/* ── Phone number + OTP verification ─────────── */}
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-foreground" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Phone Number</label>
-            <div className="flex items-center gap-1.5">
-              {phoneVerified || phoneOtpStep === "done"
-                ? <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200" style={{ fontSize: "0.7rem", fontWeight: 700, color: "#065f46" }}><CheckCircle size={11} className="text-green-600" /> Verified</span>
-                : <span className="flex items-center gap-1 text-muted-foreground" style={{ fontSize: "0.7rem" }}><Lock size={10} /> Private</span>
-              }
-            </div>
-          </div>
-          <p className="text-muted-foreground mb-3" style={{ fontSize: "0.75rem" }}>Only visible to you and admins. Verifying adds +5% to your compatibility score.</p>
-
-          <div className="flex gap-2">
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={e => { u("phone", e.target.value); setPhoneOtpStep("idle"); setPhoneVerified(false); }}
-              placeholder="+234 800 000 0000"
-              className={`${inputCls} flex-1`}
-              style={{ fontSize: "0.9375rem" }}
-            />
-            {!phoneVerified && phoneOtpStep !== "done" && (
-              <button
-                type="button"
-                onClick={phoneOtpStep === "idle" ? sendPhoneOtp : undefined}
-                disabled={phoneOtpStep === "sending" || !form.phone.trim()}
-                className="flex-shrink-0 px-3 py-2 rounded-xl bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 disabled:opacity-50 transition-all"
-                style={{ fontSize: "0.8125rem", fontWeight: 700 }}>
-                {phoneOtpStep === "sending" ? <div className="w-4 h-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" /> : "Verify"}
-              </button>
-            )}
-          </div>
-
-          {/* OTP digit input */}
-          {phoneOtpStep === "verifying" && (
-            <div className="mt-4">
-              <p className="text-muted-foreground mb-3" style={{ fontSize: "0.8125rem" }}>
-                Enter the 6-digit code sent to <strong>{form.phone}</strong>
-              </p>
-              <div className="flex gap-2 justify-center mb-3">
-                {phoneOtpDigits.map((d, i) => (
-                  <input
-                    key={i}
-                    ref={el => { otpRefs.current[i] = el; }}
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={d}
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, "");
-                      const next = [...phoneOtpDigits];
-                      next[i] = val.slice(-1);
-                      setPhoneOtpDigits(next);
-                      setPhoneOtpError("");
-                      if (val && i < 5) otpRefs.current[i + 1]?.focus();
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === "Backspace" && !d && i > 0) otpRefs.current[i - 1]?.focus();
-                    }}
-                    onPaste={e => {
-                      const text = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-                      if (text.length === 6) { setPhoneOtpDigits(text.split("")); otpRefs.current[5]?.focus(); }
-                    }}
-                    className="w-10 h-11 text-center rounded-xl border-2 border-border bg-input-background focus:outline-none focus:border-primary transition-all"
-                    style={{ fontSize: "1.25rem", fontWeight: 700, borderColor: d ? "var(--primary)" : undefined }}
-                  />
-                ))}
-              </div>
-              {phoneOtpError && (
-                <p className="text-destructive mb-2 text-center" style={{ fontSize: "0.75rem" }}>{phoneOtpError}</p>
-              )}
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setPhoneOtpStep("idle")}
-                  className="flex-1 py-2.5 rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors"
-                  style={{ fontSize: "0.875rem" }}>Cancel</button>
-                <button type="button" onClick={verifyPhoneOtp}
-                  disabled={phoneOtpDigits.join("").length !== 6}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                  style={{ fontSize: "0.875rem", fontWeight: 700 }}>Confirm</button>
-              </div>
-            </div>
-          )}
+        {/* ── Phone number ─────────────────────────────── */}
+        <div>
+          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Phone Number</label>
+          <input
+            type="tel"
+            value={form.phone}
+            onChange={e => u("phone", e.target.value)}
+            placeholder="+234 800 000 0000"
+            className={inputCls}
+            style={{ fontSize: "0.9375rem" }}
+          />
+          <p className="text-muted-foreground mt-1.5" style={{ fontSize: "0.75rem" }}>
+            Adding your number contributes +5% to your compatibility score. Kept private — only visible to you and admins.
+          </p>
         </div>
       </div>
     </div>
@@ -5378,10 +5257,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
         {subView === "none" && (
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card flex-shrink-0">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-                <Heart size={13} className="text-primary-foreground fill-primary-foreground" />
-              </div>
-              <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.0625rem" }}>Ma3moni</span>
+              <Logo variant="full" size="sm" />
               {userPlan !== "free" && (
                 <span className="px-2 py-0.5 rounded-full" style={{ fontSize: "0.6rem", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", background: userPlan === "premium" ? "#C5733F" : "#4A8DB8", color: "white" }}>
                   {userPlan}

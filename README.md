@@ -1,7 +1,7 @@
 
-  # Ma3moni
+  # ma3moni
 
-  This is a code bundle for Ma3moni. The original project is available at https://www.figma.com/design/wcJvw4cSEWfTK2r4DvlrQB/Ma3moni.
+  This is a code bundle for ma3moni. The original project is available at https://www.figma.com/design/yPskdvRa4p88KyYNz8QVG4/ma3moni.
 
   ## Running the code
 

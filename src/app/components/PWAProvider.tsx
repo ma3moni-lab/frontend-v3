@@ -55,18 +55,30 @@ export function PWAProvider({ children }: PWAProviderProps) {
   useEffect(() => {
     if (!("Notification" in window)) return;
     if (Notification.permission === "granted") {
-      // Always re-subscribe after login or page load so the backend subscription
-      // is always linked to the current user. The backend uses update_or_create
-      // (idempotent), so calling this repeatedly is safe.
-      const t = setTimeout(() => registerPushSubscription(), 3000);
+      // Re-subscribe on page load so the backend subscription is always linked
+      // to the current user. Delayed 4 s to let the JWT restore from localStorage.
+      const t = setTimeout(() => registerPushSubscription(), 4000);
       return () => clearTimeout(t);
     }
     if (Notification.permission !== "default") return;
     // Only prompt once per browser session so we don't harass the user.
     const seen = sessionStorage.getItem("ma3_push_prompted");
     if (seen) return;
-    const t = setTimeout(() => setShowPushPrompt(true), 4000);
+    const t = setTimeout(() => setShowPushPrompt(true), 6000);
     return () => clearTimeout(t);
+  }, []);
+
+  // Re-register push subscription immediately after login / registration.
+  // UserRoot dispatches 'ma3:authenticated' right after setUserTokens so the
+  // JWT is guaranteed to be in memory before we call the subscribe endpoint.
+  useEffect(() => {
+    const onAuth = () => {
+      if (Notification.permission === "granted") {
+        registerPushSubscription();
+      }
+    };
+    window.addEventListener("ma3:authenticated", onAuth);
+    return () => window.removeEventListener("ma3:authenticated", onAuth);
   }, []);
 
   const requestPush = async () => {

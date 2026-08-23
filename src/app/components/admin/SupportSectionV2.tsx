@@ -297,7 +297,7 @@ function PushModal({ target, onClose }: { target: { id?: string; name: string; e
           </div>
           <button onClick={onClose} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"><X size={17} /></button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-4 space-y-4">
           <div>
             <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Notification title…" className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30" style={{ fontSize: "0.9rem" }} />
@@ -369,7 +369,7 @@ function StartConversationModal({ user, onClose }: { user: typeof ALL_PLATFORM_U
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-4 space-y-4">
           {/* Recipient */}
           <div className="flex items-center gap-3 p-3 bg-secondary rounded-xl border border-primary/15">
             <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
@@ -803,7 +803,7 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
           {activeTab === "overview" && (
             <>
               {/* Personal details */}
-              <div className="bg-card rounded-2xl border border-border p-5">
+              <div className="bg-card rounded-2xl border border-border p-4">
                 <h4 style={{ fontWeight: 700, fontSize: "0.9rem", marginBottom: "1rem" }}>Personal Details</h4>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -823,7 +823,7 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
               </div>
 
               {/* Pool information */}
-              <div className="bg-card rounded-2xl border border-border p-5">
+              <div className="bg-card rounded-2xl border border-border p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Layers size={16} className="text-primary" />
                   <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Current Matching Pool</h4>
@@ -849,7 +849,7 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
               </div>
 
               {/* Platform usage */}
-              <div className="bg-card rounded-2xl border border-border p-5">
+              <div className="bg-card rounded-2xl border border-border p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Activity size={16} className="text-primary" />
                   <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Platform Usage</h4>
@@ -907,7 +907,7 @@ function UserProfilePanel({ userId, onClose, ticketSubject }: {
             return (
               <>
                 {/* Online / Session Status Card */}
-                <div className="bg-card rounded-2xl border border-border p-5">
+                <div className="bg-card rounded-2xl border border-border p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 style={{ fontWeight: 700, fontSize: "0.9rem" }}>Session Status</h4>
                     <div className="flex items-center gap-1.5">
@@ -1172,7 +1172,7 @@ function AgentProfilePage({
   const resolutionRate = Math.round((profile.ticketsResolved / profile.ticketsTotal) * 100);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Back */}
       <button onClick={onBack} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.9rem" }}>
         <ChevronLeft size={18} /> All Agents
@@ -1282,7 +1282,7 @@ function AgentProfilePage({
 
       {/* Bio + specialisations */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-6">
+        <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-4">
           <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", marginBottom: "0.75rem" }}>About</h3>
           <p className="text-muted-foreground" style={{ fontSize: "0.9375rem", lineHeight: 1.75 }}>{profile.bio}</p>
           <div className="flex flex-wrap gap-2 mt-4">
@@ -1293,7 +1293,7 @@ function AgentProfilePage({
         </div>
 
         {/* Resolution rate */}
-        <div className="bg-card rounded-2xl border border-border p-6 flex flex-col items-center justify-center text-center">
+        <div className="bg-card rounded-2xl border border-border p-4 flex flex-col items-center justify-center text-center">
           <p className="text-muted-foreground mb-2" style={{ fontSize: "0.8125rem" }}>Resolution Rate</p>
           <div className="relative w-24 h-24 mb-3">
             <svg width="96" height="96" viewBox="0 0 96 96">
@@ -1491,14 +1491,14 @@ function AddAgentModal({ onClose, onAdd }: {
 
           {/* Step 3: Review & invite */}
           {step === 3 && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div>
                 <p style={{ fontWeight: 800, fontSize: "1.125rem", marginBottom: "0.5rem" }}>Review & Send Invitation</p>
                 <p className="text-muted-foreground" style={{ fontSize: "0.9rem" }}>Confirm the details and send the portal invitation.</p>
               </div>
 
               {/* Summary */}
-              <div className="bg-secondary rounded-2xl border border-primary/15 p-5 space-y-3">
+              <div className="bg-secondary rounded-2xl border border-primary/15 p-4 space-y-3">
                 {[
                   { label: "Name",  value: form.name },
                   { label: "Email", value: form.email },
@@ -1513,7 +1513,7 @@ function AddAgentModal({ onClose, onAdd }: {
               </div>
 
               {/* Temp password */}
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
                 <p style={{ fontWeight: 700, fontSize: "0.9rem", color: "#854d0e", marginBottom: "0.5rem" }}>Temporary Password</p>
                 <div className="flex items-center gap-3">
                   <code style={{ fontSize: "1.125rem", fontWeight: 800, letterSpacing: "0.1em", color: "#0A6870", flex: 1 }}>{tempPassword}</code>

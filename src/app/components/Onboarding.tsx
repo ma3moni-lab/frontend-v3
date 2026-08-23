@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Check, Heart, X, RefreshCw, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, RefreshCw, ChevronDown } from "lucide-react";
+import { Logo } from "./Logo";
+import { SearchableCountrySelect } from "./SearchableCountrySelect";
 
 // ── Country list (ISO 3166-1 alpha-2 sorted by name) ──────────────────────────
 const COUNTRIES = [
@@ -494,12 +496,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
             <ChevronLeft size={18} />
             <span style={{ fontSize: "0.875rem" }}>Back</span>
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Heart size={13} className="text-primary-foreground fill-primary-foreground" />
-            </div>
-            <span className="logo-font" style={{ fontWeight: 700, fontSize: "1rem" }}>Ma3moni</span>
-          </div>
+          <Logo variant="full" size="sm" />
           <div style={{ width: "60px" }} />
         </div>
 
@@ -590,7 +587,7 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
               <div className="space-y-4">
                 <div>
                   <FieldLabel>Nationality</FieldLabel>
-                  <SelectInput
+                  <SearchableCountrySelect
                     value={form.nationality}
                     onChange={v => update("nationality", v)}
                     options={COUNTRIES}
@@ -609,7 +606,12 @@ export function Onboarding({ onComplete, onBack }: OnboardingProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <FieldLabel>Country of Residence</FieldLabel>
-                    <TextInput value={form.country} onChange={v => update("country", v)} placeholder="UAE" />
+                    <SearchableCountrySelect
+                      value={form.country}
+                      onChange={v => update("country", v)}
+                      options={COUNTRIES}
+                      placeholder="Select country…"
+                    />
                   </div>
                   <div>
                     <FieldLabel>City</FieldLabel>

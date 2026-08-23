@@ -618,18 +618,9 @@ export interface Plan {
   price_monthly_ngn?:       number;
   price_yearly_ngn?:        number;
   // Currency-resolved price returned by list_plans when authenticated
-  price?:                   number;
-  currency?:                string;
-  features:                 string[];
-  // Per-currency Credo codes
-  credo_code_monthly_ngn?:  string;
-  credo_code_yearly_ngn?:   string;
-  credo_code_monthly_usd?:  string;
-  credo_code_yearly_usd?:   string;
-  stripe_price_id_monthly?:  string;
-  stripe_price_id_yearly?:   string;
-  credo_code_monthly?:      string;
-  credo_code_yearly?:       string;
+  price?:    number;
+  currency?: string;
+  features:  string[];
 }
 
 export interface Subscription {
@@ -1088,6 +1079,10 @@ export interface PlatformSettings {
   credo_environment:            "sandbox" | "production";
   credo_secret_key_set:         boolean;
   credo_webhook_secret_set:     boolean;
+  push_configured?:             boolean;
+  auto_grant_on_completion?:    boolean;
+  auto_grant_plan?:             "basic" | "premium";
+  auto_grant_days?:             number;
 }
 
 // All possible granular permissions assignable per staff member
@@ -1261,8 +1256,6 @@ export const adminApi = {
     price_monthly_ngn?: number; price_yearly_ngn?: number;
     features?: string[]; is_active?: boolean; sort_order?: number;
     badge?: string; description?: string;
-    credo_code_monthly_ngn?: string; credo_code_yearly_ngn?: string;
-    credo_code_monthly_usd?: string; credo_code_yearly_usd?: string;
   }) =>
     patch<Plan>(`/api/admin/plans/${planName}/`, data),
 

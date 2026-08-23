@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router";
-import { Heart, ArrowRight, Clock, User, Tag, Search, ChevronRight } from "lucide-react";
+import { ArrowRight, Clock, User, Tag, Search, ChevronRight } from "lucide-react";
+import { Logo } from "./Logo";
 import { BlogDetail } from "./BlogDetail";
 import { blog, type BlogArticle } from "../../lib/api";
 
@@ -113,12 +114,7 @@ export function BlogListPage() {
       <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-sm border-b border-border">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Heart size={15} className="text-primary-foreground fill-primary-foreground" />
-            </div>
-            <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.125rem" }}>
-              Ma3moni
-            </span>
+            <Logo variant="full" size="sm" />
             <span className="hidden sm:block text-muted-foreground" style={{ fontSize: "0.9375rem" }}>
               / Journal
             </span>
@@ -462,10 +458,8 @@ export function BlogListPage() {
       {/* ── Footer ── */}
       <footer className="border-t border-border bg-card mt-0">
         <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-primary flex items-center justify-center">
-              <Heart size={11} className="text-primary-foreground fill-primary-foreground" />
-            </div>
+          <Link to="/" className="flex items-center gap-1.5">
+            <Logo variant="icon" size="xs" />
             <span className="logo-font" style={{ fontWeight: 800, fontSize: "0.875rem" }}>Ma3moni Journal</span>
           </Link>
           <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>© 2026 Ma3moni. All rights reserved.</p>

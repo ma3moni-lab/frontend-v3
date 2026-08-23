@@ -172,6 +172,9 @@ export function UserRoot() {
   const afterLogin = async (plan: UserPlan, profileComplete: boolean) => {
     try { localStorage.setItem(PLAN_KEY, plan); } catch {}
     detectAndStoreLocation();
+    // Signal PWAProvider that a user is now authenticated so it can register
+    // (or re-register) the push subscription linked to this user's JWT.
+    window.dispatchEvent(new CustomEvent('ma3:authenticated'));
     const alreadyOnboarded = (() => { try { return localStorage.getItem(ONBOARDING_KEY) === "true"; } catch { return false; } })();
     if (profileComplete || alreadyOnboarded) { setView("app"); return; }
     // Neither flag set — cross-device or cleared storage: check backend profile for any data.
@@ -190,6 +193,7 @@ export function UserRoot() {
   const afterRegister = (plan: UserPlan, _profileComplete: boolean, _identifier: string) => {
     try { localStorage.setItem(PLAN_KEY, plan); } catch {}
     detectAndStoreLocation();
+    window.dispatchEvent(new CustomEvent('ma3:authenticated'));
     setView("onboarding");
   };
 

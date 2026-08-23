@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Heart } from "lucide-react";
+import { Logo } from "./Logo";
 
 export function SplashScreen({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<"in" | "hold" | "out">("in");
@@ -43,21 +43,13 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
       {/* Content */}
       <div className="relative flex flex-col items-center gap-5">
-        {/* Logo mark */}
+        {/* Logo mark — frosted container, fav icon inside */}
         <div
           style={{
-            width: 68,
-            height: 68,
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.16)",
-            borderRadius: 18,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
             animation: "fadeUp 0.55s cubic-bezier(0.16,1,0.3,1) both",
           }}
         >
-          <Heart size={28} className="text-white fill-white" />
+          <Logo variant="icon" theme="dark" size="lg" />
         </div>
 
         {/* Brand wordmark */}
@@ -74,7 +66,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           Ma3moni
         </span>
 
-        {/* Tagline — restrained, not decorative */}
+        {/* Tagline */}
         <p
           style={{
             fontSize: "0.75rem",

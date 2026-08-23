@@ -99,7 +99,7 @@ export function ContactPage() {
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-border p-7 space-y-5">
+              <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-border p-5 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {[
                     { label: "Full Name", key: "name", placeholder: "Yusuf Al-Rashid", type: "text" },

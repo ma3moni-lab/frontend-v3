@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import {
-  Eye, EyeOff, Heart, CheckCircle2, XCircle, Loader2, AlertCircle, ArrowRight, X,
+  Eye, EyeOff, CheckCircle2, XCircle, Loader2, AlertCircle, ArrowRight, X,
 } from "lucide-react";
+import { Logo } from "./Logo";
 import { auth as apiAuth, ApiError } from "../../lib/api";
 
 // Kept in sync with backend PasswordComplexityValidator
@@ -113,12 +114,7 @@ export function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex items-center justify-center px-6 py-4 border-b border-border bg-white/80 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A6870, #14A8B4)" }}>
-            <Heart size={14} className="text-white fill-white" />
-          </div>
-          <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.0625rem" }}>Ma3moni</span>
-        </div>
+        <Logo variant="full" size="sm" />
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6">

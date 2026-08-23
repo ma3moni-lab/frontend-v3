@@ -36,7 +36,6 @@ import {
 } from "recharts";
 
 import type { AdminRole } from "./AdminRoot";
-import { Logo } from "./Logo";
 
 interface AdminAppProps {
   onBack: () => void;
@@ -2883,174 +2882,6 @@ function AdminAuditSection() {
   );
 }
 
-// ─── EMAIL DIAGNOSTICS PANEL ─────────────────────────────
-function EmailDiagnosticsPanel() {
-  type EmailStatus = Awaited<ReturnType<typeof adminApi.emailStatus>>;
-  const [status,     setStatus]    = useState<EmailStatus | null>(null);
-  const [loading,    setLoading]   = useState(true);
-  const [testTo,     setTestTo]    = useState("");
-  const [testing,    setTesting]   = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; provider: string; error: string } | null>(null);
-
-  const load = () => {
-    setLoading(true);
-    adminApi.emailStatus()
-      .then(s => setStatus(s))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const sendTest = async () => {
-    if (!testTo.trim()) return;
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const r = await adminApi.sendTestEmail(testTo.trim());
-      setTestResult({ success: r.success, provider: r.provider, error: r.error });
-      if (r.success) toast.success(`Test email sent via ${r.provider} → ${r.to}`);
-      else           toast.error(`Delivery failed: ${r.error}`);
-    } catch {
-      toast.error("Could not reach email-test endpoint.");
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const isSES  = status?.active_provider === "amazon_ses";
-  const isMock = status?.active_provider === "mock";
-
-  return (
-    <div className="bg-card rounded-2xl border border-border p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Send size={17} className="text-primary" />
-          </div>
-          <div>
-            <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Email Delivery</h3>
-            <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Amazon SES · OTP · Receipts · Alerts</p>
-          </div>
-        </div>
-        <button onClick={load} disabled={loading}
-          className="p-1.5 rounded-lg border border-border hover:bg-muted transition-colors disabled:opacity-40">
-          <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-        </button>
-      </div>
-
-      {loading && <div className="flex justify-center py-6"><Loader2 size={20} className="animate-spin text-muted-foreground" /></div>}
-
-      {!loading && status && (
-        <div className="space-y-4">
-          {/* Provider status banner */}
-          <div className={`rounded-xl px-4 py-3 flex items-start gap-3 ${isSES ? "bg-green-50 border border-green-200" : "bg-amber-50 border border-amber-200"}`}>
-            <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${isSES ? "bg-green-500" : "bg-amber-500"}`} />
-            <div>
-              <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: isSES ? "#166534" : "#92400e" }}>
-                {isSES ? "Amazon SES — live delivery active" : "Mock Provider — emails NOT sent to inbox"}
-              </p>
-              <p style={{ fontSize: "0.8125rem", color: isSES ? "#166534" : "#92400e", opacity: 0.85 }}>
-                {status.provider_reason}
-              </p>
-            </div>
-          </div>
-
-          {/* Checklist */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "AWS Key ID set",        ok: status.aws_key_set },
-              { label: "AWS Secret set",         ok: status.aws_secret_set },
-              { label: "Email verification on",  ok: status.email_verification_on },
-              { label: `Region: ${status.aws_region}`, ok: true },
-            ].map(({ label, ok }) => (
-              <div key={label} className="flex items-center gap-2">
-                {ok ? <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
-                    : <XCircle    size={14} className="text-red-500 flex-shrink-0" />}
-                <span style={{ fontWeight: ok ? 500 : 600, fontSize: "0.8125rem",
-                               color: ok ? "var(--foreground)" : "#991b1b" }}>{label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Sent (last 50)",   value: status.stats.sent,   color: "#166534" },
-              { label: "Failed (last 50)", value: status.stats.failed, color: status.stats.failed > 0 ? "#991b1b" : "var(--foreground)" },
-            ].map(s => (
-              <div key={s.label} className="rounded-xl bg-muted/50 p-3 text-center">
-                <p style={{ fontSize: "1.5rem", fontWeight: 900, color: s.color }}>{s.value}</p>
-                <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Recent log */}
-          {status.stats.recent.length > 0 && (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <p className="px-3 py-2 bg-muted/50 text-muted-foreground" style={{ fontSize: "0.75rem", fontWeight: 600 }}>RECENT ATTEMPTS</p>
-              <div className="divide-y divide-border">
-                {status.stats.recent.map((log, i) => (
-                  <div key={i} className="px-3 py-2 flex items-center gap-3">
-                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${log.status === "sent" ? "bg-green-500" : "bg-red-500"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate" style={{ fontSize: "0.8125rem" }}>
-                        {log.to} · <span className="text-muted-foreground">{log.type}</span>
-                      </p>
-                      {log.error && <p className="truncate text-red-500" style={{ fontSize: "0.75rem" }}>{log.error}</p>}
-                    </div>
-                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.6875rem" }}>
-                      {new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Test send */}
-          <div className="border-t border-border pt-4">
-            <p style={{ fontWeight: 600, fontSize: "0.875rem" }} className="mb-2">Send Test Email</p>
-            <div className="flex gap-2">
-              <input
-                type="email"
-                placeholder="recipient@example.com"
-                value={testTo}
-                onChange={e => setTestTo(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && sendTest()}
-                className="flex-1 px-3 py-2 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ fontSize: "0.875rem" }}
-              />
-              <button
-                onClick={sendTest}
-                disabled={testing || !testTo.trim()}
-                className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-                style={{ fontSize: "0.875rem", fontWeight: 600 }}
-              >
-                {testing ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                Send
-              </button>
-            </div>
-            {testResult && (
-              <p className={`mt-2 px-3 py-2 rounded-lg text-sm ${testResult.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}>
-                {testResult.success
-                  ? `✅ Delivered via ${testResult.provider}`
-                  : `❌ Failed (${testResult.provider}): ${testResult.error}`}
-              </p>
-            )}
-            {isMock && (
-              <p className="mt-2 text-amber-600" style={{ fontSize: "0.75rem" }}>
-                ⚠️ Mock provider active — test logs to server console only. Add AWS credentials on Render to enable real delivery.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── SETTINGS SECTION ─────────────────────────────────────
 function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSettingsSaved?: (s: PlatformSettings) => void }) {
   const isSuperAdmin = role === "super-admin";
@@ -3060,7 +2891,6 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     maxDailyMatchesBasic: "5",
     minFemaleRatio: "48",
     referralBonus: "10",
-    referralBonusNgn: "5000",
     maintenanceMode: false,
     emailVerification: true,
     photoModerationRequired: true,
@@ -3071,20 +2901,14 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
   const [credoKeys, setCredoKeys] = useState({
     publicKey:     "",
     secretKey:     "",
+    merchantId:    "",
     webhookSecret: "",
-    environment:   "sandbox" as "sandbox" | "production",
   });
   const [credoSaved, setCredoSaved] = useState({ secretKeySet: false, webhookSecretSet: false });
   const [credoSaving, setCredoSaving] = useState(false);
   const [adminRevenueAccess, setAdminRevenueAccess] = useState(getRevenuePermission);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [pushConfigured, setPushConfigured] = useState<boolean | null>(null);
-  const [autoGrant, setAutoGrant] = useState({
-    enabled: false,
-    plan: "basic" as "basic" | "premium",
-    days: "7",
-  });
 
   // Self-fetch live settings from DB on mount
   useEffect(() => {
@@ -3095,7 +2919,6 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           maxDailyMatchesFree:  String(s.max_daily_matches_free),
           maxDailyMatchesBasic: String(s.max_daily_matches_basic),
           referralBonus:        String(s.referral_bonus_points),
-          referralBonusNgn:     String(s.referral_bonus_ngn ?? 5000),
           maintenanceMode:      s.maintenance_mode,
           maxPhotos:            String(s.max_photos),
           emailVerification:    s.email_verification_enabled ?? true,
@@ -3107,18 +2930,12 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         // Pre-fill non-secret Credo fields; show masked indicator for secrets
         setCredoKeys(prev => ({
           ...prev,
-          publicKey:   s.credo_public_key   ?? "",
-          environment: (s.credo_environment as "sandbox" | "production") ?? "sandbox",
+          publicKey:  s.credo_public_key  ?? "",
+          merchantId: s.credo_merchant_id ?? "",
         }));
         setCredoSaved({
           secretKeySet:     s.credo_secret_key_set     ?? false,
           webhookSecretSet: s.credo_webhook_secret_set ?? false,
-        });
-        setPushConfigured(s.push_configured ?? false);
-        setAutoGrant({
-          enabled: s.auto_grant_on_completion ?? false,
-          plan:    (s.auto_grant_plan ?? "basic") as "basic" | "premium",
-          days:    String(s.auto_grant_days ?? 7),
         });
       })
       .catch(() => setLoadError(true));
@@ -3140,13 +2957,9 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         max_daily_matches_basic:      Number(settings.maxDailyMatchesBasic),
         max_photos:                   Number(settings.maxPhotos),
         referral_bonus_points:        Number(settings.referralBonus),
-        referral_bonus_ngn:           Number(settings.referralBonusNgn),
         maintenance_mode:             settings.maintenanceMode as boolean,
         email_verification_enabled:   settings.emailVerification as boolean,
         revenue_permission_for_admin: adminRevenueAccess,
-        auto_grant_on_completion:     autoGrant.enabled,
-        auto_grant_plan:              autoGrant.plan,
-        auto_grant_days:              Number(autoGrant.days),
       });
       onSettingsSaved?.(updated);
       setRevenuePermission(adminRevenueAccess);
@@ -3156,7 +2969,6 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         maxDailyMatchesFree:  String(updated.max_daily_matches_free),
         maxDailyMatchesBasic: String(updated.max_daily_matches_basic),
         referralBonus:        String(updated.referral_bonus_points),
-        referralBonusNgn:     String(updated.referral_bonus_ngn ?? 5000),
         maintenanceMode:      updated.maintenance_mode,
         maxPhotos:            String(updated.max_photos),
         emailVerification:    updated.email_verification_enabled ?? true,
@@ -3175,8 +2987,8 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
     setCredoSaving(true);
     try {
       const payload: Record<string, string> = {};
-      payload.credo_environment                                        = credoKeys.environment;
       if (credoKeys.publicKey.trim())     payload.credo_public_key     = credoKeys.publicKey.trim();
+      if (credoKeys.merchantId.trim())    payload.credo_merchant_id    = credoKeys.merchantId.trim();
       if (credoKeys.secretKey.trim())     payload.credo_secret_key     = credoKeys.secretKey.trim();
       if (credoKeys.webhookSecret.trim()) payload.credo_webhook_secret = credoKeys.webhookSecret.trim();
       const updated = await adminApi.updateSettings(payload);
@@ -3244,49 +3056,25 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
 
         {/* Referral Settings */}
         <div className="bg-card rounded-2xl border border-border p-4">
-          <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-1">Referral Program</h3>
-          <p className="text-muted-foreground mb-5" style={{ fontSize: "0.8125rem" }}>
-            Set the bonus amount shown to users when they share their referral code. Each currency is independent — never converted.
-          </p>
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
-                Nigerian users <span className="font-normal text-muted-foreground">(₦ Naira)</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold" style={{ fontSize: "0.9rem" }}>₦</span>
-                <input
-                  value={settings.referralBonusNgn}
-                  onChange={e => update("referralBonusNgn", e.target.value)}
-                  type="number"
-                  min="0"
-                  className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                  style={{ fontSize: "0.9rem" }}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
-                International users <span className="font-normal text-muted-foreground">($ USD)</span>
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold" style={{ fontSize: "0.9rem" }}>$</span>
-                <input
-                  value={settings.referralBonus}
-                  onChange={e => update("referralBonus", e.target.value)}
-                  type="number"
-                  min="0"
-                  className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                  style={{ fontSize: "0.9rem" }}
-                />
-              </div>
+          <h3 style={{ fontWeight: 700, fontSize: "1rem" }} className="mb-5">Referral Program</h3>
+          <div>
+            <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Referral Bonus Points</label>
+            <div className="flex gap-3">
+              <input
+                value={settings.referralBonus}
+                onChange={e => update("referralBonus", e.target.value)}
+                type="number"
+                min="0"
+                className="w-40 px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                style={{ fontSize: "0.9rem" }}
+              />
+              <button onClick={saveSettings} disabled={saving}
+                className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                {saving ? "Saving…" : "Save"}
+              </button>
             </div>
           </div>
-          <button onClick={saveSettings} disabled={saving}
-            className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            style={{ fontSize: "0.875rem", fontWeight: 600 }}>
-            {saving ? "Saving…" : "Save"}
-          </button>
         </div>
 
         {/* Feature toggles */}
@@ -3429,70 +3217,41 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
         </div>
       </div>
 
-        {/* ── Email Diagnostics ── super-admin only */}
-        {isSuperAdmin && <EmailDiagnosticsPanel />}
-
         {/* Payment Gateway — Credo by eTranzact */}
         {isSuperAdmin && (
-          <div className="bg-card rounded-2xl border border-border p-4 space-y-5">
-            <div className="flex items-center gap-3">
+          <div className="bg-card rounded-2xl border border-border p-4">
+            <div className="flex items-center gap-3 mb-1">
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <CreditCard size={18} className="text-primary" />
               </div>
               <div>
                 <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Payment Gateway — Credo by eTranzact</h3>
-                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Secret keys are write-only and never returned after saving.</p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Keys are stored securely in the database. Secret keys are write-only and never returned after saving.</p>
               </div>
             </div>
 
-            {/* Environment toggle */}
-            <div>
-              <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Environment</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["sandbox", "production"] as const).map(env => (
-                  <button
-                    key={env}
-                    type="button"
-                    onClick={() => setCredoKeys(p => ({ ...p, environment: env }))}
-                    className={`flex flex-col items-start px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                      credoKeys.environment === env
-                        ? env === "sandbox"
-                          ? "border-amber-400 bg-amber-50 text-amber-900"
-                          : "border-primary bg-primary/5 text-primary"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/30"
-                    }`}
-                  >
-                    <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>
-                      {env === "sandbox" ? "🧪 Sandbox" : "🚀 Production"}
-                    </span>
-                    <span style={{ fontSize: "0.75rem", marginTop: "2px" }}>
-                      {env === "sandbox"
-                        ? "Test keys · api.credodemo.com · no real charges"
-                        : "Live keys · api.credocentral.com · real payments"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-1.5 text-muted-foreground" style={{ fontSize: "0.75rem" }}>
-                {credoKeys.environment === "sandbox"
-                  ? "Use your Credo sandbox/test keys below. Find them at dashboard.credocentral.com → Sandbox."
-                  : "Use your Credo live keys below. Find them at dashboard.credocentral.com → API Keys."}
-              </p>
-            </div>
-
-            {/* Key fields */}
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>
-                  Public Key
-                </label>
-                <input
-                  value={credoKeys.publicKey}
-                  onChange={e => setCredoKeys(p => ({ ...p, publicKey: e.target.value }))}
-                  placeholder={credoKeys.environment === "sandbox" ? "test_pk_…" : "pk_live_…"}
-                  className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
-                  style={{ fontSize: "0.8125rem" }}
-                />
+            <div className="mt-5 grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Public Key</label>
+                  <input
+                    value={credoKeys.publicKey}
+                    onChange={e => setCredoKeys(p => ({ ...p, publicKey: e.target.value }))}
+                    placeholder="pk_live_xxxxxxxxxxxx"
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                    style={{ fontSize: "0.8125rem" }}
+                  />
+                </div>
+                <div>
+                  <label className="block mb-1.5" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Merchant ID</label>
+                  <input
+                    value={credoKeys.merchantId}
+                    onChange={e => setCredoKeys(p => ({ ...p, merchantId: e.target.value }))}
+                    placeholder="MER_xxxxxxxxxxxx"
+                    className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
+                    style={{ fontSize: "0.8125rem" }}
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -3506,7 +3265,7 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
                     type="password"
                     value={credoKeys.secretKey}
                     onChange={e => setCredoKeys(p => ({ ...p, secretKey: e.target.value }))}
-                    placeholder={credoSaved.secretKeySet ? "Leave blank to keep" : credoKeys.environment === "sandbox" ? "test_sk_…" : "sk_live_…"}
+                    placeholder={credoSaved.secretKeySet ? "Leave blank to keep existing key" : "sk_live_xxxxxxxxxxxx"}
                     className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
                     style={{ fontSize: "0.8125rem" }}
                     autoComplete="new-password"
@@ -3523,128 +3282,32 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
                     type="password"
                     value={credoKeys.webhookSecret}
                     onChange={e => setCredoKeys(p => ({ ...p, webhookSecret: e.target.value }))}
-                    placeholder={credoSaved.webhookSecretSet ? "Leave blank to keep" : "whsec_…"}
+                    placeholder={credoSaved.webhookSecretSet ? "Leave blank to keep existing secret" : "whsec_xxxxxxxxxxxx"}
                     className="w-full px-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-mono"
                     style={{ fontSize: "0.8125rem" }}
                     autoComplete="new-password"
                   />
                 </div>
               </div>
-            </div>
 
-            {/* URLs reference */}
-            <div className="bg-muted/50 rounded-xl p-3 space-y-1.5" style={{ fontSize: "0.75rem" }}>
-              <p className="font-semibold text-foreground">Credo dashboard — paste these URLs:</p>
-              <p className="text-muted-foreground">
-                <span className="font-semibold">Callback URL:</span>{" "}
-                <code className="bg-card px-1.5 py-0.5 rounded border border-border text-foreground">https://ma3moni-backend26.onrender.com/api/payments/credo/callback/</code>
-              </p>
-              <p className="text-muted-foreground">
-                <span className="font-semibold">Webhook URL:</span>{" "}
-                <code className="bg-card px-1.5 py-0.5 rounded border border-border text-foreground">https://ma3moni-backend26.onrender.com/api/payments/credo/webhook/</code>
-              </p>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-border">
-              <button
-                onClick={saveCredoKeys}
-                disabled={credoSaving}
-                className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                style={{ fontSize: "0.875rem", fontWeight: 600 }}
-              >
-                {credoSaving ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Save Settings"}
-              </button>
+              <div className="flex items-center justify-between pt-2 border-t border-border">
+                <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
+                  Callback URL: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground" style={{ fontSize: "0.75rem" }}>/payment/verify</code>
+                  &nbsp;·&nbsp;
+                  Webhook URL: <code className="bg-muted px-1.5 py-0.5 rounded text-foreground" style={{ fontSize: "0.75rem" }}>/api/payments/webhook/credo/</code>
+                </p>
+                <button
+                  onClick={saveCredoKeys}
+                  disabled={credoSaving}
+                  className="flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2 rounded-xl hover:bg-primary/90 disabled:opacity-50 transition-colors flex-shrink-0 ml-4"
+                  style={{ fontSize: "0.875rem", fontWeight: 600 }}
+                >
+                  {credoSaving ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Save Keys"}
+                </button>
+              </div>
             </div>
           </div>
         )}
-
-      {/* ── Push Notification Status ──────────────────────────────── */}
-      <div className="rounded-2xl border border-border bg-card p-5 mt-2">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>Push Notifications</p>
-            <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem", lineHeight: 1.5 }}>
-              Web push uses VAPID keys configured as environment variables on Render. The admin panel can send pushes but users must first allow notifications on their device.
-            </p>
-          </div>
-          {pushConfigured === null ? (
-            <div className="w-4 h-4 rounded-full border-2 border-muted border-t-primary animate-spin flex-shrink-0 mt-1" />
-          ) : pushConfigured ? (
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 border border-green-200 text-green-700 flex-shrink-0" style={{ fontSize: "0.75rem", fontWeight: 700 }}>
-              ✓ Configured
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 flex-shrink-0" style={{ fontSize: "0.75rem", fontWeight: 700 }}>
-              ⚠ VAPID keys missing
-            </span>
-          )}
-        </div>
-        {pushConfigured === false && (
-          <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3" style={{ fontSize: "0.8125rem", lineHeight: 1.6, color: "#92400e" }}>
-            <strong>To enable push notifications:</strong>
-            <ol className="list-decimal ml-4 mt-1 space-y-0.5">
-              <li>SSH into your Render instance and run: <code className="bg-amber-100 px-1 rounded">python manage.py generate_vapid_keys</code></li>
-              <li>Copy the printed VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, and VAPID_ADMIN_EMAIL values</li>
-              <li>Add them as Environment Variables in your Render service dashboard</li>
-              <li>Redeploy — push will activate automatically</li>
-            </ol>
-          </div>
-        )}
-      </div>
-
-      {/* ── Auto-grant subscription on profile completion ────────── */}
-      <div className="rounded-2xl border border-border bg-card p-5 mt-2">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>Auto-Grant on Profile Completion</p>
-            <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem", lineHeight: 1.5 }}>
-              When toggled on, users who complete their profile (≥70% score) automatically receive the selected plan for the specified number of days — free of charge.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setAutoGrant(p => ({ ...p, enabled: !p.enabled }))}
-            className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors ${autoGrant.enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
-            style={{ marginLeft: "1rem" }}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${autoGrant.enabled ? "translate-x-6" : ""}`} />
-          </button>
-        </div>
-        {autoGrant.enabled && (
-          <div className="grid grid-cols-2 gap-3 mt-3">
-            <div>
-              <label className="block text-muted-foreground mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Plan to Grant</label>
-              <select
-                value={autoGrant.plan}
-                onChange={e => setAutoGrant(p => ({ ...p, plan: e.target.value as "basic" | "premium" }))}
-                className="w-full px-3 py-2 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                style={{ fontSize: "0.875rem" }}>
-                <option value="basic">Basic</option>
-                <option value="premium">Premium</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-muted-foreground mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Duration (days)</label>
-              <select
-                value={autoGrant.days}
-                onChange={e => setAutoGrant(p => ({ ...p, days: e.target.value }))}
-                className="w-full px-3 py-2 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                style={{ fontSize: "0.875rem" }}>
-                <option value="7">7 days</option>
-                <option value="14">14 days</option>
-                <option value="30">30 days</option>
-                <option value="60">60 days</option>
-                <option value="90">90 days</option>
-              </select>
-            </div>
-          </div>
-        )}
-        {autoGrant.enabled && (
-          <p className="mt-3 text-primary" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
-            ✓ Active — new users completing their profile will automatically receive {autoGrant.days} days of {autoGrant.plan} plan.
-          </p>
-        )}
-      </div>
 
       {/* Save button */}
       <div className="flex justify-end mt-6">
@@ -3811,7 +3474,9 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
       >
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b" style={{ borderColor: "var(--sidebar-border)", minHeight: "68px" }}>
-          <Logo variant="icon" theme="dark" size="sm" />
+          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center flex-shrink-0">
+            <Heart size={15} className="text-sidebar-primary-foreground fill-sidebar-primary-foreground" />
+          </div>
           {sidebarOpen && (
             <div className="min-w-0">
               <p className="logo-font" style={{ fontWeight: 800, fontSize: "1rem", color: "var(--sidebar-foreground)" }}>Ma3moni</p>

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { BlogDetail } from "./BlogDetail";
 import { blog, type BlogArticle } from "../../lib/api";
+import { Logo } from "./Logo";
 
 const u = (id: string, w: number, h: number) =>
   `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&auto=format`;
@@ -273,12 +274,7 @@ export function Landing({ onStart, onLogin }: LandingProps) {
       >
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--primary)" }}>
-              <Heart size={15} className="text-white fill-white" />
-            </div>
-            <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.125rem", letterSpacing: "-0.01em" }}>Ma3moni</span>
-          </div>
+          <Logo variant="full" size="md" />
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-0.5">
@@ -915,11 +911,8 @@ export function Landing({ onStart, onLogin }: LandingProps) {
         <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="col-span-2">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "var(--primary)" }}>
-                <Heart size={14} className="text-white fill-white" />
-              </div>
-              <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.0625rem" }}>Ma3moni</span>
+            <div className="mb-4">
+              <Logo variant="full" size="sm" />
             </div>
             <p className="text-muted-foreground mb-5" style={{ fontSize: "0.875rem", lineHeight: 1.75, maxWidth: "240px" }}>
               A compatibility-first marriage platform for serious individuals seeking lifelong partnerships.

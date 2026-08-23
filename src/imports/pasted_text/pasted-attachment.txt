@@ -1,0 +1,359 @@
+want Amazon SES integrated into the Django backend following enterprise software architecture and best practices.
+
+1. Configuration
+
+Store all AWS credentials in environment variables.
+
+Never hardcode credentials.
+
+Create a dedicated SES configuration module.
+
+Support Development, Staging and Production environments.
+
+Required environment variables:
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_SES_REGION=eu-west-2
+AWS_SES_FROM_EMAIL=no-reply@ma3moni.com
+AWS_SES_FROM_NAME=Ma3moni
+2. Email Architecture
+
+Implement a provider abstraction instead of coupling the application directly to Amazon SES.
+
+Architecture:
+
+EmailService
+      │
+      ▼
+BaseEmailProvider (abstract)
+      │
+      ├── AmazonSESProvider
+      ├── MockEmailProvider
+      ├── ResendProvider (future)
+      └── MailgunProvider (future)
+
+The rest of the application must only use:
+
+EmailService.send_verification_email(user)
+
+and never communicate directly with Amazon SES.
+
+3. Folder Structure
+
+Create:
+
+services/
+
+    email/
+
+        __init__.py
+
+        base.py
+
+        ses_provider.py
+
+        mock_provider.py
+
+        email_service.py
+
+notifications/
+
+    notification_service.py
+4. Email Templates
+
+Create reusable HTML and plain-text templates.
+
+templates/
+
+    emails/
+
+        base.html
+        base.txt
+
+        verification.html
+        verification.txt
+
+        password_reset.html
+        password_reset.txt
+
+        login_alert.html
+        login_alert.txt
+
+        subscription_receipt.html
+        subscription_receipt.txt
+
+Use Ma3moni branding throughout:
+
+Logo
+Colors
+Footer
+Support email
+Copyright
+Responsive design
+5. Email Verification
+
+During registration:
+
+Create user.
+Generate secure verification token.
+Store token securely.
+Queue email.
+Send through Amazon SES.
+Return success immediately.
+
+Verification link:
+
+https://ma3moni.com/verify-email?token=<token>
+
+The frontend will call:
+
+POST /api/auth/verify-email/
+
+Backend must:
+
+Validate token
+Check expiry
+Verify email
+Invalidate token
+Return success
+
+Tokens expire after 24 hours.
+
+Tokens must be single-use.
+
+6. Development Email Verification Toggle
+
+Implement a configurable verification mode for development and production.
+
+Environment Variables
+EMAIL_VERIFICATION_ENABLED=True
+EMAIL_VERIFICATION_DEV_CODE=000000
+Production Mode
+
+When:
+
+EMAIL_VERIFICATION_ENABLED=True
+
+The backend must:
+
+Generate secure verification tokens or OTPs.
+Send real verification emails through Amazon SES.
+Require users to verify using the real code.
+Reject invalid or expired verification attempts.
+Development Mode
+
+When:
+
+EMAIL_VERIFICATION_ENABLED=False
+
+The backend must:
+
+Skip sending real emails.
+Use the MockEmailProvider.
+Accept the configured development verification code.
+Default verification code:
+000000
+Continue the complete verification workflow exactly as production:
+Verify the email.
+Update the user's verification status.
+Execute all post-verification business logic.
+Clearly log that Development Verification Mode is active.
+
+The frontend must continue using the exact same API endpoints in both development and production.
+
+Example:
+
+POST /api/auth/verify-email/
+
+Production:
+
+{
+    "email":"user@example.com",
+    "code":"583214"
+}
+
+Development:
+
+{
+    "email":"user@example.com",
+    "code":"000000"
+}
+Security
+
+If:
+
+DEBUG=False
+
+and
+
+EMAIL_VERIFICATION_ENABLED=False
+
+the backend should:
+
+Log a critical warning.
+Optionally refuse to start to prevent accidental production deployment.
+
+The development verification code must never be hardcoded throughout the codebase. It must always come from environment variables.
+
+7. Password Reset
+
+Implement:
+
+POST /forgot-password/
+
+POST /reset-password/
+
+Requirements:
+
+Secure token generation
+Expiration
+Single-use tokens
+HTML email
+Plain-text email
+8. Login Alerts
+
+Optionally send login alerts when users log in from:
+
+New browser
+New device
+New IP
+New location
+
+Include:
+
+Date
+Time
+Browser
+OS
+IP Address
+Approximate location
+9. Email Change Verification
+
+When users change their email:
+
+Keep current email active.
+Send verification email to the new address.
+Activate only after verification.
+Roll back if verification expires.
+10. Logging
+
+Create centralized logging for:
+
+Email queued
+Email sent
+Email failed
+Retry scheduled
+Bounce
+Complaint
+Verification success
+Verification failure
+11. Background Jobs
+
+Integrate:
+
+Celery
+Redis
+
+Email workflow:
+
+User registers
+
+↓
+
+Create account
+
+↓
+
+Queue Celery task
+
+↓
+
+Return API response immediately
+
+↓
+
+Celery sends email through Amazon SES
+
+API response time must never depend on email delivery.
+
+12. Notification Service
+
+Implement a centralized notification layer.
+
+Examples:
+
+NotificationService.send_email_verification(user)
+
+NotificationService.send_password_reset(user)
+
+NotificationService.send_login_alert(user)
+
+NotificationService.send_subscription_receipt(user, payment)
+13. Error Handling
+
+Email failures must never crash API requests.
+
+If SES fails:
+
+Log the error.
+Return success if user creation succeeded.
+Queue retry.
+Mark email status as failed.
+14. Security
+
+Implement:
+
+Secure random tokens
+Hashed token storage
+Expiring tokens
+Single-use tokens
+Replay attack prevention
+Rate limiting
+CSRF protection where applicable
+JWT authentication
+Audit logging
+15. Environment Support
+
+Support:
+
+Development
+Staging
+Production
+
+Behavior should automatically change based on environment variables.
+
+16. Future Extensibility
+
+The email system must support changing providers without modifying business logic.
+
+The application should be able to switch between:
+
+Amazon SES
+Resend
+Mailgun
+SendGrid
+
+by replacing only the provider implementation.
+
+17. Production Quality
+
+Follow enterprise Django architecture and best practices.
+
+Requirements:
+
+SOLID principles
+Clean Architecture
+Reusable services
+Dependency Injection where appropriate
+Type hints
+Comprehensive docstrings
+Maintainable folder structure
+Comprehensive exception handling
+Unit-testable design
+Production-ready code
+Scalable for hundreds of thousands of users
+
+Do not generate placeholder code.
+
+Implement complete production-ready code that integrates seamlessly into the existing authentication and user management modules without breaking any existing APIs or frontend functionality.

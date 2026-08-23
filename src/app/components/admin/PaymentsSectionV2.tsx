@@ -63,19 +63,15 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
   const [open,   setOpen]   = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    price_monthly:          String(plan.price_monthly     ?? 0),
-    price_yearly:           String(plan.price_yearly      ?? 0),
-    price_monthly_ngn:      String(plan.price_monthly_ngn ?? 0),
-    price_yearly_ngn:       String(plan.price_yearly_ngn  ?? 0),
-    description:            plan.description ?? "",
-    badge:                  plan.badge       ?? "",
-    is_active:              plan.is_active   !== false,
-    sort_order:             String(plan.sort_order ?? 0),
-    features:               (plan.features ?? []).join("\n"),
-    credo_code_monthly_ngn: plan.credo_code_monthly_ngn ?? "",
-    credo_code_yearly_ngn:  plan.credo_code_yearly_ngn  ?? "",
-    credo_code_monthly_usd: plan.credo_code_monthly_usd ?? "",
-    credo_code_yearly_usd:  plan.credo_code_yearly_usd  ?? "",
+    price_monthly:     String(plan.price_monthly     ?? 0),
+    price_yearly:      String(plan.price_yearly      ?? 0),
+    price_monthly_ngn: String(plan.price_monthly_ngn ?? 0),
+    price_yearly_ngn:  String(plan.price_yearly_ngn  ?? 0),
+    description:       plan.description ?? "",
+    badge:             plan.badge       ?? "",
+    is_active:         plan.is_active   !== false,
+    sort_order:        String(plan.sort_order ?? 0),
+    features:          (plan.features ?? []).join("\n"),
   });
 
   const f = (k: keyof typeof form, v: string | boolean) =>
@@ -85,19 +81,15 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
     setSaving(true);
     try {
       await adminApi.updatePlan(plan.name, {
-        price_monthly:          parseFloat(form.price_monthly)     || 0,
-        price_yearly:           parseFloat(form.price_yearly)      || 0,
-        price_monthly_ngn:      parseFloat(form.price_monthly_ngn) || 0,
-        price_yearly_ngn:       parseFloat(form.price_yearly_ngn)  || 0,
-        description:            form.description,
-        badge:                  form.badge,
-        is_active:              form.is_active,
-        sort_order:             parseInt(form.sort_order) || 0,
-        features:               form.features.split("\n").map(s => s.trim()).filter(Boolean),
-        credo_code_monthly_ngn: form.credo_code_monthly_ngn,
-        credo_code_yearly_ngn:  form.credo_code_yearly_ngn,
-        credo_code_monthly_usd: form.credo_code_monthly_usd,
-        credo_code_yearly_usd:  form.credo_code_yearly_usd,
+        price_monthly:     parseFloat(form.price_monthly)     || 0,
+        price_yearly:      parseFloat(form.price_yearly)      || 0,
+        price_monthly_ngn: parseFloat(form.price_monthly_ngn) || 0,
+        price_yearly_ngn:  parseFloat(form.price_yearly_ngn)  || 0,
+        description:       form.description,
+        badge:             form.badge,
+        is_active:         form.is_active,
+        sort_order:        parseInt(form.sort_order) || 0,
+        features:          form.features.split("\n").map(s => s.trim()).filter(Boolean),
       });
       toast.success(`${plan.name} plan saved — changes are live`);
       setOpen(false);
@@ -158,6 +150,7 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
                   <span>🇳🇬</span>
                   <span className="text-sm font-bold text-green-800">Nigeria Pricing (NGN ₦)</span>
                 </div>
+                <p className="text-xs text-green-700 mb-3">Independent from USD — set the naira amount directly. No conversion applied.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Monthly (₦)</label>
@@ -166,14 +159,6 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Yearly (₦)</label>
                     <input type="number" className={inp} value={form.price_yearly_ngn} onChange={e => f("price_yearly_ngn", e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo monthly code</label>
-                    <input className={inp} value={form.credo_code_monthly_ngn} onChange={e => f("credo_code_monthly_ngn", e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo yearly code</label>
-                    <input className={inp} value={form.credo_code_yearly_ngn} onChange={e => f("credo_code_yearly_ngn", e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -184,6 +169,7 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
                   <span>🌍</span>
                   <span className="text-sm font-bold text-blue-800">International Pricing (USD $)</span>
                 </div>
+                <p className="text-xs text-blue-700 mb-3">Shown to users outside Nigeria. Independent from NGN — no conversion applied.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Monthly ($)</label>
@@ -192,14 +178,6 @@ function PlanEditor({ plan, onSaved }: { plan: Plan; onSaved: () => void }) {
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Yearly ($)</label>
                     <input type="number" className={inp} value={form.price_yearly} onChange={e => f("price_yearly", e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo monthly code</label>
-                    <input className={inp} value={form.credo_code_monthly_usd} onChange={e => f("credo_code_monthly_usd", e.target.value)} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Credo yearly code</label>
-                    <input className={inp} value={form.credo_code_yearly_usd} onChange={e => f("credo_code_yearly_usd", e.target.value)} />
                   </div>
                 </div>
               </div>

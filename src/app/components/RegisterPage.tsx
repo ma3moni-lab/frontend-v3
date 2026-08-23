@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
-import { Eye, EyeOff, Heart, AlertCircle, ArrowRight, ChevronLeft, Phone, Mail, Shield, Gift, CheckCircle2, X } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowRight, ChevronLeft, Phone, Mail, Shield, Gift, CheckCircle2, X } from "lucide-react";
 import { auth as apiAuth, setUserTokens, ApiError, referrals as referralsApi } from "../../lib/api";
 import type { UserPlan } from "./LoginPage";
+import { Logo } from "./Logo";
 
 const PENDING_REF_KEY = "ma3moni_pending_ref";
 
@@ -265,12 +266,7 @@ export function RegisterPage({ onVerified, onLogin, onBack }: RegisterPageProps)
         <button onClick={onBack} className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.9rem" }}>
           <ChevronLeft size={18} /> Back
         </button>
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-            <Heart size={13} className="text-primary-foreground fill-primary-foreground" />
-          </div>
-          <span className="logo-font" style={{ fontWeight: 800, fontSize: "1rem" }}>Ma3moni</span>
-        </div>
+        <Logo variant="full" size="sm" />
         <div style={{ width: 60 }} />
       </div>
 

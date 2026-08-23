@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Heart, Clock, RefreshCw } from "lucide-react";
+import { Clock, RefreshCw } from "lucide-react";
+import { Logo } from "./Logo";
 
 interface MaintenancePageProps {
   endTime: number | null; // unix ms timestamp when maintenance ends (null = indefinite)
@@ -33,11 +34,8 @@ export function MaintenancePage({ endTime, message }: MaintenancePageProps) {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center">
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-10">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-          <Heart size={18} className="text-primary-foreground fill-primary-foreground" />
-        </div>
-        <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.375rem" }}>Ma3moni</span>
+      <div className="mb-10">
+        <Logo variant="full" size="lg" />
       </div>
 
       {/* Icon */}

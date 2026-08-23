@@ -57,7 +57,12 @@ sw.addEventListener("fetch", (e: FetchEvent) => {
     e.respondWith(
       fetch(request)
         .then(res => {
-          if (res.ok) caches.open(SHELL_CACHE).then(c => c.put(request, res.clone()));
+          // Clone SYNCHRONOUSLY before returning — body stream is consumed
+          // by the browser as soon as we return res, so async cloning fails.
+          if (res.ok) {
+            const toCache = res.clone();
+            caches.open(SHELL_CACHE).then(c => c.put(request, toCache));
+          }
           return res;
         })
         .catch(() =>
@@ -73,7 +78,10 @@ sw.addEventListener("fetch", (e: FetchEvent) => {
       caches.match(request).then(cached => {
         if (cached) return cached;
         return fetch(request).then(res => {
-          if (res.ok) caches.open(CACHE_VERSION).then(c => c.put(request, res.clone()));
+          if (res.ok) {
+            const toCache = res.clone(); // clone before returning
+            caches.open(CACHE_VERSION).then(c => c.put(request, toCache));
+          }
           return res;
         });
       })

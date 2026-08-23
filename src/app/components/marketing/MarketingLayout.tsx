@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
-import { Heart, Menu, X, ArrowRight } from "lucide-react";
+import { Menu, X, ArrowRight } from "lucide-react";
+import { Logo } from "../Logo";
 
 const NAV_LINKS = [
   { to: "/about",   label: "About" },
@@ -18,13 +19,8 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
       {/* ── Nav ─────────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-sm border-b border-border flex-shrink-0">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Heart size={16} className="text-primary-foreground fill-primary-foreground" />
-            </div>
-            <span style={{ fontWeight: 700, fontSize: "1.125rem", letterSpacing: "-0.02em", color: "var(--foreground)" }}>
-              Ma3moni
-            </span>
+          <Link to="/">
+            <Logo variant="full" size="md" />
           </Link>
 
           {/* Desktop nav */}
@@ -103,11 +99,8 @@ export function MarketingLayout({ children }: { children: ReactNode }) {
         <div className="max-w-6xl mx-auto px-6 py-12">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-10">
             <div className="col-span-2">
-              <Link to="/" className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                  <Heart size={15} className="text-primary-foreground fill-primary-foreground" />
-                </div>
-                <span className="logo-font" style={{ fontWeight: 800, fontSize: "1.0625rem" }}>Ma3moni</span>
+              <Link to="/" className="inline-block mb-4">
+                <Logo variant="full" size="sm" />
               </Link>
               <p className="text-muted-foreground" style={{ fontSize: "0.9rem", lineHeight: 1.7, maxWidth: "260px" }}>
                 A compatibility-first marriage platform for serious individuals seeking lifelong partnerships.

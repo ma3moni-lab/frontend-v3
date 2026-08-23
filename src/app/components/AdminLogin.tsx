@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Eye, EyeOff, Shield, AlertCircle, Heart, Lock, ChevronRight, ChevronLeft } from "lucide-react";
+import { Eye, EyeOff, Shield, AlertCircle, Lock, ChevronRight, ChevronLeft } from "lucide-react";
 import type { AdminRole } from "./AdminRoot";
 import { auth as apiAuth, adminApi, setAdminTokens, toFrontendRole, ApiError } from "../../lib/api";
+import { Logo } from "./Logo";
 
 interface AdminSession {
   role: AdminRole;
@@ -142,14 +143,8 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         style={{ width: "42%", background: "var(--sidebar)" }}
       >
         <div>
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
-              <Heart size={18} className="fill-white text-white" />
-            </div>
-            <div>
-              <p className="logo-font" style={{ fontWeight: 800, fontSize: "1.125rem", color: "var(--sidebar-foreground)" }}>Ma3moni</p>
-              <p style={{ fontSize: "0.75rem", color: "rgba(203,213,224,0.5)", fontWeight: 500 }}>Admin Portal</p>
-            </div>
+          <div className="mb-16">
+            <Logo variant="wordmark" theme="dark" size="md" subtitle="Admin Portal" />
           </div>
 
           <div>
@@ -188,12 +183,9 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
       <div className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 bg-background overflow-y-auto">
         <div className="w-full max-w-[400px]">
           {/* Mobile logo */}
-          <div className="flex items-center gap-2 mb-10 lg:hidden">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Heart size={14} className="fill-white text-white" />
-            </div>
-            <span className="logo-font" style={{ fontWeight: 800, fontSize: "1rem" }}>Ma3moni</span>
-            <span className="ml-1 text-muted-foreground" style={{ fontSize: "0.8125rem" }}>· Admin</span>
+          <div className="flex items-center gap-2.5 mb-10 lg:hidden">
+            <Logo variant="full" size="sm" />
+            <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>· Admin</span>
           </div>
 
           <div className="mb-8">
