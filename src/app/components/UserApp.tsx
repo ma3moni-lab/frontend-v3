@@ -4226,7 +4226,7 @@ function BlockModal({ name, onConfirm, onCancel }: {
 }
 
 // ── Profile photo grid with real upload ──────────────────
-const MAX_PHOTOS = 4;
+const MAX_PHOTOS = 6;
 const PHOTOS_KEY = "ma3moni_profile_photos";
 const AVATAR_KEY = "ma3moni_avatar_photo";
 

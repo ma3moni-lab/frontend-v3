@@ -852,6 +852,9 @@ export function UsersSectionV2() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [detailUser, setDetailUser] = useState<typeof USERS[0] | null>(null);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState({ full_name: "", email: "", gender: "" });
+  const [editProfileSaving, setEditProfileSaving] = useState(false);
   const [showPushModal, setShowPushModal] = useState(false);
   const [showGrantModal, setShowGrantModal] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -1182,7 +1185,7 @@ export function UsersSectionV2() {
                 <tr
                   key={u.id}
                   className={`border-b border-border last:border-0 transition-colors cursor-pointer ${detailUser?.id === u.id ? "bg-secondary/60" : "hover:bg-muted/30"}`}
-                  onClick={() => setDetailUser(detailUser?.id === u.id ? null : u)}
+                  onClick={() => { setDetailUser(detailUser?.id === u.id ? null : u); setShowEditProfile(false); }}
                 >
                   <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.includes(u.id)} onChange={() => toggleSelect(u.id)} className="rounded accent-primary" />
@@ -1223,7 +1226,7 @@ export function UsersSectionV2() {
                   </td>
                   <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
-                      <button onClick={() => { setDetailUser(u); }} className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors" title="View detail"><Eye size={14} /></button>
+                      <button onClick={() => { setDetailUser(u); setShowEditProfile(false); }} className="p-1.5 text-muted-foreground hover:text-primary hover:bg-secondary rounded-lg transition-colors" title="View detail"><Eye size={14} /></button>
                       <button
                         onClick={() => {
                           if (u.status === "suspended") {
@@ -1347,7 +1350,110 @@ export function UsersSectionV2() {
               >
                 <KeyRound size={14} /> Reset Password
               </button>
+              <button
+                onClick={() => {
+                  setEditProfileForm({
+                    full_name: detailUser.name || "",
+                    email: detailUser.email || "",
+                    gender: detailUser.gender || "",
+                  });
+                  setShowEditProfile(v => !v);
+                }}
+                className="col-span-2 flex items-center justify-center gap-1.5 py-2.5 bg-secondary border border-border rounded-xl text-foreground hover:bg-muted transition-all"
+                style={{ fontSize: "0.8125rem", fontWeight: 700 }}
+              >
+                <UserCheck size={14} /> Edit Profile
+              </button>
             </div>
+
+            {/* Inline edit profile form */}
+            {showEditProfile && (
+              <div className="bg-muted/60 rounded-2xl border border-border p-4 space-y-3">
+                <p style={{ fontWeight: 700, fontSize: "0.875rem" }}>Edit Name / Email / Gender</p>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-muted-foreground mb-1" style={{ fontSize: "0.75rem", fontWeight: 600 }}>Full Name</label>
+                    <input
+                      value={editProfileForm.full_name}
+                      onChange={e => setEditProfileForm(f => ({ ...f, full_name: e.target.value }))}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      style={{ fontSize: "0.875rem" }}
+                      placeholder="Full name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-muted-foreground mb-1" style={{ fontSize: "0.75rem", fontWeight: 600 }}>Email</label>
+                    <input
+                      type="email"
+                      value={editProfileForm.email}
+                      onChange={e => setEditProfileForm(f => ({ ...f, email: e.target.value }))}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      style={{ fontSize: "0.875rem" }}
+                      placeholder="Email address"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-muted-foreground mb-1" style={{ fontSize: "0.75rem", fontWeight: 600 }}>Gender</label>
+                    <select
+                      value={editProfileForm.gender}
+                      onChange={e => setEditProfileForm(f => ({ ...f, gender: e.target.value }))}
+                      className="w-full px-3 py-2 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      style={{ fontSize: "0.875rem" }}
+                    >
+                      <option value="">— unchanged —</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={editProfileSaving}
+                    onClick={async () => {
+                      if (!detailUser) return;
+                      setEditProfileSaving(true);
+                      try {
+                        const payload: { full_name?: string; email?: string; gender?: string } = {};
+                        if (editProfileForm.full_name.trim()) payload.full_name = editProfileForm.full_name.trim();
+                        if (editProfileForm.email.trim()) payload.email = editProfileForm.email.trim();
+                        if (editProfileForm.gender) payload.gender = editProfileForm.gender;
+                        const res = await adminApi.updateUserProfile(detailUser.id, payload);
+                        setDetailUser(prev => prev ? {
+                          ...prev,
+                          name: res.full_name || prev.name,
+                          email: res.email || prev.email,
+                          gender: (res.gender as typeof prev.gender) || prev.gender,
+                        } : prev);
+                        setLiveUsers(prev => prev.map(u => u.id === detailUser.id ? {
+                          ...u,
+                          name: res.full_name || u.name,
+                          email: res.email || u.email,
+                          gender: (res.gender as typeof u.gender) || u.gender,
+                        } : u));
+                        toast.success("Profile updated.");
+                        setShowEditProfile(false);
+                      } catch (err: unknown) {
+                        const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+                        toast.error(msg || "Failed to save changes.");
+                      } finally {
+                        setEditProfileSaving(false);
+                      }
+                    }}
+                    className="flex-1 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    style={{ fontSize: "0.8125rem", fontWeight: 700 }}
+                  >
+                    {editProfileSaving ? "Saving…" : "Save Changes"}
+                  </button>
+                  <button
+                    onClick={() => setShowEditProfile(false)}
+                    className="px-4 py-2 bg-secondary border border-border rounded-xl text-foreground hover:bg-muted transition-colors"
+                    style={{ fontSize: "0.8125rem", fontWeight: 600 }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Photo catalogue */}
             <UserPhotoGallery userId={detailUser.id} />

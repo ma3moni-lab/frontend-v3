@@ -1160,6 +1160,11 @@ export const adminApi = {
       `/api/admin/users/${id}/reset-password/`, { expires_in_hours }
     ),
 
+  updateUserProfile: (id: string, data: { full_name?: string; email?: string; gender?: string }) =>
+    patch<{ full_name: string; email: string; gender: string }>(
+      `/api/admin/users/${id}/profile/`, data
+    ),
+
   pushToUser: (id: string, type: string, title: string, body: string, data: Record<string, unknown> = {}) =>
     post<void>(`/api/admin/users/${id}/push/`, { type, title, body, data }),
 
