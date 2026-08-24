@@ -3121,7 +3121,10 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
           days:    String(s.auto_grant_days ?? 7),
         });
       })
-      .catch(() => setLoadError(true));
+      .catch(() => {
+        setLoadError(true);
+        setPushConfigured(false); // stop spinner — don't leave it running on error
+      });
   }, []);
 
   const toggle = (key: keyof typeof settings) => {
