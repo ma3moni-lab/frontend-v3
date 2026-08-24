@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Check, X, RefreshCw, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, RefreshCw, ChevronDown, Heart } from "lucide-react";
 import { Logo } from "./Logo";
 import { SearchableCountrySelect } from "./SearchableCountrySelect";
 
