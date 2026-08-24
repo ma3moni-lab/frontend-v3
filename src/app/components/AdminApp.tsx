@@ -3677,7 +3677,21 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
       : defaultSection
   );
   const [section, setSection] = useState<AdminSection>(resolvedInitial);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // On mobile the sidebar starts closed (drawer mode); on desktop it starts open.
+  const isMobile = () => typeof window !== "undefined" && window.innerWidth < 768;
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile());
+  const [mobileView, setMobileView] = useState(isMobile);
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setMobileView(mobile);
+      if (!mobile) setSidebarOpen(true);   // always open on desktop
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // ── My Account modal ──────────────────────────────────────
   const [profileOpen, setProfileOpen] = useState(false);
@@ -3711,6 +3725,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
     startTransition(() => {
       setSection(next);
       onSectionChange?.(next);
+      if (mobileView) setSidebarOpen(false); // close drawer after nav on mobile
     });
   };
 
@@ -3802,87 +3817,150 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
     }
   };
 
+  const roleGradient = role === "super-admin"
+    ? "linear-gradient(135deg,#0A6870,#14A8B4)"
+    : role === "admin"
+    ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)"
+    : role === "blog-admin"
+    ? "linear-gradient(135deg,#5B8F68,#7DB48A)"
+    : "linear-gradient(135deg,#B5632F,#D08050)";
+
+  const adminInitials = adminName && adminName !== adminEmail
+    ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase()
+    : ROLE_BADGE[role];
+
+  const currentLabel = ALL_NAV_ITEMS.find(i => i.key === section)?.label ?? "";
+
   return (
     <div className="size-full flex overflow-hidden bg-background">
-      {/* Sidebar */}
+
+      {/* ── Mobile backdrop ───────────────────────────────────── */}
+      {mobileView && sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ──────────────────────────────────────────── */}
       <aside
-        className="flex-shrink-0 flex flex-col transition-[width] duration-200 ease-in-out"
-        style={{ width: sidebarOpen ? "240px" : "64px", background: "var(--sidebar)", borderRight: "1px solid var(--sidebar-border)" }}
+        className="flex-shrink-0 flex flex-col transition-transform duration-250 ease-in-out"
+        style={{
+          width: mobileView ? "280px" : sidebarOpen ? "240px" : "64px",
+          background: "var(--sidebar)",
+          borderRight: "1px solid var(--sidebar-border)",
+          // On mobile: fixed overlay drawer; on desktop: inline panel
+          ...(mobileView ? {
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            zIndex: 40,
+            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+            boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.25)" : "none",
+          } : {
+            transition: "width 200ms ease-in-out",
+          }),
+        }}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b" style={{ borderColor: "var(--sidebar-border)", minHeight: "68px" }}>
-          <Logo variant="icon" theme="dark" size="sm" />
-          {sidebarOpen && (
-            <div className="min-w-0">
-              <p className="logo-font" style={{ fontWeight: 800, fontSize: "1rem", color: "var(--sidebar-foreground)" }}>Ma3moni</p>
-              <p style={{ fontSize: "0.6875rem", color: "rgba(203,213,224,0.5)", fontWeight: 500 }}>Admin Portal</p>
-            </div>
+        {/* Logo + close button */}
+        <div className="flex items-center justify-between px-4 py-4 border-b" style={{ borderColor: "var(--sidebar-border)", minHeight: "64px" }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <Logo variant="icon" theme="dark" size="sm" />
+            {(sidebarOpen || mobileView) && (
+              <div className="min-w-0">
+                <p className="logo-font" style={{ fontWeight: 800, fontSize: "1rem", color: "var(--sidebar-foreground)" }}>Ma3moni</p>
+                <p style={{ fontSize: "0.6875rem", color: "rgba(203,213,224,0.5)", fontWeight: 500 }}>Admin Portal</p>
+              </div>
+            )}
+          </div>
+          {mobileView && (
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-lg transition-colors flex-shrink-0"
+              style={{ color: "rgba(203,213,224,0.6)" }}
+            >
+              <X size={18} />
+            </button>
           )}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-          {navItems.map(({ key, icon, label, badge }) => (
-            <button
-              key={key}
-              onClick={() => changeSection(key)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${section === key ? "text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${isPending ? "opacity-80" : ""}`}
-              style={{ background: section === key ? "var(--sidebar-primary)" : "transparent", justifyContent: sidebarOpen ? "flex-start" : "center" }}
-            >
-              <span className="flex-shrink-0">{icon}</span>
-              {sidebarOpen && (
-                <>
-                  <span style={{ fontSize: "0.875rem", fontWeight: section === key ? 700 : 500, flex: 1, textAlign: "left" }}>{label}</span>
-                  {badge !== undefined && (
-                    <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center" style={{ fontSize: "0.625rem", fontWeight: 700, background: section === key ? "rgba(255,255,255,0.25)" : "var(--sidebar-primary)", color: "white" }}>
-                      {badge}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-          ))}
+          {navItems.map(({ key, icon, label, badge }) => {
+            const active = section === key;
+            const showLabel = sidebarOpen || mobileView;
+            return (
+              <button
+                key={key}
+                onClick={() => changeSection(key)}
+                className={`w-full flex items-center gap-3 px-3 rounded-xl transition-all ${active ? "text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent"} ${isPending ? "opacity-70" : ""}`}
+                style={{
+                  background: active ? "var(--sidebar-primary)" : "transparent",
+                  justifyContent: showLabel ? "flex-start" : "center",
+                  paddingTop: mobileView ? "12px" : "10px",
+                  paddingBottom: mobileView ? "12px" : "10px",
+                }}
+              >
+                <span className="flex-shrink-0">{icon}</span>
+                {showLabel && (
+                  <>
+                    <span style={{ fontSize: mobileView ? "0.9375rem" : "0.875rem", fontWeight: active ? 700 : 500, flex: 1, textAlign: "left" }}>{label}</span>
+                    {badge !== undefined && badge > 0 && (
+                      <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center" style={{ fontSize: "0.625rem", fontWeight: 700, background: active ? "rgba(255,255,255,0.25)" : "var(--sidebar-primary)", color: "white" }}>
+                        {badge}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Bottom — logout only */}
+        {/* Bottom — logout */}
         <div className="p-3 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
           <button
             onClick={onBack}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors"
-            style={{
-              justifyContent: sidebarOpen ? "flex-start" : "center",
-              color: "rgba(203,213,224,0.55)",
-              background: "transparent",
-            }}
+            style={{ justifyContent: (sidebarOpen || mobileView) ? "flex-start" : "center", color: "rgba(203,213,224,0.55)" }}
             onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
             onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
           >
             <LogOut size={15} />
-            {sidebarOpen && <span style={{ fontSize: "0.8125rem", fontWeight: 500 }}>Sign Out</span>}
+            {(sidebarOpen || mobileView) && <span style={{ fontSize: "0.875rem", fontWeight: 500 }}>Sign Out</span>}
           </button>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ── Main ─────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
+
         {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card flex-shrink-0">
-          <button
-            onClick={() => setSidebarOpen(o => !o)}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-          >
-            <Menu size={18} />
-          </button>
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 border-b border-border bg-card flex-shrink-0 gap-2">
+          {/* Left: hamburger + section title on mobile */}
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(o => !o)}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors flex-shrink-0"
+            >
+              <Menu size={18} />
+            </button>
+            {mobileView && (
+              <span className="font-bold truncate" style={{ fontSize: "0.9375rem" }}>{currentLabel}</span>
+            )}
+          </div>
+
+          {/* Right: bell + identity */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted">
               <Bell size={18} />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent rounded-full" />
             </button>
             <div className="h-5 w-px bg-border" />
-            {/* Admin identity chip — click to open My Account */}
             <button
               onClick={() => { setEditName(adminName); setProfileOpen(true); }}
-              className="flex items-center gap-2.5 rounded-xl px-2 py-1 hover:bg-muted/60 transition-colors"
+              className="flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-muted/60 transition-colors"
               title="My Account"
             >
               <div className="hidden sm:block text-right">
@@ -3892,22 +3970,17 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
                 <p className="text-muted-foreground" style={{ fontSize: "0.6875rem", lineHeight: 1.2 }}>{ROLE_LABEL[role]}</p>
               </div>
               <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                }}
+                className="w-8 h-8 md:w-9 md:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: roleGradient, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}
               >
-                <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>
-                  {adminName && adminName !== adminEmail ? adminName.split(" ").map((n: string) => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
-                </span>
+                <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>{adminInitials}</span>
               </div>
             </button>
           </div>
         </div>
 
-        {/* Section content — only one section mounted at a time */}
-        <main className={`flex-1 p-6 ${section === "users" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
+        {/* Section content */}
+        <main className={`flex-1 p-3 md:p-6 ${section === "users" ? "overflow-hidden flex flex-col" : "overflow-y-auto"}`}>
           <Suspense fallback={<SectionLoading />}>
             {renderSection()}
           </Suspense>
@@ -3923,9 +3996,7 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
               <div className="flex items-center gap-2.5">
                 <div
                   className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: role === "super-admin" ? "linear-gradient(135deg,#0A6870,#14A8B4)" : role === "admin" ? "linear-gradient(135deg,#3A7DA8,#5BA0CC)" : role === "blog-admin" ? "linear-gradient(135deg,#5B8F68,#7DB48A)" : "linear-gradient(135deg,#B5632F,#D08050)",
-                  }}
+                  style={{ background: roleGradient }}
                 >
                   <span style={{ fontSize: "0.6875rem", fontWeight: 800, color: "white" }}>
                     {editName.trim() ? editName.trim().split(" ").map(n => n[0] ?? "").join("").slice(0, 2).toUpperCase() : ROLE_BADGE[role]}
