@@ -1286,15 +1286,15 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
     if (blocked.includes(m.id)) return false;
     if (chattingIds.has(m.id)) return false;
     if (passed.includes(m.id)) return false;
-    if (oppositeGender && m.nationality !== undefined) {
-      const matchGender = (m as MatchItem & { gender?: string }).gender;
-      if (matchGender && matchGender !== oppositeGender) return false;
-    }
+    const matchGender = (m as MatchItem & { gender?: string }).gender;
+    if (oppositeGender && matchGender && matchGender !== oppositeGender) return false;
     // "best" = high compatibility (≥75%); "new" = not yet expressed interest
     if (filter === "high" && m.score < 75) return false;
     if (filter === "new" && sentInterests.includes(m.id)) return false;
     if (canFilter) {
-      if (m.age < adv.minAge || m.age > adv.maxAge) return false;
+      // Only apply age filter when age is known (> 0 means DOB was available)
+      const age = m.age ?? 0;
+      if (age > 0 && (age < adv.minAge || age > adv.maxAge)) return false;
       if (adv.country !== "any" && m.country !== adv.country) return false;
       if (adv.minRelig && (m.religiosity ?? 0) < adv.minRelig) return false;
     }
@@ -1306,121 +1306,6 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
     [filtered, dailyLimit]
   );
   const limitReached = dailyLimit !== Infinity && filtered.length > dailyLimit;
-
-  // ── Profile completion gate (after all hooks) ──────────────────────────────
-  if (profileStrength < 70) {
-    const circ = 2 * Math.PI * 45;
-    const offset = circ - (profileStrength / 100) * circ;
-    const remaining = incompleteFields.length;
-    const done = 10 - remaining; // total profile fields = 10
-
-    return (
-      <div className="flex flex-col h-full bg-background">
-        {/* Header */}
-        <div className="px-5 pt-5 pb-3 border-b border-border bg-card flex-shrink-0">
-          <h2 style={{ fontWeight: 800, fontSize: "1.125rem" }}>Discover Matches</h2>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {/* Hero card */}
-          <div className="mx-4 mt-5 rounded-3xl overflow-hidden" style={{ background: "var(--primary)" }}>
-            <div className="p-6 text-white flex items-center gap-5">
-              {/* Progress ring */}
-              <div className="relative flex-shrink-0" style={{ width: 96, height: 96 }}>
-                <svg width="96" height="96" style={{ transform: "rotate(-90deg)" }}>
-                  <circle cx="48" cy="48" r="45" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
-                  <circle cx="48" cy="48" r="45" fill="none" stroke="white" strokeWidth="6"
-                    strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
-                    style={{ transition: "stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span style={{ fontWeight: 900, fontSize: "1.5rem", color: "white", lineHeight: 1 }}>{profileStrength}<span style={{ fontSize: "0.75rem" }}>%</span></span>
-                  <span style={{ fontSize: "0.5rem", color: "rgba(255,255,255,0.7)", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>done</span>
-                </div>
-              </div>
-
-              {/* Text */}
-              <div className="flex-1 min-w-0">
-                <p style={{ fontWeight: 900, fontSize: "1.0625rem", color: "white", lineHeight: 1.25 }}>
-                  {done} of {done + remaining} steps complete
-                </p>
-                <p style={{ fontSize: "0.8125rem", color: "rgba(255,255,255,0.75)", marginTop: 4, lineHeight: 1.5 }}>
-                  Matches are hidden until your profile is 100%. This protects you and ensures compatibility scores are meaningful.
-                </p>
-              </div>
-            </div>
-
-            {/* Progress track at bottom of hero */}
-            <div style={{ background: "rgba(0,0,0,0.2)" }} className="px-6 pb-4 pt-1">
-              <div className="h-1.5 rounded-full overflow-hidden bg-white/20">
-                <div className="h-full rounded-full bg-white transition-all duration-700" style={{ width: `${profileStrength}%` }} />
-              </div>
-              <div className="flex justify-between mt-1.5">
-                <span style={{ fontSize: "0.625rem", color: "rgba(255,255,255,0.6)" }}>Profile strength</span>
-                <span style={{ fontSize: "0.625rem", color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>{remaining} step{remaining !== 1 ? "s" : ""} left</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Why this matters */}
-          <div className="mx-4 mt-4 rounded-2xl border border-border bg-card p-4">
-            <p style={{ fontWeight: 700, fontSize: "0.8125rem", color: "var(--foreground)", marginBottom: 10 }}>Why a complete profile matters</p>
-            <div className="space-y-2.5">
-              {[
-                { icon: "✨", text: "Our Values & Spirituality score needs your lifestyle and faith engagement info" },
-                { icon: "🔒", text: "Incomplete profiles are hidden from other members — privacy first" },
-                { icon: "💍", text: "Serious members only see serious candidates" },
-              ].map(({ icon, text }) => (
-                <div key={text} className="flex items-start gap-2.5">
-                  <span style={{ fontSize: "1rem", flexShrink: 0, marginTop: 1 }}>{icon}</span>
-                  <p className="text-muted-foreground" style={{ fontSize: "0.8125rem", lineHeight: 1.5 }}>{text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Remaining steps — each is a tappable action */}
-          {incompleteFields.length > 0 && (
-            <div className="mx-4 mt-4 mb-6">
-              <p style={{ fontWeight: 700, fontSize: "0.875rem", marginBottom: 10 }}>
-                Complete these steps ({remaining} remaining)
-              </p>
-              <div className="rounded-2xl border border-border bg-card overflow-hidden">
-                {incompleteFields.map((f, i) => (
-                  <button
-                    key={f.key}
-                    onClick={() => onCompleteProfile?.(f.section)}
-                    className={`w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-muted/50 active:bg-muted transition-colors ${i < incompleteFields.length - 1 ? "border-b border-border" : ""}`}
-                  >
-                    {/* Step indicator */}
-                    <div className="w-8 h-8 rounded-full border-2 border-border flex items-center justify-center flex-shrink-0 bg-background">
-                      <span style={{ fontSize: "0.625rem", fontWeight: 800, color: "var(--muted-foreground)" }}>{i + 1}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p style={{ fontWeight: 600, fontSize: "0.9375rem" }}>{f.label}</p>
-                      <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>Tap to complete</p>
-                    </div>
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <ArrowRight size={13} className="text-primary" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Primary CTA — points to first incomplete step */}
-              <button
-                onClick={() => onCompleteProfile?.(incompleteFields[0].section)}
-                className="w-full mt-4 py-4 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95 transition-all"
-                style={{ fontWeight: 700, fontSize: "1rem" }}
-              >
-                Continue — {incompleteFields[0].label} →
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 
   const handlePass = (m: (typeof MATCHES)[number]) => {
     setPassed(prev => [...prev, m.id]);
@@ -1461,6 +1346,32 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
 
   return (
     <div className="pb-6">
+      {/* Profile completion nudge banner — shown when profile is below 70% */}
+      {profileStrength < 70 && incompleteFields.length > 0 && (
+        <div className="mx-4 mt-4 rounded-2xl overflow-hidden" style={{ background: "var(--primary)" }}>
+          <div className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+              <span style={{ fontWeight: 900, fontSize: "0.875rem", color: "white" }}>{profileStrength}%</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "white", lineHeight: 1.25 }}>
+                Complete your profile for better matches
+              </p>
+              <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
+                Your profile is only {profileStrength}% complete. Profiles shown to you may not yet see yours.
+              </p>
+            </div>
+            <button
+              onClick={() => onCompleteProfile?.(incompleteFields[0].section)}
+              className="flex-shrink-0 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-xl text-white transition-colors"
+              style={{ fontSize: "0.75rem", fontWeight: 700 }}
+            >
+              Fix →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-4 pt-4 pb-3 flex items-center justify-between">
         <div>

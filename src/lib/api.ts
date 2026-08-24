@@ -1329,7 +1329,7 @@ export const adminApi = {
   platformActivity: (type?: "user" | "admin") =>
     get<{ results: ActivityEntry[] }>(`/api/admin/activity/${type ? "?type=" + type : ""}`),
 
-  auditLog: (params: { action?: string; actor_id?: string; search?: string; page?: number; page_size?: number } = {}) => {
+  auditLog: (params: { source?: "admin" | "user" | "all"; action?: string; actor_id?: string; search?: string; page?: number; page_size?: number } = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== '') qs.set(k, String(v)); });
     const q = qs.toString();
@@ -1374,9 +1374,10 @@ export const adminApi = {
 };
 
 export interface AuditEntry {
-  id:           number;
-  action:       string;
-  action_label: string;
+  id:               number;
+  action:           string;
+  action_label:     string;
+  is_user_activity: boolean;
   actor: {
     id:    string | null;
     name:  string;

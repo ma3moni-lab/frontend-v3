@@ -2555,10 +2555,8 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
 };
 
 function AdminAuditSection() {
-  // "admin" = AdminAuditLog entries; "user" = platform activity (notifications sent to users)
   const [logSource, setLogSource] = useState<"admin" | "user">("admin");
   const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [userActivityRows, setUserActivityRows] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
@@ -2569,44 +2567,33 @@ function AdminAuditSection() {
   const [searchInput, setSearchInput] = useState("");
   const [showIpTooltip, setShowIpTooltip] = useState(false);
 
-  const fetchAudit = (p = 1, q = search, act = actionFilter) => {
+  const fetchAudit = (p = 1, q = search, act = actionFilter, src = logSource) => {
     setLoading(true);
     setFetchError(null);
-    adminApi.auditLog({ page: p, page_size: 25, search: q, action: act })
+    adminApi.auditLog({ source: src, page: p, page_size: 25, search: q, action: act })
       .then(r => { setEntries(r.results); setTotal(r.count); setPage(r.page); setPages(r.pages); })
       .catch((err) => {
         setEntries([]);
-        setFetchError(err?.message ?? "Failed to load audit log. The database table may need a migration.");
-      })
-      .finally(() => setLoading(false));
-  };
-
-  const fetchUserActivity = () => {
-    setLoading(true);
-    setFetchError(null);
-    adminApi.platformActivity("user")
-      .then(r => { setUserActivityRows(r.results); setTotal(r.results.length); setPage(1); setPages(1); })
-      .catch((err) => {
-        setUserActivityRows([]);
-        setFetchError(err?.message ?? "Failed to load user activity.");
+        setFetchError(err?.message ?? "Failed to load log. The database table may need a migration.");
       })
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    if (logSource === "admin") fetchAudit();
-    else fetchUserActivity();
+    fetchAudit(1, "", "", logSource);
+    setSearch(""); setSearchInput(""); setActionFilter("");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logSource]);
 
-  const applySearch = () => { setSearch(searchInput); if (logSource === "admin") fetchAudit(1, searchInput, actionFilter); };
-  const applyAction = (act: string) => { setActionFilter(act); if (logSource === "admin") fetchAudit(1, search, act); };
+  const applySearch = () => { setSearch(searchInput); fetchAudit(1, searchInput, actionFilter); };
+  const applyAction = (act: string) => { setActionFilter(act); fetchAudit(1, search, act); };
 
   const fmtTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
-  const ALL_ACTIONS = [
+  const ADMIN_ACTIONS = [
     { value: "", label: "All Actions" },
     { value: "user_suspend",    label: "User Suspended" },
     { value: "user_activate",   label: "User Activated" },
@@ -2626,13 +2613,18 @@ function AdminAuditSection() {
     { value: "login",           label: "Admin Login" },
   ];
 
-  // Filter user activity rows client-side by search term
-  const filteredUserRows = search.trim()
-    ? userActivityRows.filter(r =>
-        r.actor.toLowerCase().includes(search.toLowerCase()) ||
-        r.action.toLowerCase().includes(search.toLowerCase()) ||
-        r.detail?.toLowerCase().includes(search.toLowerCase()))
-    : userActivityRows;
+  const USER_ACTIONS = [
+    { value: "", label: "All Activity" },
+    { value: "user_login",          label: "User Login" },
+    { value: "user_register",       label: "User Registered" },
+    { value: "user_profile_update", label: "Profile Updated" },
+    { value: "user_photo_upload",   label: "Photo Uploaded" },
+    { value: "user_photo_delete",   label: "Photo Deleted" },
+    { value: "user_interest_sent",  label: "Interest Sent" },
+    { value: "user_interest_resp",  label: "Interest Responded" },
+    { value: "user_report_filed",   label: "Report Filed" },
+    { value: "user_sub_purchase",   label: "Subscription Purchased" },
+  ];
 
   return (
     <div>
@@ -2642,7 +2634,7 @@ function AdminAuditSection() {
       />
 
       {/* Log source toggle */}
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="flex gap-1 bg-muted rounded-xl p-1">
           {([
             { key: "admin", label: "Admin Actions" },
@@ -2650,7 +2642,7 @@ function AdminAuditSection() {
           ] as const).map(t => (
             <button
               key={t.key}
-              onClick={() => { setLogSource(t.key); setSearch(""); setSearchInput(""); setActionFilter(""); }}
+              onClick={() => setLogSource(t.key)}
               className={`px-4 py-2 rounded-lg transition-all ${logSource === t.key ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}
               style={{ fontSize: "0.875rem", fontWeight: logSource === t.key ? 700 : 400 }}
             >
@@ -2660,8 +2652,8 @@ function AdminAuditSection() {
         </div>
         <span className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>
           {logSource === "admin"
-            ? "Tamper-evident log of all admin actions"
-            : "Recent system notifications and events sent to users"}
+            ? "Actions performed by admin and support team"
+            : "Logins, profile updates, photo uploads, and match interactions"}
         </span>
       </div>
 
@@ -2680,24 +2672,24 @@ function AdminAuditSection() {
           {searchInput && (
             <button onClick={() => {
               setSearchInput(""); setSearch("");
-              if (logSource === "admin") fetchAudit(1, "", actionFilter);
+              fetchAudit(1, "", actionFilter);
             }} className="text-muted-foreground hover:text-foreground">
               <X size={13} />
             </button>
           )}
         </div>
-        {logSource === "admin" && (
-          <select
-            value={actionFilter}
-            onChange={e => applyAction(e.target.value)}
-            className="px-3 py-2.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
-            style={{ fontSize: "0.875rem" }}
-          >
-            {ALL_ACTIONS.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-          </select>
-        )}
+        <select
+          value={actionFilter}
+          onChange={e => applyAction(e.target.value)}
+          className="px-3 py-2.5 rounded-xl border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+          style={{ fontSize: "0.875rem" }}
+        >
+          {(logSource === "admin" ? ADMIN_ACTIONS : USER_ACTIONS).map(a => (
+            <option key={a.value} value={a.value}>{a.label}</option>
+          ))}
+        </select>
         <button
-          onClick={() => { if (logSource === "admin") fetchAudit(page); else fetchUserActivity(); }}
+          onClick={() => fetchAudit(page)}
           className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors"
           style={{ fontSize: "0.875rem" }}
         >
@@ -2705,7 +2697,7 @@ function AdminAuditSection() {
         </button>
         {/* IP address explanation tooltip — only shown for admin log */}
         {logSource === "admin" && (
-          <div className="relative">
+          <div className="relative" key="ip-tooltip">
             <button
               onClick={() => setShowIpTooltip(v => !v)}
               className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-border bg-card hover:bg-muted transition-colors text-muted-foreground"
@@ -2728,7 +2720,7 @@ function AdminAuditSection() {
           </div>
         )}
         <span className="text-muted-foreground ml-auto" style={{ fontSize: "0.875rem" }}>
-          {(logSource === "admin" ? total : filteredUserRows.length).toLocaleString()} event{total !== 1 ? "s" : ""}
+          {total.toLocaleString()} event{total !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -2741,26 +2733,29 @@ function AdminAuditSection() {
             <AlertTriangle size={36} className="mx-auto mb-3 opacity-50" style={{ color: "#D41F3A" }} />
             <p style={{ fontWeight: 700, fontSize: "1rem", color: "#D41F3A" }}>Could not load {logSource === "admin" ? "audit log" : "user activity"}</p>
             <p className="text-muted-foreground mt-2" style={{ fontSize: "0.875rem", maxWidth: 420, margin: "0.5rem auto 0" }}>{fetchError}</p>
-            {logSource === "admin" && (
-              <p className="text-muted-foreground mt-3" style={{ fontSize: "0.8125rem" }}>
-                Ensure the backend is deployed with the latest migrations (<code style={{ background: "var(--muted)", padding: "1px 6px", borderRadius: 4 }}>python manage.py migrate</code>) and the code is up to date.
-              </p>
-            )}
-            <button onClick={() => logSource === "admin" ? fetchAudit() : fetchUserActivity()} className="mt-4 px-4 py-2 rounded-lg bg-primary text-white" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Retry</button>
+            <p className="text-muted-foreground mt-3" style={{ fontSize: "0.8125rem" }}>
+              Ensure the backend is deployed and the database table exists.
+            </p>
+            <button onClick={() => fetchAudit()} className="mt-4 px-4 py-2 rounded-lg bg-primary text-white" style={{ fontSize: "0.875rem", fontWeight: 600 }}>Retry</button>
           </div>
-        ) : logSource === "admin" ? (
-          entries.length === 0 ? (
-            <div className="py-20 text-center">
-              <Shield size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-              <p style={{ fontWeight: 700, fontSize: "1rem" }}>No audit events yet</p>
-              <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>Actions taken by admins will appear here once the backend is deployed and migrations are run.</p>
-            </div>
-          ) : (
+        ) : entries.length === 0 ? (
+          <div className="py-20 text-center">
+            <Shield size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+            <p style={{ fontWeight: 700, fontSize: "1rem" }}>No {logSource === "admin" ? "admin actions" : "user activity"} yet</p>
+            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>
+              {logSource === "admin"
+                ? "Actions taken by admins will appear here once the backend is deployed."
+                : "User logins, profile updates, and match activity will appear here automatically."}
+            </p>
+          </div>
+        ) : (
+          <>
+          {true ? (
             <div className="overflow-x-auto">
               <table className="w-full" style={{ fontSize: "0.875rem" }}>
                 <thead>
                   <tr className="border-b border-border bg-muted/40">
-                    {["Timestamp", "Admin", "Action", "Target", "Detail", "IP"].map(h => (
+                    {["Timestamp", "Actor", "Action", "Target", "Detail", "IP"].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-muted-foreground" style={{ fontWeight: 600, fontSize: "0.8125rem", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -2788,9 +2783,14 @@ function AdminAuditSection() {
                           </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: colors.bg, color: colors.text }}>
-                            {e.action_label}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-full" style={{ fontSize: "0.75rem", fontWeight: 700, background: colors.bg, color: colors.text }}>
+                              {e.action_label}
+                            </span>
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full w-fit" style={{ fontSize: "0.6rem", fontWeight: 700, background: e.is_user_activity ? "#E8F4FB" : "#F3EAF8", color: e.is_user_activity ? "#1A73A7" : "#7C4DAF" }}>
+                              {e.is_user_activity ? "USER" : "ADMIN"}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           {e.target_label ? (
@@ -2819,48 +2819,12 @@ function AdminAuditSection() {
             </table>
           </div>
         )
-        ) : (
-          // User Activity view
-          filteredUserRows.length === 0 ? (
-            <div className="py-20 text-center">
-              <Activity size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
-              <p style={{ fontWeight: 700, fontSize: "1rem" }}>No user activity yet</p>
-              <p className="text-muted-foreground mt-1" style={{ fontSize: "0.875rem" }}>System notifications and events sent to users will appear here.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border">
-              {filteredUserRows.map((row, idx) => {
-                const typeColor = row.type === "subscription" ? "#4A8DB8"
-                  : row.type === "moderation" ? "#D41F3A"
-                  : row.type === "auth" ? "#0A6870"
-                  : row.type === "admin" ? "#9B6DAF"
-                  : "#6B9E78";
-                return (
-                  <div key={idx} className={`flex items-start gap-4 px-5 py-4 hover:bg-muted/20 transition-colors ${idx % 2 === 0 ? "" : "bg-muted/5"}`}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: typeColor + "18", color: typeColor }}>
-                      <Users size={14} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span style={{ fontWeight: 700, fontSize: "0.875rem" }}>{row.actor}</span>
-                        <span className="px-2 py-0.5 rounded-full capitalize" style={{ fontSize: "0.6875rem", fontWeight: 700, background: typeColor + "18", color: typeColor }}>{row.type}</span>
-                      </div>
-                      <p style={{ fontSize: "0.875rem", marginTop: 2 }}>{row.action}</p>
-                      {row.detail && <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>{row.detail}</p>}
-                    </div>
-                    <span className="text-muted-foreground flex-shrink-0" style={{ fontSize: "0.75rem", whiteSpace: "nowrap" }}>
-                      {fmtTime(row.timestamp)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )
+        ) : null}
+        </>
         )}
       </div>
 
-      {/* Pagination — only for admin log */}
-      {logSource === "admin" && pages > 1 && (
+      {pages > 1 && (
         <div className="flex items-center justify-between mt-4">
           <span className="text-muted-foreground" style={{ fontSize: "0.875rem" }}>Page {page} of {pages}</span>
           <div className="flex items-center gap-2">
