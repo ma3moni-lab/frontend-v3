@@ -2749,8 +2749,6 @@ function AdminAuditSection() {
             </p>
           </div>
         ) : (
-          <>
-          {true ? (
             <div className="overflow-x-auto">
               <table className="w-full" style={{ fontSize: "0.875rem" }}>
                 <thead>
@@ -2818,9 +2816,6 @@ function AdminAuditSection() {
               </tbody>
             </table>
           </div>
-        )
-        ) : null}
-        </>
         )}
       </div>
 

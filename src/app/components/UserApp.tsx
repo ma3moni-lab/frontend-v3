@@ -4407,12 +4407,15 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "", comple
     } catch { return ""; }
   })();
 
-  // Lock is only enforced when ALL 3 fields have values AND completion score >= 60%
-  const nameFilled    = !!fullName.trim();
+  // Lock is only enforced when the field is COMPLETELY filled AND score >= 60.
+  // Requires BOTH first + last name so a user who only set a first name can still edit.
+  const firstFilled   = !!(parts[0]?.trim());
+  const lastFilled    = !!(parts.slice(1).join(" ").trim());
+  const nameFilled    = firstFilled && lastFilled;
   const genderFilled  = !!(pf.gender as string);
   const emailFilled   = !isPhoneUser; // phone users have no real email yet
   const lockEnforced  = nameFilled && genderFilled && emailFilled && completionScore >= 60;
-  const nameLocked    = lockEnforced && nameFilled;
+  const nameLocked    = lockEnforced;
   const genderLocked  = lockEnforced && genderFilled;
 
   const [form, setForm] = useState({

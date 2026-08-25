@@ -47,7 +47,26 @@ sw.addEventListener("fetch", (e: FetchEvent) => {
   const { request } = e;
   const url = new URL(request.url);
 
-  if (request.method !== "GET" || url.origin !== sw.location.origin) return;
+  if (request.method !== "GET") return;
+
+  // Cross-origin images (Cloudinary, CDN) — cache-first so repeated visits
+  // never re-download the same photo.
+  if (url.origin !== sw.location.origin) {
+    if (!/\.(jpe?g|png|webp|gif|avif)$/i.test(url.pathname)) return;
+    e.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_VERSION).then(c => c.put(request, clone));
+          }
+          return res;
+        }).catch(() => cached ?? Response.error());
+      })
+    );
+    return;
+  }
 
   // API calls — never cache, always go to network
   if (url.pathname.startsWith("/api/")) return;

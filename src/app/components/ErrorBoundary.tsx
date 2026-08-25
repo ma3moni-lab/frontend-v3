@@ -8,6 +8,13 @@ export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
+    // Stale chunk after a new deploy — reload silently instead of crashing
+    if (
+      error.message.includes("dynamically imported module") ||
+      error.message.includes("Failed to fetch")
+    ) {
+      window.location.reload();
+    }
     return { error };
   }
 

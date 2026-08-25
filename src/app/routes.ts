@@ -1,14 +1,26 @@
 import { createBrowserRouter } from "react-router";
-import { lazy } from "react";
+import { lazy, type ComponentType } from "react";
 
 // Eagerly load the user-facing root (most visited)
 import { UserRoot } from "./components/UserRoot";
 import { NotFound } from "./components/NotFound";
 
+// Lazy import that reloads when the chunk 404s (stale hash after a new deploy)
+function lazyWithRetry<T extends ComponentType>(
+  factory: () => Promise<{ default: T }>
+) {
+  return lazy(() =>
+    factory().catch(() => {
+      window.location.reload();
+      return new Promise<{ default: T }>(() => {});
+    })
+  );
+}
+
 // Lazy-load admin, blog, and reset-password — not needed on first paint for regular users
-const AdminRoot         = lazy(() => import("./components/AdminRoot").then(m => ({ default: m.AdminRoot })));
-const BlogListPage      = lazy(() => import("./components/BlogListPage").then(m => ({ default: m.BlogListPage })));
-const ResetPasswordPage = lazy(() => import("./components/ResetPasswordPage").then(m => ({ default: m.ResetPasswordPage })));
+const AdminRoot         = lazyWithRetry(() => import("./components/AdminRoot").then(m => ({ default: m.AdminRoot })));
+const BlogListPage      = lazyWithRetry(() => import("./components/BlogListPage").then(m => ({ default: m.BlogListPage })));
+const ResetPasswordPage = lazyWithRetry(() => import("./components/ResetPasswordPage").then(m => ({ default: m.ResetPasswordPage })));
 
 // Named appRouter to avoid collision with any build-pipeline injected 'router' global
 export const appRouter = createBrowserRouter([
