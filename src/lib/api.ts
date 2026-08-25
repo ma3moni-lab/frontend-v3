@@ -437,6 +437,15 @@ export const auth = {
     pause_after?: boolean;
   }) => post<{ detail: string; paused: boolean }>("/api/auth/found-partner/", data),
 
+  toggle2fa: (enabled: boolean) =>
+    post<{ two_fa_enabled: boolean }>("/api/auth/toggle-2fa/", { enabled }),
+
+  uploadIdDocument: (url: string) =>
+    post<{ status: string }>("/api/auth/upload-id-document/", { url }),
+
+  idVerificationStatus: () =>
+    get<{ id_verified: boolean; id_review_status: string }>("/api/auth/id-verification-status/"),
+
   /**
    * Submit a suspension appeal.  Tries the dedicated appeal endpoint first;
    * falls back to creating a support ticket so the appeal always reaches staff.
@@ -453,6 +462,17 @@ export const auth = {
       });
     }
   },
+
+  // 2FA toggle (STUB-10)
+  toggle2fa: (enabled: boolean) =>
+    post<{ two_fa_enabled: boolean }>("/api/auth/toggle-2fa/", { enabled }),
+
+  // ID verification (MISSING-02)
+  uploadIdDocument: (url: string) =>
+    post<{ status: string }>("/api/auth/upload-id-document/", { url }),
+
+  idVerificationStatus: () =>
+    get<{ id_verified: boolean; id_review_status: string }>("/api/auth/id-verification-status/"),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -995,6 +1015,26 @@ export const moderation = {
 
   replyTicket: (id: string, body: string) =>
     post<void>(`/api/support/tickets/${id}/reply/`, { body }),
+
+  /** Alias kept so ProfileSections can call moderationApi.unblock() */
+  unblock: (userId: string) =>
+    del<void>(`/api/users/${userId}/unblock/`),
+};
+
+/** Named alias so any component can import `moderationApi` directly. */
+export const moderationApi = moderation;
+
+// ═══════════════════════════════════════════════════════════════
+// PROFILE VIEWS — "Who viewed me" (MISSING-06)
+// ═══════════════════════════════════════════════════════════════
+export interface ProfileViewEntry {
+  viewer:    { id: string; full_name: string; photo_url: string | null };
+  viewed_at: string;
+}
+
+export const profileViews = {
+  whoViewedMe: (limit = 20) =>
+    get<{ results: ProfileViewEntry[]; count: number }>(`/api/matches/who-viewed-me/?limit=${limit}`),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -1474,6 +1514,7 @@ export function wsUrl(conversationId: string): string {
   const base = (import.meta.env.VITE_API_URL ?? "https://ma3moni-backend26.onrender.com")
     .replace(/^http/, "ws")
     .replace(/\/$/, "");
-  const token = getAccessToken() ?? "";
+  // Must use the current user token slot, not the legacy read-only ACCESS_KEY (BROKEN-01)
+  const token = ls(USER_ACCESS_KEY) ?? ls(ACCESS_KEY) ?? "";
   return `${base}/ws/chat/${conversationId}/?token=${token}`;
 }

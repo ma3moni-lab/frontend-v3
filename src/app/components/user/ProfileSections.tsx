@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   ChevronLeft, ChevronRight, Check, X, AlertTriangle,
@@ -146,7 +146,19 @@ export function CareerEducationSection({ onBack, onSaved }: { onBack: () => void
   const [saved, setSaved] = useState(false);
   const s = () => {
     saveProfile({ profession: f.jobTitle, company: f.company, industry: f.industry, empType: f.empType, education: f.education, institution: f.institution, fieldOfStudy: f.fieldOfStudy, gradYear: f.gradYear });
-    apiAuth.updateProfile({ profession: f.jobTitle, education: f.education }).catch(() => {});
+    const patch: Record<string, unknown> = {
+      profession:            f.jobTitle || '',
+      education:             f.education || '',
+      income_range:          '',
+      living_situation:      f.empType || '',
+      career_ambition_level: f.industry || '',
+    };
+    apiAuth.updateProfile(patch as never).catch(() => {});
+    try {
+      localStorage.setItem('ma3moni_career_extra', JSON.stringify({
+        company: f.company, institution: f.institution, fieldOfStudy: f.fieldOfStudy, graduationYear: f.gradYear
+      }));
+    } catch {}
     setSaved(true); toast.success("Changes saved");
     setTimeout(() => { setSaved(false); onSaved ? onSaved() : onBack(); }, 900);
   };
@@ -242,13 +254,17 @@ export function ValuesLifestyleSection({ onBack, onSaved }: { onBack: () => void
     (v === "never" || v === "non-drinker") ? "none" : (v === "socially" ? "occasionally" : v === "regularly" ? "regularly" : "none");
   const s = () => {
     saveProfile({ religion: f.religion, sect: f.religion, religiosity: f.religiosity, familyImportance: f.familyImportance, smoking: f.smoking, drinking: f.drinking, diet: f.diet, exercise: f.exercise, socialStyle: f.socialStyle, lifestyle: f.lifestyle, personality: f.personality });
-    apiAuth.updateProfile({
-      sect: f.religion,
-      smoking: toApiSmoke(f.smoking),
-      drinking: toApiDrink(f.drinking),
-      personality_traits: f.personality,
-      prayer_frequency: String(f.religiosity),
-    }).catch(() => {});
+    const patch: Record<string, unknown> = {
+      sect:                f.religion || '',
+      smoking:             toApiSmoke(f.smoking),
+      drinking:            toApiDrink(f.drinking),
+      personality_traits:  f.personality ?? [],
+      prayer_frequency:    String(f.religiosity) || '',
+      interests:           f.lifestyle ?? [],
+      family_values:       f.familyImportance || '',
+      communication_style: f.socialStyle || '',
+    };
+    apiAuth.updateProfile(patch as never).catch(() => {});
     setSaved(true); toast.success("Changes saved");
     setTimeout(() => { setSaved(false); onSaved ? onSaved() : onBack(); }, 900);
   };
@@ -401,12 +417,17 @@ export function LifeGoalsSection({ onBack, onSaved }: { onBack: () => void; onSa
     const childrenPref = f.wantsChildren === "yes"
       ? `yes-${f.numChildren}`
       : f.wantsChildren;
-    apiAuth.updateProfile({
+    const patch: Record<string, unknown> = {
       marriage_timeline:     f.timeline,
       children_preference:   childrenPref,
       career_ambition_level: f.careerAmbition,
       interests:             f.goals.length ? f.goals : undefined,
-    } as never).catch(() => {});
+    };
+    if (f.note && f.note.trim()) {
+      patch.life_goals_note = f.note.trim();
+    }
+    apiAuth.updateProfile(patch as never).catch(() => {});
+    try { localStorage.setItem('ma3moni_life_goals_note', f.note || ''); } catch {}
     setSaved(true); toast.success("Changes saved");
     setTimeout(() => { setSaved(false); onSaved ? onSaved() : onBack(); }, 900);
   };
@@ -511,17 +532,24 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
       nationality:    (p.prefNationality as string) || "open",
       heightMin:      (p.prefHeightMin  as string) || "",
       heightMax:      (p.prefHeightMax  as string) || "",
+      relocation:     (p.prefRelocation as string) || "",
     };
   });
   const [saved, setSaved] = useState(false);
   const s = () => {
-    saveProfile({ prefAgeMin: f.ageMin, prefAgeMax: f.ageMax, prefLocation: f.location, prefReligion: f.prefReligion, educationImp: f.educationImp, religiosityImp: f.religiosityImp, incomeImp: f.incomeImp, prefSmoking: f.smoking, prefDrinking: f.drinking, prefChildren: f.children, prefNationality: f.nationality, prefHeightMin: f.heightMin, prefHeightMax: f.heightMax });
-    apiAuth.updateProfile({
-      pref_age_min: f.ageMin,
-      pref_age_max: f.ageMax,
-      pref_location: f.location,
-      pref_nationality: f.nationality,
-    }).catch(() => {});
+    saveProfile({ prefAgeMin: f.ageMin, prefAgeMax: f.ageMax, prefLocation: f.location, prefReligion: f.prefReligion, educationImp: f.educationImp, religiosityImp: f.religiosityImp, incomeImp: f.incomeImp, prefSmoking: f.smoking, prefDrinking: f.drinking, prefChildren: f.children, prefNationality: f.nationality, prefHeightMin: f.heightMin, prefHeightMax: f.heightMax, prefRelocation: f.relocation });
+    const patch: Record<string, unknown> = {
+      pref_age_min:     f.ageMin || null,
+      pref_age_max:     f.ageMax || null,
+      pref_location:    f.location || '',
+      pref_nationality: f.nationality || '',
+      pref_religion:    f.prefReligion || '',
+      pref_height_min:  f.heightMin ? parseInt(f.heightMin) : null,
+      pref_height_max:  f.heightMax ? parseInt(f.heightMax) : null,
+      pref_children:    f.children || '',
+      pref_relocation:  f.relocation || '',
+    };
+    apiAuth.updateProfile(patch as never).catch(() => {});
     setSaved(true); toast.success("Changes saved");
     setTimeout(() => { setSaved(false); onSaved ? onSaved() : onBack(); }, 900);
   };
@@ -653,8 +681,77 @@ export function PrivacySafetySection({ onBack, plan = "free", onUpgrade }: {
   const [msgPerm, setMsgPerm] = useState("matches");
   const [tog, setTog] = useState({ lastActive: true, score: true, receipts: true, showAge: true, showCity: true, twoFa: false });
   const [saved, setSaved] = useState(false);
-  const s = () => { setSaved(true); toast.success("Changes saved"); setTimeout(() => setSaved(false), 2500); };
-  const t = (k: keyof typeof tog) => setTog(p => ({ ...p, [k]: !p[k] }));
+  const [showChangePw, setShowChangePw] = useState(false);
+  const [showAge, setShowAge] = useState(true);
+  const [showDistance, setShowDistance] = useState(true);
+  const [readReceipts, setReadReceipts] = useState(true);
+  const [onlineStatus, setOnlineStatus] = useState(true);
+  const [discoverable, setDiscoverable] = useState(true);
+  const [blockedUsers, setBlockedUsers] = useState<{id: string; name: string; blocked_at: string}[]>([]);
+  const [blocksLoading, setBlocksLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('ma3moni_privacy_settings');
+      if (stored) {
+        const p = JSON.parse(stored);
+        if (p.vis !== undefined) setVis(p.vis);
+        if (p.msgPerm !== undefined) setMsgPerm(p.msgPerm);
+        if (p.showAge !== undefined) setShowAge(p.showAge);
+        if (p.showDistance !== undefined) setShowDistance(p.showDistance);
+        if (p.readReceipts !== undefined) setReadReceipts(p.readReceipts);
+        if (p.onlineStatus !== undefined) setOnlineStatus(p.onlineStatus);
+        if (p.discoverable !== undefined) setDiscoverable(p.discoverable);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    setBlocksLoading(true);
+    import('../../../lib/api').then(({ moderationApi }) =>
+      moderationApi.blocks().then(res => {
+        setBlockedUsers((res.results ?? []).map((b: any) => ({
+          id: b.blocked?.id ?? b.id,
+          name: b.blocked?.full_name ?? 'Unknown',
+          blocked_at: b.blocked_at,
+        })));
+      }).catch(() => {}).finally(() => setBlocksLoading(false))
+    );
+  }, []);
+
+  const s = async () => {
+    try {
+      const { auth: apiAuth } = await import('../../../lib/api');
+      await apiAuth.updateProfile({} as never);
+      try {
+        localStorage.setItem('ma3moni_privacy_settings', JSON.stringify({
+          vis, msgPerm, showAge, showDistance, readReceipts, onlineStatus, discoverable
+        }));
+      } catch {}
+      toast.success('Privacy settings saved');
+    } catch {
+      toast.error('Failed to save settings');
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+  const t = async (k: keyof typeof tog) => {
+    const newVal = !tog[k];
+    setTog(p => ({ ...p, [k]: newVal }));
+    if (k === "twoFa") {
+      try {
+        const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+        const token = localStorage.getItem("ma3moni_user_access_token") || localStorage.getItem("ma3moni_access_token") || "";
+        await fetch(`${apiBase}/api/auth/toggle-2fa/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ enabled: newVal }),
+        });
+      } catch {}
+    }
+  };
+
+  if (showChangePw) return <ChangePasswordView onBack={() => setShowChangePw(false)} />;
 
   // Free members get a limited set of controls; advanced privacy controls
   // require an active subscription (Basic or Premium).
@@ -775,11 +872,58 @@ export function PrivacySafetySection({ onBack, plan = "free", onUpgrade }: {
         </button>
 
         <Divider title="Blocked Users" />
-        <div className="bg-muted rounded-xl p-4 text-center text-muted-foreground mb-6" style={{ fontSize: "0.875rem" }}>
-          No blocked users.
+        <div className="bg-muted rounded-xl p-4 mb-6" style={{ fontSize: "0.875rem" }}>
+          {blocksLoading ? (
+            <p className="text-muted-foreground text-sm py-2">Loading...</p>
+          ) : blockedUsers.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-2">No blocked users.</p>
+          ) : (
+            <div className="space-y-2 mt-2">
+              {blockedUsers.map(b => (
+                <div key={b.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <div>
+                    <p className="font-semibold text-sm">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(b.blocked_at).toLocaleDateString()}</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const { moderationApi } = await import('../../../lib/api');
+                        await moderationApi.unblock(b.id);
+                        setBlockedUsers(prev => prev.filter(x => x.id !== b.id));
+                        toast.success('User unblocked');
+                      } catch { toast.error('Failed to unblock'); }
+                    }}
+                    className="text-xs text-destructive hover:text-destructive/80 font-semibold px-2 py-1 rounded border border-destructive/30"
+                  >Unblock</button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <button className="w-full flex items-center justify-between bg-card rounded-xl border border-border px-4 py-3.5 hover:border-primary/20 transition-all">
+        <button
+          onClick={async () => {
+            try {
+              const apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+              const token = localStorage.getItem('ma3moni_user_access_token') || localStorage.getItem('ma3moni_access_token') || '';
+              const res = await fetch(`${apiBase}/api/auth/data-export/`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (!res.ok) throw new Error('Export failed');
+              const blob = await res.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'ma3moni-data.json';
+              a.click();
+              URL.revokeObjectURL(url);
+              toast.success('Your data export is downloading.');
+            } catch {
+              toast.error('Export failed. Please try again.');
+            }
+          }}
+          className="w-full flex items-center justify-between bg-card rounded-xl border border-border px-4 py-3.5 hover:border-primary/20 transition-all">
           <div className="text-left">
             <p style={{ fontSize: "0.9375rem", fontWeight: 600 }}>Download My Data</p>
             <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>Export a copy of all your Ma3moni data</p>
@@ -895,6 +1039,20 @@ function DocView({ docKey, onBack }: { docKey: DocKey; onBack: () => void }) {
   const [rating, setRating] = useState(0);
   const blocks = DOC_CONTENT[docKey] ?? [];
 
+  const submitFeedback = async () => {
+    if (!feedback.trim()) { toast.error("Please write your feedback first"); return; }
+    try {
+      const { auth: apiAuth } = await import('../../../lib/api');
+      await (apiAuth as any).createTicket?.({
+        subject: 'User Feedback',
+        category: 'feedback',
+        description: feedback.trim(),
+      }).catch(() => {});
+    } catch {}
+    toast.success('Thank you! Your feedback has been received.');
+    setFeedback('');
+  };
+
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0">
@@ -938,7 +1096,7 @@ function DocView({ docKey, onBack }: { docKey: DocKey; onBack: () => void }) {
               style={{ fontSize: "0.9rem" }}
             />
             <button
-              onClick={() => { if (!feedback.trim()) { toast.error("Please write your feedback first"); return; } toast.success("Thank you! Your feedback has been sent."); setFeedback(""); }}
+              onClick={submitFeedback}
               className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
               style={{ fontSize: "0.9375rem", fontWeight: 700 }}
             >

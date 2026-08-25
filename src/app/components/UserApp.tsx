@@ -7,6 +7,7 @@ import {
   moderation as moderationApi,
   subscriptions as subsApi,
   referrals as referralsApi,
+  profileViews as profileViewsApi,
   restoreUserToken,
   setUserTokens,
   type MatchProfile as ApiMatchProfile,
@@ -14,6 +15,7 @@ import {
   type AppNotification as ApiNotification,
   type ReferralStats,
   type SupportTicket,
+  type ProfileViewEntry,
 } from "../../lib/api";
 import {
   Home, Heart, MessageCircle, User, Bell, ChevronLeft,
@@ -62,7 +64,8 @@ type SubView =
   | "deactivate"
   | "blog-list"
   | "blog-detail"
-  | "support-center";
+  | "support-center"
+  | "who-viewed-me";
 
 // ── Unsplash helper (for match discovery mock data only) ─
 const p = (id: string, w = 600, h = 750) =>
@@ -2034,6 +2037,7 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
   ];
 
   const ACCOUNT_ROWS: { icon: ReactNode; label: string; sub: string; view: SubView; color: string }[] = [
+    { icon: <Search size={15} />,  label: "Who Viewed Me",   sub: "See who recently visited your profile", view: "who-viewed-me", color: "#9B6DAF" },
     { icon: <BookOpen size={15} />,label: "Guidance & Articles", sub: "Reading on values, faith & marriage", view: "blog-list",      color: "#6B9E78" },
     { icon: <Gift size={15} />,    label: "Refer & Earn",    sub: `Earn ${isNigerianProfile ? `₦${referralBonusNgn.toLocaleString()}` : `$${referralBonus}`} per referral`, view: "referral",       color: "#C5733F" },
     { icon: <Bell size={15} />,    label: "Notifications",   sub: "Manage your alerts",                 view: "notifications",    color: "#4A8DB8" },
@@ -4662,6 +4666,80 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "", comple
   );
 }
 
+// ── Who Viewed Me (MISSING-06) ────────────────────────────────────────────────
+function WhoViewedMeSection({ onBack, onOpenMatch }: { onBack: () => void; onOpenMatch: (id: string) => void }) {
+  const [entries, setEntries] = useState<ProfileViewEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    profileViewsApi.whoViewedMe(30)
+      .then(r => setEntries(r.results))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const fmt = (iso: string) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / 1000);
+    if (diff < 60) return "Just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-background">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
+        <button onClick={onBack} className="p-1 -ml-1 text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft size={22} />
+        </button>
+        <h2 className="text-base font-semibold text-foreground flex-1">Who Viewed Me</h2>
+        <span className="text-sm text-muted-foreground">{entries.length} recent</span>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-40 text-muted-foreground text-sm">Loading…</div>
+        ) : entries.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-56 gap-3 text-center px-6">
+            <Search size={36} className="text-muted-foreground/40" />
+            <p className="text-muted-foreground text-sm">No one has viewed your profile yet. Complete your profile to get more visibility.</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {entries.map((e, i) => (
+              <li key={i} className="flex items-center gap-3 px-4 py-3">
+                <button
+                  onClick={() => onOpenMatch(e.viewer.id)}
+                  className="flex items-center gap-3 flex-1 text-left"
+                >
+                  {e.viewer.photo_url ? (
+                    <img src={e.viewer.photo_url} alt={e.viewer.full_name} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <User size={20} className="text-primary" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground text-sm truncate">{e.viewer.full_name}</p>
+                    <p className="text-xs text-muted-foreground">{fmt(e.viewed_at)}</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => onOpenMatch(e.viewer.id)}
+                  className="text-xs font-medium text-primary hover:text-primary/80 transition-colors flex-shrink-0"
+                >
+                  View →
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function UserApp({ onSignOut }: UserAppProps) {
   const [tab, setTab] = useState<Tab>("home");
   const [subView, setSubView] = useState<SubView>("none");
@@ -5133,7 +5211,8 @@ export function UserApp({ onSignOut }: UserAppProps) {
     } catch (err: unknown) {
       const detail = (err as { data?: { detail?: string } })?.data?.detail;
       if (detail === "both_free") {
-        toast.error("Upgrade to Basic or Premium to start messaging.");
+        toast.error("Upgrade to start messaging with this match.");
+        setSubView("subscription");
       } else {
         toast.error("Could not start conversation. Please try again.");
       }
@@ -5399,6 +5478,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
               }
             }}
           />}
+          {subView === "who-viewed-me"     && <WhoViewedMeSection onBack={goBack} onOpenMatch={openMatch} />}
           {subView === "found-partner"     && <FoundPartnerSection onBack={goBack} onComplete={() => { setFoundPartner(true); try { localStorage.setItem("ma3moni_found_partner","true"); } catch {} goBack(); }} />}
           {subView === "deactivate"        && <DeactivateSection onBack={goBack} onSignOut={onSignOut} />}
         </div>
