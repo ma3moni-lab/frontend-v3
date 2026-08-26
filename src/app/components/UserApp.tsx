@@ -3742,7 +3742,12 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
           ) : [
             { value: String(apiStats?.total_signups ?? 0),           label: "Signups" },
             { value: String(apiStats?.total_converted ?? 0),         label: "Converted" },
-            { value: isNigerianReferral ? `₦${(apiStats?.total_points ?? 0).toLocaleString()}` : `$${apiStats?.total_points ?? 0}`, label: "Earned" },
+            {
+              value: isNigerianReferral
+                ? `₦${((apiStats?.total_signups ?? 0) * bonusPointsNgn).toLocaleString()}`
+                : `$${((apiStats?.total_signups ?? 0) * bonusPoints).toLocaleString()}`,
+              label: "Earned",
+            },
           ].map(({ value, label }) => (
             <div key={label} className="bg-card rounded-2xl border border-border p-4 text-center">
               <p style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--primary)" }}>{value}</p>

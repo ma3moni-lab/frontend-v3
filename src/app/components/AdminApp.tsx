@@ -1049,6 +1049,7 @@ function ModerationSection() {
 function BlacklistSection() {
   const [form, setForm] = useState({ type: "email", value: "", reason: "" });
   const [list, setList] = useState<typeof BLACKLIST>([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     adminApi.blacklist().then(res => {
@@ -1058,6 +1059,14 @@ function BlacklistSection() {
       })));
     }).catch(() => {});
   }, []);
+
+  const filtered = search.trim()
+    ? list.filter(item =>
+        item.value.toLowerCase().includes(search.toLowerCase()) ||
+        item.reason.toLowerCase().includes(search.toLowerCase()) ||
+        item.type.toLowerCase().includes(search.toLowerCase())
+      )
+    : list;
 
   const add = async () => {
     if (!form.value || !form.reason) return;
@@ -1123,7 +1132,24 @@ function BlacklistSection() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Search + Table */}
+      <div className="flex items-center gap-3 mb-3">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by value, type or reason…"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            style={{ fontSize: "0.875rem" }}
+          />
+        </div>
+        {search && (
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            {filtered.length} / {list.length} entries
+          </span>
+        )}
+      </div>
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         <table className="w-full">
           <thead>
@@ -1134,7 +1160,14 @@ function BlacklistSection() {
             </tr>
           </thead>
           <tbody>
-            {list.map(item => (
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-5 py-8 text-center text-muted-foreground" style={{ fontSize: "0.875rem" }}>
+                  {search ? "No entries match your search." : "Blacklist is empty."}
+                </td>
+              </tr>
+            ) : null}
+            {filtered.map(item => (
               <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                 <td className="px-5 py-4">
                   <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground capitalize" style={{ fontSize: "0.75rem", fontWeight: 600 }}>{item.type}</span>
