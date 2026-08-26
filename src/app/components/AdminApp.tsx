@@ -1145,7 +1145,11 @@ function BlacklistSection() {
                 <td className="px-5 py-4 text-muted-foreground" style={{ fontSize: "0.875rem" }}>{item.date}</td>
                 <td className="px-5 py-4">
                   <button
-                    onClick={() => setList(prev => prev.filter(b => b.id !== item.id))}
+                    onClick={async () => {
+                      setList(prev => prev.filter(b => b.id !== item.id));
+                      try { await adminApi.removeBlacklist(item.id); } catch {}
+                    }}
+                    title="Remove from blacklist"
                     className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <Trash2 size={14} />
