@@ -1284,6 +1284,8 @@ const DAILY_LIMITS: Record<"free" | "basic" | "premium", number> = {
   premium: Infinity,
 };
 
+const NEW_PREFS_NUDGE_KEY = "ma3_new_prefs_nudge_v1";
+
 function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList, profileStrength = 100, incompleteFields = [], onCompleteProfile, noMatchReasons = [] }: {
   onOpenMatch: (id: string) => void;
   plan: "free" | "basic" | "premium";
@@ -1300,6 +1302,23 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
 }) {
   // ── All hooks must be declared before any conditional return (Rules of Hooks) ──
   const DATA = matchesList ?? [];
+
+  // Check whether user has set the new preference fields
+  const [showNewPrefsNudge, setShowNewPrefsNudge] = useState(() => {
+    try {
+      if (localStorage.getItem(NEW_PREFS_NUDGE_KEY) === "dismissed") return false;
+      const p = JSON.parse(localStorage.getItem("ma3moni_onboarding_progress") ?? "{}");
+      const form = (p as { form?: Record<string, unknown> }).form ?? {};
+      const hasWifePref = !!(form.wifePreference);
+      const hasPrefEth  = !!(form.prefEthnicity);
+      return !hasWifePref || !hasPrefEth;  // show if either is missing
+    } catch { return false; }
+  });
+
+  const dismissNewPrefsNudge = () => {
+    try { localStorage.setItem(NEW_PREFS_NUDGE_KEY, "dismissed"); } catch {}
+    setShowNewPrefsNudge(false);
+  };
 
   // Persist filter state in sessionStorage so it survives tab switches
   const [filter, setFilter] = useState<"all" | "high" | "new">(() => {
@@ -1413,6 +1432,39 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
             >
               Fix →
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* New preferences nudge — shown once until dismissed or preferences are set */}
+      {showNewPrefsNudge && (
+        <div className="mx-4 mt-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span style={{ fontSize: "1rem" }}>✨</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--primary)" }}>
+                New: Ethnicity & Role Preferences
+              </p>
+              <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.75rem", lineHeight: 1.5 }}>
+                You can now set your tribe/ethnicity preference and whether you prefer a housewife or career-focused partner — and make these <strong>must-have</strong> filters for your matches.
+              </p>
+              <div className="flex items-center gap-3 mt-2.5">
+                <button
+                  onClick={() => { dismissNewPrefsNudge(); onCompleteProfile?.("partner-preferences"); }}
+                  className="px-3 py-1.5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  style={{ fontSize: "0.75rem", fontWeight: 700 }}>
+                  Set Preferences
+                </button>
+                <button
+                  onClick={dismissNewPrefsNudge}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  style={{ fontSize: "0.75rem" }}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
