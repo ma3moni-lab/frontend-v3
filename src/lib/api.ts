@@ -175,12 +175,18 @@ export interface Profile {
   smoking:            "none" | "occasionally" | "regularly";
   drinking:           "none" | "occasionally" | "regularly";
   personality_traits: string[];
-  pref_age_min:       number | null;
-  pref_age_max:       number | null;
-  pref_location:      string;
-  pref_nationality:   string;
-  completion_score:   number;
-  found_partner:      boolean;
+  pref_age_min:        number | null;
+  pref_age_max:        number | null;
+  pref_location:       string;
+  pref_nationality:    string;
+  pref_religion:       string;
+  pref_ethnicity:      string;
+  must_match_ethnicity: boolean;
+  must_match_religion:  boolean;
+  wife_preference:     string;
+  must_match_wife_pref: boolean;
+  completion_score:    number;
+  found_partner:       boolean;
 }
 
 export interface ProfilePhoto {
@@ -524,10 +530,11 @@ export interface MatchProfile {
 }
 
 export interface DiscoverResponse {
-  results:         MatchProfile[];
-  remaining_today: number;
-  count:           number;
-  next:            string | null;
+  results:          MatchProfile[];
+  remaining_today:  number;
+  count:            number;
+  next:             string | null;
+  no_match_reasons: string[];
 }
 
 export interface Interest {

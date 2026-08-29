@@ -508,6 +508,43 @@ export function LifeGoalsSection({ onBack, onSaved }: { onBack: () => void; onSa
 // ═══════════════════════════════════════════════════════
 // 4. PARTNER PREFERENCES
 // ═══════════════════════════════════════════════════════
+
+function MustMatchToggle({ label, description, value, onChange, disabled = false }: {
+  label: string; description: string; value: boolean;
+  onChange: (v: boolean) => void; disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => !disabled && onChange(!value)}
+      className={`w-full flex items-start gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+        disabled
+          ? "border-border bg-muted/30 opacity-50 cursor-not-allowed"
+          : value
+            ? "border-primary bg-primary/8 cursor-pointer"
+            : "border-border bg-card hover:border-primary/30 cursor-pointer"
+      }`}
+    >
+      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+        value && !disabled ? "border-primary bg-primary" : "border-muted-foreground"
+      }`}>
+        {value && !disabled && <div className="w-2 h-2 rounded-full bg-white" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p style={{ fontSize: "0.8125rem", fontWeight: value && !disabled ? 700 : 600,
+          color: value && !disabled ? "var(--primary)" : "var(--foreground)" }}>
+          {label}
+          {value && !disabled && <span className="ml-2 px-1.5 py-0.5 rounded-full text-primary-foreground bg-primary"
+            style={{ fontSize: "0.6rem", fontWeight: 800, verticalAlign: "middle" }}>MUST-HAVE</span>}
+        </p>
+        <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.75rem", lineHeight: 1.4 }}>
+          {disabled ? "Set a preference above to enable this filter" : description}
+        </p>
+      </div>
+    </button>
+  );
+}
+
 const IMP_OPTS = [
   { value: "must-have", label: "Must Have" },
   { value: "important", label: "Important" },
@@ -519,35 +556,54 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
   const [f, setF] = useState(() => {
     const p = readProfile();
     return {
-      ageMin:         Number(p.prefAgeMin      ?? 24),
-      ageMax:         Number(p.prefAgeMax      ?? 35),
-      location:       (p.prefLocation   as string) || "same-country",
-      prefReligion:   (p.prefReligion   as string) || "open",
-      educationImp:   (p.educationImp   as string) || "important",
-      religiosityImp: (p.religiosityImp as string) || "must-have",
-      incomeImp:      (p.incomeImp      as string) || "not-important",
-      smoking:        (p.prefSmoking    as string) || "non-smoker",
-      drinking:       (p.prefDrinking   as string) || "non-drinker",
-      children:       (p.prefChildren   as string) || "doesnt-matter",
-      nationality:    (p.prefNationality as string) || "open",
-      heightMin:      (p.prefHeightMin  as string) || "",
-      heightMax:      (p.prefHeightMax  as string) || "",
-      relocation:     (p.prefRelocation as string) || "",
+      ageMin:             Number(p.prefAgeMin          ?? 24),
+      ageMax:             Number(p.prefAgeMax          ?? 35),
+      location:           (p.prefLocation      as string) || "same-country",
+      prefReligion:       (p.prefReligion      as string) || "open",
+      educationImp:       (p.educationImp      as string) || "important",
+      religiosityImp:     (p.religiosityImp    as string) || "must-have",
+      incomeImp:          (p.incomeImp         as string) || "not-important",
+      smoking:            (p.prefSmoking       as string) || "non-smoker",
+      drinking:           (p.prefDrinking      as string) || "non-drinker",
+      children:           (p.prefChildren      as string) || "doesnt-matter",
+      nationality:        (p.prefNationality   as string) || "open",
+      heightMin:          (p.prefHeightMin     as string) || "",
+      heightMax:          (p.prefHeightMax     as string) || "",
+      relocation:         (p.prefRelocation    as string) || "",
+      prefEthnicity:      (p.prefEthnicity     as string) || "",
+      mustMatchEthnicity: !!(p.mustMatchEthnicity),
+      mustMatchReligion:  !!(p.mustMatchReligion),
+      wifePreference:     (p.wifePreference    as string) || "either",
+      mustMatchWifePref:  !!(p.mustMatchWifePref),
     };
   });
   const [saved, setSaved] = useState(false);
   const s = () => {
-    saveProfile({ prefAgeMin: f.ageMin, prefAgeMax: f.ageMax, prefLocation: f.location, prefReligion: f.prefReligion, educationImp: f.educationImp, religiosityImp: f.religiosityImp, incomeImp: f.incomeImp, prefSmoking: f.smoking, prefDrinking: f.drinking, prefChildren: f.children, prefNationality: f.nationality, prefHeightMin: f.heightMin, prefHeightMax: f.heightMax, prefRelocation: f.relocation });
+    saveProfile({
+      prefAgeMin: f.ageMin, prefAgeMax: f.ageMax, prefLocation: f.location,
+      prefReligion: f.prefReligion, educationImp: f.educationImp,
+      religiosityImp: f.religiosityImp, incomeImp: f.incomeImp,
+      prefSmoking: f.smoking, prefDrinking: f.drinking, prefChildren: f.children,
+      prefNationality: f.nationality, prefHeightMin: f.heightMin, prefHeightMax: f.heightMax,
+      prefRelocation: f.relocation, prefEthnicity: f.prefEthnicity,
+      mustMatchEthnicity: f.mustMatchEthnicity, mustMatchReligion: f.mustMatchReligion,
+      wifePreference: f.wifePreference, mustMatchWifePref: f.mustMatchWifePref,
+    });
     const patch: Record<string, unknown> = {
-      pref_age_min:     f.ageMin || null,
-      pref_age_max:     f.ageMax || null,
-      pref_location:    f.location || '',
-      pref_nationality: f.nationality || '',
-      pref_religion:    f.prefReligion || '',
-      pref_height_min:  f.heightMin ? parseInt(f.heightMin) : null,
-      pref_height_max:  f.heightMax ? parseInt(f.heightMax) : null,
-      pref_children:    f.children || '',
-      pref_relocation:  f.relocation || '',
+      pref_age_min:          f.ageMin || null,
+      pref_age_max:          f.ageMax || null,
+      pref_location:         f.location || '',
+      pref_nationality:      f.nationality || '',
+      pref_religion:         f.prefReligion || '',
+      pref_height_min:       f.heightMin ? parseInt(f.heightMin) : null,
+      pref_height_max:       f.heightMax ? parseInt(f.heightMax) : null,
+      pref_children:         f.children || '',
+      pref_relocation:       f.relocation || '',
+      pref_ethnicity:        f.prefEthnicity || '',
+      must_match_ethnicity:  f.mustMatchEthnicity,
+      must_match_religion:   f.mustMatchReligion,
+      wife_preference:       f.wifePreference || '',
+      must_match_wife_pref:  f.mustMatchWifePref,
     };
     apiAuth.updateProfile(patch as never).catch(() => {});
     setSaved(true); toast.success("Changes saved");
@@ -588,20 +644,68 @@ export function PartnerPrefsSection({ onBack, onSaved }: { onBack: () => void; o
         ]} />
 
         <Divider title="Religious Preference" />
-        <div>
-          <FL>Partner's Religion</FL>
-          <SI value={f.prefReligion} onChange={v => u("prefReligion", v)} opts={[
-            { value: "open",        label: "Open to all" },
-            { value: "same",        label: "Same as mine" },
-            { value: "islam",       label: "Islam" },
-            { value: "christianity",label: "Christianity" },
-            { value: "judaism",     label: "Judaism" },
-            { value: "hinduism",    label: "Hinduism" },
-            { value: "buddhism",    label: "Buddhism" },
-            { value: "sikhism",     label: "Sikhism" },
-            { value: "agnostic",    label: "Agnostic" },
-            { value: "atheist",     label: "Atheist / None" },
-          ]} />
+        <div className="space-y-3">
+          <div>
+            <FL>Partner's Religion</FL>
+            <SI value={f.prefReligion} onChange={v => u("prefReligion", v)} opts={[
+              { value: "open",        label: "Open to all" },
+              { value: "same",        label: "Same as mine" },
+              { value: "islam",       label: "Islam" },
+              { value: "christianity",label: "Christianity" },
+              { value: "judaism",     label: "Judaism" },
+              { value: "hinduism",    label: "Hinduism" },
+              { value: "buddhism",    label: "Buddhism" },
+              { value: "sikhism",     label: "Sikhism" },
+              { value: "agnostic",    label: "Agnostic" },
+              { value: "atheist",     label: "Atheist / None" },
+            ]} />
+          </div>
+          <MustMatchToggle
+            label="Must-Have: Religion"
+            description="Only show profiles matching this religion exactly"
+            value={f.mustMatchReligion}
+            onChange={v => u("mustMatchReligion", v)}
+            disabled={f.prefReligion === "open"}
+          />
+        </div>
+
+        <Divider title="Ethnicity / Tribe Preference" />
+        <div className="space-y-3">
+          <div>
+            <FL opt>Preferred Ethnicity / Tribe</FL>
+            <input
+              value={f.prefEthnicity}
+              onChange={e => u("prefEthnicity", e.target.value)}
+              placeholder="e.g. Yoruba, Punjabi, Arab… (leave blank for any)"
+              className="w-full px-4 py-3 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+              style={{ fontSize: "0.9375rem" }} />
+          </div>
+          <MustMatchToggle
+            label="Must-Have: Ethnicity"
+            description="Only show profiles with this exact ethnicity"
+            value={f.mustMatchEthnicity}
+            onChange={v => u("mustMatchEthnicity", v)}
+            disabled={!f.prefEthnicity.trim()}
+          />
+        </div>
+
+        <Divider title="Partner's Role Preference" />
+        <div className="space-y-3">
+          <div>
+            <FL>Wife / Partner Role</FL>
+            <CardPick value={f.wifePreference as never} onChange={v => u("wifePreference", v)} cols={1} opts={[
+              { value: "housewife", label: "Prefers to be a homemaker / housewife" },
+              { value: "working",   label: "Career-focused / working partner" },
+              { value: "either",    label: "Either is fine" },
+            ]} />
+          </div>
+          <MustMatchToggle
+            label="Must-Have: Partner Role"
+            description="Only show profiles that match your role preference"
+            value={f.mustMatchWifePref}
+            onChange={v => u("mustMatchWifePref", v)}
+            disabled={f.wifePreference === "either"}
+          />
         </div>
 
         <Divider title="Importance Weights" />

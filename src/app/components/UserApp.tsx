@@ -144,6 +144,47 @@ function fixMediaUrl(raw: string, base: string): string {
   return raw;
 }
 
+// Ethnic groups indexed by country name — used in PersonalInfoEdit
+const ETHNICITY_BY_COUNTRY: Record<string, string[]> = {
+  "Nigeria":        ["Hausa", "Yoruba", "Igbo", "Fulani", "Ijaw", "Kanuri", "Ibibio", "Tiv", "Other"],
+  "Ghana":          ["Akan", "Ewe", "Mole-Dagbon", "Guan", "Ga-Dangme", "Other"],
+  "Kenya":          ["Kikuyu", "Luhya", "Luo", "Kalenjin", "Kamba", "Kisii", "Meru", "Other"],
+  "Ethiopia":       ["Oromo", "Amhara", "Tigray", "Somali", "Afar", "Gurage", "Sidama", "Other"],
+  "Somalia":        ["Somali", "Bantu", "Benadiri", "Other"],
+  "South Africa":   ["Zulu", "Xhosa", "Sotho", "Tsonga", "Venda", "Tswana", "Swazi", "Ndebele", "Other"],
+  "Sudan":          ["Arab", "Dinka", "Nuer", "Beja", "Nuba", "Fur", "Other"],
+  "Egypt":          ["Arab", "Coptic", "Nubian", "Berber", "Other"],
+  "Algeria":        ["Arab", "Berber/Amazigh", "Tuareg", "Other"],
+  "Morocco":        ["Arab", "Berber/Amazigh", "Sahrawi", "Other"],
+  "Senegal":        ["Wolof", "Pulaar/Fula", "Serer", "Jola", "Mandinka", "Other"],
+  "Cameroon":       ["Fulani", "Bamileke", "Beti", "Bassa", "Duala", "Other"],
+  "Tanzania":       ["Sukuma", "Chagga", "Haya", "Nyamwezi", "Swahili", "Other"],
+  "Uganda":         ["Baganda", "Banyankole", "Basoga", "Bakiga", "Acholi", "Other"],
+  "Saudi Arabia":   ["Arab", "Bedouin", "Afro-Saudi", "South Asian", "Western", "Other"],
+  "United Arab Emirates": ["Emirati", "Arab", "South Asian", "Western", "African", "Other"],
+  "Pakistan":       ["Punjabi", "Sindhi", "Pashtun", "Baloch", "Muhajir", "Hazara", "Saraiki", "Other"],
+  "India":          ["Punjabi", "Bengali", "Tamil", "Telugu", "Marathi", "Gujarati", "Rajasthani", "Kannada", "Odia", "Kashmiri", "Other"],
+  "Bangladesh":     ["Bengali", "Chakma", "Marma", "Tripuri", "Other"],
+  "Indonesia":      ["Javanese", "Sundanese", "Batak", "Madurese", "Minangkabau", "Bugis", "Betawi", "Other"],
+  "Malaysia":       ["Malay", "Chinese", "Tamil", "Iban", "Kadazan", "Dusun", "Bidayuh", "Other"],
+  "Turkey":         ["Turkish", "Kurdish", "Arab", "Armenian", "Other"],
+  "United Kingdom": ["White British", "Black British", "British Asian", "Mixed Heritage", "Other"],
+  "United States":  ["White/Caucasian", "Black/African American", "Hispanic/Latino", "Asian", "Native American", "Pacific Islander", "Other"],
+  "Canada":         ["White/Caucasian", "South Asian", "Chinese", "Black/African", "Filipino", "Indigenous", "Other"],
+  "Australia":      ["White/Caucasian", "Aboriginal/Torres Strait Islander", "South Asian", "East Asian", "Other"],
+  "France":         ["White/European", "North African", "Sub-Saharan African", "Caribbean", "Other"],
+  "Germany":        ["White/European", "Turkish", "South Asian", "East Asian", "Other"],
+  "Jordan":         ["Arab", "Circassian", "Armenian", "Other"],
+  "Iraq":           ["Arab", "Kurdish", "Turkmen", "Assyrian", "Other"],
+  "Syria":          ["Arab", "Kurdish", "Alawite", "Druze", "Assyrian", "Other"],
+  "Lebanon":        ["Arab", "Armenian", "Other"],
+  "Libya":          ["Arab", "Berber/Amazigh", "Tuareg", "Other"],
+  "Tunisia":        ["Arab", "Berber/Amazigh", "Other"],
+  "Iran":           ["Persian", "Azeri", "Kurdish", "Arab", "Baloch", "Turkmen", "Other"],
+  "Afghanistan":    ["Pashtun", "Tajik", "Hazara", "Uzbek", "Aimak", "Baloch", "Other"],
+  "Uzbekistan":     ["Uzbek", "Russian", "Tajik", "Kazakh", "Other"],
+};
+
 const COUNTRIES_LIST = [
   "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda","Argentina","Armenia","Australia",
   "Austria","Azerbaijan","Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize","Benin",
@@ -1243,7 +1284,7 @@ const DAILY_LIMITS: Record<"free" | "basic" | "premium", number> = {
   premium: Infinity,
 };
 
-function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList, profileStrength = 100, incompleteFields = [], onCompleteProfile }: {
+function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList, profileStrength = 100, incompleteFields = [], onCompleteProfile, noMatchReasons = [] }: {
   onOpenMatch: (id: string) => void;
   plan: "free" | "basic" | "premium";
   onUpgrade: () => void;
@@ -1255,6 +1296,7 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   profileStrength?: number;
   incompleteFields?: { key: string; label: string; section: SubView }[];
   onCompleteProfile?: (section: SubView) => void;
+  noMatchReasons?: string[];
 }) {
   // ── All hooks must be declared before any conditional return (Rules of Hooks) ──
   const DATA = matchesList ?? [];
@@ -1580,8 +1622,38 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
           </div>
         )}
 
-        {/* Empty state */}
-        {visible.length === 0 && !limitReached && (
+        {/* No-match explanation banner — shown when must-match filters produced zero results */}
+        {visible.length === 0 && !limitReached && noMatchReasons.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span style={{ fontSize: "1.125rem" }}>🔍</span>
+              </div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#92400e" }}>
+                  No matches found for your strict requirements
+                </p>
+                <p className="mt-0.5" style={{ fontSize: "0.8125rem", color: "#a16207", lineHeight: 1.5 }}>
+                  Your must-have preferences are filtering out all available profiles. Here's why:
+                </p>
+              </div>
+            </div>
+            <ul className="space-y-2">
+              {noMatchReasons.map((r, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-amber-500 flex-shrink-0 mt-0.5" style={{ fontSize: "0.875rem" }}>•</span>
+                  <span style={{ fontSize: "0.8125rem", color: "#78350f", lineHeight: 1.5 }}>{r}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-amber-600" style={{ fontSize: "0.75rem" }}>
+              Go to <strong>Profile → Partner Preferences</strong> to adjust your must-have settings.
+            </p>
+          </div>
+        )}
+
+        {/* Empty state (no filters active, genuinely no matches) */}
+        {visible.length === 0 && !limitReached && noMatchReasons.length === 0 && (
           <div className="bg-card rounded-2xl border border-border p-10 text-center">
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Star size={24} className="text-primary" />
@@ -4435,6 +4507,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "", comple
     city:        (pf.city        as string) ?? "",
     country:     (pf.country     as string) ?? "",
     nationality: (pf.nationality as string) ?? detectedCountry,
+    ethnicity:   (pf.ethnicity   as string) ?? "",
     bio:         (pf.bio         as string) ?? "",
     phone:       (pf.phone       as string) ?? "",
     email:       "",  // real email for phone users to fill in
@@ -4459,6 +4532,7 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "", comple
         location_city:    form.city.trim() || undefined,
         location_country: form.country.trim() || undefined,
         nationality:      form.nationality.trim() || undefined,
+        ethnicity:        form.ethnicity.trim() || undefined,
         bio:              form.bio.trim() || undefined,
       };
       if (form.dob) patch.date_of_birth = form.dob;
@@ -4628,6 +4702,39 @@ function PersonalInfoEdit({ onBack, profileData, onSaved, userEmail = "", comple
           )}
         </div>
 
+        {/* Ethnicity — options update dynamically when nationality changes */}
+        <div>
+          <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>
+            Tribe / Ethnicity <span className="text-muted-foreground" style={{ fontSize: "0.7rem", fontWeight: 400 }}>(optional)</span>
+          </label>
+          {(() => {
+            const countryKey = form.nationality || form.country;
+            const opts = ETHNICITY_BY_COUNTRY[countryKey] ?? [];
+            return opts.length > 0 ? (
+              <select
+                value={form.ethnicity}
+                onChange={e => u("ethnicity", e.target.value)}
+                className={inputCls}
+                style={{ fontSize: "0.9375rem", color: form.ethnicity ? "var(--foreground)" : "var(--muted-foreground)" }}>
+                <option value="">Select ethnicity…</option>
+                {opts.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            ) : (
+              <input
+                value={form.ethnicity}
+                onChange={e => u("ethnicity", e.target.value)}
+                placeholder="e.g. Yoruba, Punjabi, Arab…"
+                className={inputCls}
+                style={{ fontSize: "0.9375rem" }} />
+            );
+          })()}
+          {form.nationality && !ETHNICITY_BY_COUNTRY[form.nationality] && (
+            <p className="text-muted-foreground mt-1" style={{ fontSize: "0.75rem" }}>
+              Type your ethnic group or tribe freely above.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={labelCls} style={{ fontSize: "0.8125rem", fontWeight: 600 }}>City</label>
@@ -4767,6 +4874,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const MATCHES_CACHE_KEY = `ma3_matches_${_cacheUid}`;
   const NOTIF_CACHE_KEY   = `ma3_notifs_${_cacheUid}`;
 
+  const [noMatchReasons, setNoMatchReasons] = useState<string[]>([]);
   // undefined = still waiting for first response (shows skeleton); [] = loaded empty; [...] = real data
   // Initialise from cache so returning users see their last known matches instantly.
   const [liveMatches, setLiveMatches] = useState<MatchItem[] | undefined>(() => {
@@ -4852,6 +4960,11 @@ export function UserApp({ onSignOut }: UserAppProps) {
           set("dob",             p.date_of_birth);
           set("nationality",     p.nationality);
           set("ethnicity",       p.ethnicity);
+          set("prefEthnicity",   (p as Record<string,unknown>).pref_ethnicity);
+          set("mustMatchEthnicity", (p as Record<string,unknown>).must_match_ethnicity);
+          set("mustMatchReligion",  (p as Record<string,unknown>).must_match_religion);
+          set("wifePreference",  (p as Record<string,unknown>).wife_preference);
+          set("mustMatchWifePref",  (p as Record<string,unknown>).must_match_wife_pref);
           set("city",            p.location_city);
           set("country",         p.location_country);
           set("bio",             p.bio);
@@ -4909,6 +5022,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
     matchesApi.discover().then(res => {
       const mapped = res.results.map(mapApiMatch);
       setLiveMatches(mapped);
+      setNoMatchReasons(res.no_match_reasons ?? []);
       try { localStorage.setItem(MATCHES_CACHE_KEY, JSON.stringify(mapped)); } catch {}
     }).catch(() => {
       // Keep cached data if available; only fall to empty if there's no cache at all.
@@ -5363,7 +5477,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           {subView === "none" && (
             <div className="size-full overflow-y-auto">
               {tab === "home"     && <HomeTab onOpenMatch={openMatch} onOpenChat={openChat} onOpenNotif={() => setSubView("notifications")} setSubView={setSubView} setTab={setTab} onOpenArticle={(id) => openArticle(id, "none")} onOpenGuidance={() => setSubView("blog-list")} displayName={displayName} firstName={firstName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} foundPartner={foundPartner} conversations={liveConversations} matchesList={liveMatches} />}
-              {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} />}
+              {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} noMatchReasons={noMatchReasons} />}
               {tab === "messages" && <MessagesTab onOpenChat={openChat} onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} onBlock={blockMatch} onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })} onReport={(matchId, name) => setReportModal({ matchId, name })} sentInterests={sentInterests} onInterest={showInterest} conversations={liveConversations} receivedInterests={liveInterests} matchesList={liveMatches} onBrowseMatches={() => setTab("matches")} onStartChat={startChat} />}
               {tab === "profile" && <ProfileTab setSubView={setSubView} onSignOut={onSignOut} displayName={displayName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} onAvatarSaved={() => setProfileVersion(v => v + 1)} />}
             </div>
