@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback, type ReactNode } from "react";
+import { useWebSocketChat } from "../../lib/useWebSocketChat";
 import { toast } from "sonner";
 import {
   matches as matchesApi,
@@ -2565,6 +2566,10 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
       const loaded = res.results.map(toChat);
       setMessages(loaded);
       if (loaded.length > 0) setShowSuggestions(false);
+      // Notify partner via WS that we've read their messages
+      res.results.forEach(m => {
+        if (!m.read_at) markRead(m.id);
+      });
     }).catch(() => {}).finally(() => scrollToBottom(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
@@ -2611,7 +2616,47 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);
 
-  // Poll for new messages every 5 s while chat is open
+  // WebSocket — real-time incoming messages and read receipts
+  const handleWsMessage = useCallback((apiMsg: import("../../lib/useWebSocketChat").ApiMessage) => {
+    setMessages(prev => {
+      // Ignore if already in local state (e.g. our own optimistic message)
+      if (prev.some(m => m.id === apiMsg.id)) return prev;
+      const newMsg = toChat(apiMsg);
+      const prevThemCount = prev.filter(m => m.from === "them").length;
+      if (newMsg.from === "them" && prevThemCount !== prev.filter(m => m.from === "them").length + 1) {
+        scrollToBottom();
+      } else if (newMsg.from === "them") {
+        scrollToBottom();
+      }
+      setShowSuggestions(false);
+      return [...prev, newMsg];
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toChat]);
+
+  const handleWsRead = useCallback((messageId: string, _readAt: string) => {
+    setMessages(prev =>
+      prev.map(m => m.id === messageId ? { ...m, status: "read" as const } : m)
+    );
+  }, []);
+
+  const handleWsTyping = useCallback((isTyping: boolean) => {
+    setTyping(isTyping);
+    if (isTyping) {
+      // Auto-clear typing indicator after 4 s in case partner's close event is lost
+      setTimeout(() => setTyping(false), 4_000);
+    }
+  }, []);
+
+  const { markRead, sendTyping } = useWebSocketChat({
+    conversationId,
+    onMessage: handleWsMessage,
+    onRead: handleWsRead,
+    onTyping: handleWsTyping,
+  });
+
+  // Fallback HTTP poll — runs at a slower cadence (15 s) to stay in sync when
+  // WS is disconnected or delivering partial state (e.g. on reconnect).
   useEffect(() => {
     const poll = () => {
       messagingApi.messages(conversationId).then(res => {
@@ -2619,23 +2664,18 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
         if (fromBackend.length === 0) return;
         setMessages(prev => {
           const backendIds = new Set(fromBackend.map(m => m.id));
-          // Keep optimistic messages not yet confirmed by backend
           const stillOptimistic = prev.filter(m => optimisticIds.current.has(m.id) && !backendIds.has(m.id));
-          // Preserve read status for our sent messages
           const merged = fromBackend.map(bm => {
             const existing = prev.find(pm => pm.id === bm.id);
             return {
               ...bm,
-              // Preserve promoted read status from local state
               ...(existing?.from === "me" && existing?.status === "read" ? { status: "read" as const } : {}),
-              // Preserve client-side reply data — backend doesn't store these yet
               replyToId:   existing?.replyToId,
               replyToText: existing?.replyToText,
               replyToFrom: existing?.replyToFrom,
             };
           });
           const result = [...merged, ...stillOptimistic];
-          // Auto-scroll only if new partner messages arrived
           const prevThemCount = prev.filter(m => m.from === "them").length;
           const newThemCount  = fromBackend.filter(m => m.from === "them").length;
           if (newThemCount > prevThemCount) scrollToBottom();
@@ -2644,7 +2684,7 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
         });
       }).catch(() => {});
     };
-    const id = setInterval(poll, 5_000);
+    const id = setInterval(poll, 15_000);
     return () => clearInterval(id);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
@@ -3037,8 +3077,8 @@ function ChatView({ conversationId, onBack, plan, onRequestBlock, onViewPartnerP
 
         <input
           value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && send(input)}
+          onChange={e => { setInput(e.target.value); sendTyping(!!e.target.value); }}
+          onKeyDown={e => { if (e.key === "Enter") { sendTyping(false); send(input); } }}
           aria-label="Message"
           placeholder="Type a message…"
           className="flex-1 px-4 py-2.5 rounded-xl bg-input-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
@@ -5081,6 +5121,19 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [backendEmail, setBackendEmail] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
+  // Re-fetch /me/ and apply results immediately to all profile-derived state.
+  // Called after any profile edit so changes reflect without a page reload.
+  const refreshProfile = useCallback(() => {
+    import("../../lib/api").then(({ auth }) => {
+      auth.me().then(me => {
+        if (typeof me.profile?.completion_score === "number") setBackendScore(me.profile.completion_score);
+        if (me.profile) setBackendProfileData(me.profile as unknown as Record<string, unknown>);
+        if (me.email) setBackendEmail(me.email);
+        setProfileVersion(v => v + 1);
+      }).catch(() => {});
+    });
+  }, []);
+
   // ── Hydrate localStorage profile from backend on mount ──────
   // Runs once on mount. Fetches /me/ and merges backend profile fields into
   // the localStorage key so data survives logout/device changes.
@@ -5633,7 +5686,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
               {tab === "home"     && <HomeTab onOpenMatch={openMatch} onOpenChat={openChat} onOpenNotif={() => setSubView("notifications")} setSubView={setSubView} setTab={setTab} onOpenArticle={(id) => openArticle(id, "none")} onOpenGuidance={() => setSubView("blog-list")} displayName={displayName} firstName={firstName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} foundPartner={foundPartner} conversations={liveConversations} matchesList={liveMatches} />}
               {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} noMatchReasons={noMatchReasons} />}
               {tab === "messages" && <MessagesTab onOpenChat={openChat} onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} onBlock={blockMatch} onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })} onReport={(matchId, name) => setReportModal({ matchId, name })} sentInterests={sentInterests} onInterest={showInterest} conversations={liveConversations} receivedInterests={liveInterests} matchesList={liveMatches} onBrowseMatches={() => setTab("matches")} onStartChat={startChat} />}
-              {tab === "profile" && <ProfileTab setSubView={setSubView} onSignOut={onSignOut} displayName={displayName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} onAvatarSaved={() => setProfileVersion(v => v + 1)} />}
+              {tab === "profile" && <ProfileTab setSubView={setSubView} onSignOut={onSignOut} displayName={displayName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} onAvatarSaved={refreshProfile} />}
             </div>
           )}
 
@@ -5718,7 +5771,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           )}
 
           {subView === "edit-profile" && (
-            <PersonalInfoEdit onBack={goBack} profileData={profileData} userEmail={backendEmail} completionScore={profileStrength} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />
+            <PersonalInfoEdit onBack={goBack} profileData={profileData} userEmail={backendEmail} completionScore={profileStrength} onSaved={() => { refreshProfile(); goBack(); }} />
           )}
           {subView === "photos" && (
             <div className="flex flex-col h-full bg-background">
@@ -5734,10 +5787,10 @@ export function UserApp({ onSignOut }: UserAppProps) {
               </div>
             </div>
           )}
-          {subView === "career-education"  && <CareerEducationSection onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
-          {subView === "values-lifestyle"  && <ValuesLifestyleSection onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
-          {subView === "life-goals"        && <LifeGoalsSection        onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
-          {subView === "partner-prefs"     && <PartnerPrefsSection      onBack={goBack} onSaved={() => { setProfileVersion(v => v + 1); goBack(); }} />}
+          {subView === "career-education"  && <CareerEducationSection onBack={goBack} onSaved={() => { refreshProfile(); goBack(); }} />}
+          {subView === "values-lifestyle"  && <ValuesLifestyleSection onBack={goBack} onSaved={() => { refreshProfile(); goBack(); }} />}
+          {subView === "life-goals"        && <LifeGoalsSection        onBack={goBack} onSaved={() => { refreshProfile(); goBack(); }} />}
+          {subView === "partner-prefs"     && <PartnerPrefsSection      onBack={goBack} onSaved={() => { refreshProfile(); goBack(); }} />}
           {subView === "privacy-safety"    && <PrivacySafetySection onBack={goBack} plan={userPlan} onUpgrade={() => setSubView("subscription")} />}
           {subView === "app-settings"      && <AppSettingsSection onBack={goBack} />}
           {subView === "support-center"    && <SupportCenterView
