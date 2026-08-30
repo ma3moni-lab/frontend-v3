@@ -1293,7 +1293,7 @@ const DAILY_LIMITS: Record<"free" | "basic" | "premium", number> = {
 
 const NEW_PREFS_NUDGE_KEY = "ma3_new_prefs_nudge_v1";
 
-function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList, profileStrength = 100, incompleteFields = [], onCompleteProfile, noMatchReasons = [] }: {
+function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentInterests, onInterest, matchesList, profileStrength = 100, incompleteFields = [], onCompleteProfile, noMatchReasons = [], userGender: userGenderProp = "" }: {
   onOpenMatch: (id: string) => void;
   plan: "free" | "basic" | "premium";
   onUpgrade: () => void;
@@ -1306,21 +1306,21 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   incompleteFields?: { key: string; label: string; section: SubView }[];
   onCompleteProfile?: (section: SubView) => void;
   noMatchReasons?: string[];
+  userGender?: string;
 }) {
   // ── All hooks must be declared before any conditional return (Rules of Hooks) ──
   const DATA = matchesList ?? [];
 
-  // Check whether user has set the new preference fields
-  const [showNewPrefsNudge, setShowNewPrefsNudge] = useState(() => {
+  // Nudge re-evaluates whenever the match list refreshes (i.e. after prefs save)
+  const [showNewPrefsNudge, setShowNewPrefsNudge] = useState(false);
+  useEffect(() => {
     try {
-      if (localStorage.getItem(NEW_PREFS_NUDGE_KEY) === "dismissed") return false;
+      if (localStorage.getItem(NEW_PREFS_NUDGE_KEY) === "dismissed") { setShowNewPrefsNudge(false); return; }
       const p = JSON.parse(localStorage.getItem("ma3moni_onboarding_progress") ?? "{}");
       const form = (p as { form?: Record<string, unknown> }).form ?? {};
-      const hasWifePref = !!(form.wifePreference);
-      const hasPrefEth  = !!(form.prefEthnicity);
-      return !hasWifePref || !hasPrefEth;  // show if either is missing
-    } catch { return false; }
-  });
+      setShowNewPrefsNudge(!form.wifePreference || !form.prefEthnicity);
+    } catch { setShowNewPrefsNudge(false); }
+  }, [matchesList]);
 
   const dismissNewPrefsNudge = () => {
     try { localStorage.setItem(NEW_PREFS_NUDGE_KEY, "dismissed"); } catch {}
@@ -1344,13 +1344,15 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   const dailyLimit = DAILY_LIMITS[plan];
   const countries = useMemo(() => Array.from(new Set(DATA.map(m => m.country))).sort(), [DATA]);
 
-  const userGender = useMemo(() => {
+  // Prefer prop (from backendProfileData, updated on every profile save);
+  // fall back to localStorage for the brief window before the first /me/ fetch.
+  const userGender = userGenderProp || (() => {
     try {
       const raw = localStorage.getItem("ma3moni_onboarding_progress");
       if (raw) return (JSON.parse(raw) as { form: Record<string,string> }).form?.gender ?? "";
     } catch {}
     return "";
-  }, []);
+  })();
   const oppositeGender = userGender === "male" ? "female" : userGender === "female" ? "male" : null;
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -5121,6 +5123,16 @@ export function UserApp({ onSignOut }: UserAppProps) {
   const [backendEmail, setBackendEmail] = useState<string>("");
   const [currentUserId, setCurrentUserId] = useState<string>("");
 
+  // Re-fetch matches + no-match reasons immediately (called after prefs save).
+  const refreshMatches = useCallback(() => {
+    matchesApi.discover().then(res => {
+      const mapped = res.results.map(mapApiMatch);
+      setLiveMatches(mapped);
+      setNoMatchReasons(res.no_match_reasons ?? []);
+      try { localStorage.setItem(MATCHES_CACHE_KEY, JSON.stringify(mapped)); } catch {}
+    }).catch(() => {});
+  }, []);
+
   // Re-fetch /me/ and apply results immediately to all profile-derived state.
   // Called after any profile edit so changes reflect without a page reload.
   const refreshProfile = useCallback(() => {
@@ -5132,7 +5144,9 @@ export function UserApp({ onSignOut }: UserAppProps) {
         setProfileVersion(v => v + 1);
       }).catch(() => {});
     });
-  }, []);
+    // Also re-fetch matches so must-have filters and no-match reasons update instantly
+    refreshMatches();
+  }, [refreshMatches]);
 
   // ── Hydrate localStorage profile from backend on mount ──────
   // Runs once on mount. Fetches /me/ and merges backend profile fields into
@@ -5684,7 +5698,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           {subView === "none" && (
             <div className="size-full overflow-y-auto">
               {tab === "home"     && <HomeTab onOpenMatch={openMatch} onOpenChat={openChat} onOpenNotif={() => setSubView("notifications")} setSubView={setSubView} setTab={setTab} onOpenArticle={(id) => openArticle(id, "none")} onOpenGuidance={() => setSubView("blog-list")} displayName={displayName} firstName={firstName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} foundPartner={foundPartner} conversations={liveConversations} matchesList={liveMatches} />}
-              {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} noMatchReasons={noMatchReasons} />}
+              {tab === "matches"  && <MatchesTab onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} chattingIds={chattingPartnerIds} sentInterests={sentInterests} onInterest={showInterest} matchesList={liveMatches} profileStrength={profileStrength} incompleteFields={incompleteFields} onCompleteProfile={(section) => setSubView(section)} noMatchReasons={noMatchReasons} userGender={(backendProfileData?.gender as string) || ""} />}
               {tab === "messages" && <MessagesTab onOpenChat={openChat} onOpenMatch={openMatch} plan={userPlan} onUpgrade={() => setSubView("subscription")} blocked={blocked} onBlock={blockMatch} onRequestBlock={(matchId, name) => setBlockModal({ matchId, name })} onReport={(matchId, name) => setReportModal({ matchId, name })} sentInterests={sentInterests} onInterest={showInterest} conversations={liveConversations} receivedInterests={liveInterests} matchesList={liveMatches} onBrowseMatches={() => setTab("matches")} onStartChat={startChat} />}
               {tab === "profile" && <ProfileTab setSubView={setSubView} onSignOut={onSignOut} displayName={displayName} profileStrength={profileStrength} profileData={profileData} plan={userPlan} incompleteFields={incompleteFields} onAvatarSaved={refreshProfile} />}
             </div>
