@@ -335,9 +335,11 @@ export interface SuspensionInfo {
 }
 
 export interface LoginResponse {
-  access:  string;
-  refresh: string;
-  user: AuthUser & { phone?: string; profile_complete: boolean; account_status?: string; suspension_reason?: string };
+  access?:       string;
+  refresh?:      string;
+  requires_2fa?: boolean;
+  detail?:       string;
+  user?: AuthUser & { phone?: string; profile_complete: boolean; account_status?: string; suspension_reason?: string };
 }
 
 export interface RegisterResponse {
@@ -350,6 +352,10 @@ export const auth = {
   /** identifier = email address OR phone number */
   login: (identifier: string, password: string) =>
     post<LoginResponse>("/api/auth/login/", { identifier, password }),
+
+  /** Second step when server returned requires_2fa:true */
+  loginWith2fa: (identifier: string, password: string, otp_code: string) =>
+    post<LoginResponse>("/api/auth/login/", { identifier, password, otp_code }),
 
   register: (email: string, password: string, phone?: string) =>
     post<RegisterResponse>("/api/auth/register/", { email, password, ...(phone ? { phone } : {}) }),
@@ -753,6 +759,11 @@ export const referrals = {
     get<{ results: Array<{ rank: number; name: string; signups: number; points: number }> }>(
       "/api/referrals/leaderboard/"
     ),
+
+  redeem: () =>
+    post<{ detail: string; plan: string; expires_at: string; points_redeemed: number }>(
+      "/api/referrals/redeem/"
+    ),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -976,6 +987,11 @@ export interface PublicSettings {
 
 export const publicApi = {
   settings: () => get<PublicSettings>("/api/settings/"),
+
+  partnerStories: () =>
+    get<{ results: Array<{ id: number; partner_name: string; story: string; how_met: string; created_at: string }> }>(
+      "/api/stories/"
+    ),
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -1418,6 +1434,34 @@ export const adminApi = {
       ngn: { total: number; count: number; successful: number; failed: number; pending: number };
       usd: { total: number; count: number; successful: number; failed: number; pending: number };
     }>("/api/admin/payments/summary/"),
+
+  // Photo moderation queue
+  photoQueue: () =>
+    get<{ results: Array<{ id: string; photo_url: string; submitted_at: string; user: object }> }>(
+      "/api/admin/moderation/photos/"
+    ),
+  approvePhoto: (id: string) =>
+    patch<{ detail: string }>(`/api/admin/moderation/photos/${id}/`, { status: "approved" }),
+  rejectPhoto: (id: string) =>
+    patch<{ detail: string }>(`/api/admin/moderation/photos/${id}/`, { status: "rejected" }),
+
+  // Partner stories
+  partnerStories: () =>
+    get<{ results: Array<{ id: number; partner_name: string; story: string; share_publicly: boolean; created_at: string; user: { id: string; email: string; name: string } }> }>(
+      "/api/admin/stories/"
+    ),
+  reviewStory: (id: number, share_publicly: boolean) =>
+    patch<{ id: number; share_publicly: boolean }>(`/api/admin/stories/${id}/`, { share_publicly }),
+
+  // ID verification
+  idVerifications: () =>
+    get<{ results: Array<{ id: string; email: string; name: string; id_document_url: string; id_review_status: string; id_verified: boolean }> }>(
+      "/api/admin/id-verifications/"
+    ),
+  reviewIdVerification: (userId: string, action: "approve" | "reject") =>
+    patch<{ id: string; id_verified: boolean; id_review_status: string }>(
+      `/api/admin/id-verifications/${userId}/`, { action }
+    ),
 };
 
 export interface AuditEntry {

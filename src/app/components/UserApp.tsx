@@ -22,7 +22,7 @@ import {
   Settings, Star, Shield, Send, ArrowRight, Copy, Check,
   LogOut, Camera, Edit2, CreditCard, Gift, X, AlertCircle,
   MapPin, Briefcase, BookOpen, ChevronRight, MoreHorizontal,
-  PartyPopper, UserX, Clock, SlidersHorizontal, Lock, CheckCheck, Search, ImagePlus, CheckCircle, Flag, Mail, MessageSquare
+  PartyPopper, UserX, Clock, SlidersHorizontal, Lock, CheckCheck, Search, ImagePlus, CheckCircle, Flag, Mail, MessageSquare, Loader2, Heart as HeartFilled, Users
 } from "lucide-react";
 import {
   CareerEducationSection,
@@ -65,7 +65,8 @@ type SubView =
   | "blog-list"
   | "blog-detail"
   | "support-center"
-  | "who-viewed-me";
+  | "who-viewed-me"
+  | "stories";
 
 // ── Unsplash helper (for match discovery mock data only) ─
 const p = (id: string, w = 600, h = 750) =>
@@ -531,6 +532,11 @@ function makePlans(sym: "₦" | "$") {
       id: "premium", name: "Premium", price: ngn ? "₦—" : "$49", period: "/month", highlight: true,
       features: ["Unlimited matches", "Priority visibility", "Advanced filters", "Profile boost", "Dedicated support"],
       cta: "Go Premium",
+    },
+    {
+      id: "vip", name: "VIP", price: ngn ? "₦—" : "$99", period: "/month", highlight: false,
+      features: ["All Premium features", "Dedicated relationship manager", "Verified profile badge", "First in discovery"],
+      cta: "Go VIP",
     },
   ];
 }
@@ -1346,7 +1352,9 @@ function MatchesTab({ onOpenMatch, plan, onUpgrade, blocked, chattingIds, sentIn
   }, []);
   const oppositeGender = userGender === "male" ? "female" : userGender === "female" ? "male" : null;
 
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const filtered = useMemo(() => DATA.filter(m => {
+    if (!UUID_RE.test(m.id)) return false;  // exclude mock/demo profiles
     if (blocked.includes(m.id)) return false;
     if (chattingIds.has(m.id)) return false;
     if (passed.includes(m.id)) return false;
@@ -2164,6 +2172,7 @@ function ProfileTab({ setSubView, onSignOut, displayName = "Yusuf", profileStren
     { icon: <Search size={15} />,  label: "Who Viewed Me",   sub: "See who recently visited your profile", view: "who-viewed-me", color: "#9B6DAF" },
     { icon: <BookOpen size={15} />,label: "Guidance & Articles", sub: "Reading on values, faith & marriage", view: "blog-list",      color: "#6B9E78" },
     { icon: <Gift size={15} />,    label: "Refer & Earn",    sub: `Earn ${isNigerianProfile ? `₦${referralBonusNgn.toLocaleString()}` : `$${referralBonus}`} per referral`, view: "referral",       color: "#C5733F" },
+    { icon: <HeartFilled size={15} />, label: "Success Stories", sub: "Real couples who found love on Ma3moni", view: "stories", color: "#e85d75" },
     { icon: <Bell size={15} />,    label: "Notifications",   sub: "Manage your alerts",                 view: "notifications",    color: "#4A8DB8" },
     { icon: <Shield size={15} />,  label: "Privacy & Safety",sub: "Visibility, blocked users, data",    view: "privacy-safety",   color: "#0A6870" },
     { icon: <Flag size={15} />,    label: "Support & Appeals",sub: "Tickets, report status, appeals",   view: "support-center",   color: "#C5733F" },
@@ -3756,12 +3765,73 @@ function SubscriptionView({ onBack, onUpgrade, currentPlan = "free", displayName
   );
 }
 
+function StoriesView({ onBack }: { onBack: () => void }) {
+  const [stories, setStories] = useState<Array<{ id: number; partner_name: string; story: string; how_met: string; created_at: string }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    import("../../lib/api").then(({ publicApi }) =>
+      publicApi.partnerStories().catch(() => ({ results: [] as typeof stories }))
+    ).then(r => { setStories(r.results ?? []); }).finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <div className="flex flex-col h-full bg-background">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card flex-shrink-0">
+        <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors"><ChevronLeft size={22} /></button>
+        <h3 style={{ fontWeight: 700, fontSize: "1rem" }}>Success Stories</h3>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="bg-primary rounded-2xl p-5 text-white text-center">
+          <HeartFilled size={32} className="mx-auto mb-2 opacity-80" />
+          <h2 style={{ fontWeight: 800, fontSize: "1.375rem" }}>Real Love Stories</h2>
+          <p style={{ fontSize: "0.875rem", opacity: 0.8, marginTop: 6 }}>
+            Couples who found their partner on Ma3moni.
+          </p>
+        </div>
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-card rounded-2xl border border-border p-5 animate-pulse space-y-3">
+              <div className="h-4 bg-muted rounded w-32" />
+              <div className="h-3 bg-muted rounded w-full" />
+              <div className="h-3 bg-muted rounded w-4/5" />
+            </div>
+          ))
+        ) : stories.length === 0 ? (
+          <div className="text-center py-12">
+            <Users size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+            <p className="text-muted-foreground">No stories published yet. Be the first!</p>
+          </div>
+        ) : stories.map(s => (
+          <div key={s.id} className="bg-card rounded-2xl border border-border p-5">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <HeartFilled size={16} className="text-primary" />
+              </div>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
+                  {s.partner_name ? `With ${s.partner_name}` : "Anonymous couple"}
+                </p>
+                <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>
+                  {s.how_met === "match" ? "Met through matching" : s.how_met} · {new Date(s.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+            <p style={{ fontSize: "0.875rem", lineHeight: 1.65 }} className="text-foreground/80">{s.story}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: string }) {
   const [copied, setCopied] = useState(false);
   const [apiStats, setApiStats] = useState<ReferralStats | null>(null);
   const [bonusPoints, setBonusPoints] = useState<number>(10);
   const [bonusPointsNgn, setBonusPointsNgn] = useState<number>(5000);
   const [loading, setLoading] = useState(true);
+  const [redeeming, setRedeeming] = useState(false);
   const isNigerianReferral = getStoredCurrency() === "NGN";
   const bonusDisplay = isNigerianReferral ? `₦${bonusPointsNgn.toLocaleString()}` : `$${bonusPoints}`;
 
@@ -3855,7 +3925,7 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-4">
           {loading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="bg-card rounded-2xl border border-border p-4 text-center animate-pulse">
@@ -3864,14 +3934,9 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
               </div>
             ))
           ) : [
-            { value: String(apiStats?.total_signups ?? 0),           label: "Signups" },
-            { value: String(apiStats?.total_converted ?? 0),         label: "Converted" },
-            {
-              value: isNigerianReferral
-                ? `₦${((apiStats?.total_signups ?? 0) * bonusPointsNgn).toLocaleString()}`
-                : `$${((apiStats?.total_signups ?? 0) * bonusPoints).toLocaleString()}`,
-              label: "Earned",
-            },
+            { value: String(apiStats?.total_signups ?? 0),   label: "Signups" },
+            { value: String(apiStats?.total_converted ?? 0), label: "Converted" },
+            { value: String(apiStats?.total_points ?? 0),    label: "Points" },
           ].map(({ value, label }) => (
             <div key={label} className="bg-card rounded-2xl border border-border p-4 text-center">
               <p style={{ fontSize: "1.5rem", fontWeight: 800, color: "var(--primary)" }}>{value}</p>
@@ -3879,6 +3944,43 @@ function ReferralView({ onBack, userEmail }: { onBack: () => void; userEmail?: s
             </div>
           ))}
         </div>
+
+        {/* Redeem points */}
+        {!loading && (apiStats?.total_points ?? 0) >= 30 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <Gift size={18} className="text-amber-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#92400e" }}>
+                  Redeem {apiStats!.total_points} points
+                </p>
+                <p className="text-amber-700 mt-0.5" style={{ fontSize: "0.8125rem" }}>
+                  Convert your referral points into a 7-day Basic plan trial.
+                </p>
+                <button
+                  onClick={async () => {
+                    setRedeeming(true);
+                    try {
+                      await referralsApi.redeem();
+                      toast.success("Points redeemed! 7-day Basic plan activated.");
+                      setApiStats(prev => prev ? { ...prev, total_points: 0 } : prev);
+                    } catch (e: unknown) {
+                      const msg = (e as { data?: { detail?: string } })?.data?.detail;
+                      toast.error(msg ?? "Could not redeem points.");
+                    } finally { setRedeeming(false); }
+                  }}
+                  disabled={redeeming}
+                  className="mt-3 flex items-center gap-1.5 bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-50"
+                  style={{ fontSize: "0.875rem", fontWeight: 600 }}
+                >
+                  {redeeming ? <><Loader2 size={14} className="animate-spin" /> Redeeming…</> : <>Redeem for 7-day Basic trial <ArrowRight size={13} /></>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Monthly activity */}
         {apiStats?.monthly_stats && apiStats.monthly_stats.length > 0 && (
@@ -5651,6 +5753,7 @@ export function UserApp({ onSignOut }: UserAppProps) {
           />}
           {subView === "who-viewed-me"     && <WhoViewedMeSection onBack={goBack} onOpenMatch={openMatch} />}
           {subView === "found-partner"     && <FoundPartnerSection onBack={goBack} onComplete={() => { setFoundPartner(true); try { localStorage.setItem("ma3moni_found_partner","true"); } catch {} goBack(); }} />}
+          {subView === "stories"           && <StoriesView onBack={goBack} />}
           {subView === "deactivate"        && <DeactivateSection onBack={goBack} onSignOut={onSignOut} />}
         </div>
 

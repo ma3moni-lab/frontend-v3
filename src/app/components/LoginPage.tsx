@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, AlertCircle, ArrowRight, ChevronLeft, Phone, Shield, CheckCircle, Loader2, Sparkles } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowRight, ChevronLeft, Phone, Shield, CheckCircle, Loader2, Sparkles, KeyRound } from "lucide-react";
 import { auth as apiAuth, setUserTokens, ApiError } from "../../lib/api";
 import { Logo } from "./Logo";
 
@@ -113,6 +113,23 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
   const [error, setError]           = useState("");
   const [slow, setSlow]             = useState(false);
   const [showForgot, setShowForgot] = useState(false);
+  const [requires2fa, setRequires2fa] = useState(false);
+  const [otpCode, setOtpCode]         = useState("");
+
+  const handleLoginSuccess = (res: { access?: string; refresh?: string; user?: { email?: string; account_status?: string; suspension_reason?: string; plan?: string; profile_complete?: boolean } }) => {
+    if (!res.access || !res.refresh || !res.user) return;
+    setUserTokens(res.access, res.refresh);
+    try { localStorage.setItem("ma3moni_login_email", res.user.email ?? ""); } catch {}
+    if (res.user.account_status === "suspended") {
+      onSuspended(
+        res.user.suspension_reason ?? "Your account has been suspended.",
+        undefined,
+        res.user.email,
+      );
+      return;
+    }
+    onSuccess(res.user.plan as UserPlan, res.user.profile_complete ?? false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,20 +138,16 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
     setSlow(false);
     const t = setTimeout(() => setSlow(true), 5000);
     try {
-      const res = await apiAuth.login(identifier.trim(), password);
+      const res = requires2fa
+        ? await apiAuth.loginWith2fa(identifier.trim(), password, otpCode.trim())
+        : await apiAuth.login(identifier.trim(), password);
       clearTimeout(t);
-      setUserTokens(res.access, res.refresh);
-      try { localStorage.setItem("ma3moni_login_email", res.user.email); } catch {}
       setLoading(false);
-      if (res.user.account_status === "suspended") {
-        onSuspended(
-          res.user.suspension_reason ?? "Your account has been suspended.",
-          undefined,
-          res.user.email,
-        );
+      if (res.requires_2fa) {
+        setRequires2fa(true);
         return;
       }
-      onSuccess(res.user.plan as UserPlan, res.user.profile_complete ?? false);
+      handleLoginSuccess(res);
     } catch (err) {
       clearTimeout(t);
       setLoading(false);
@@ -153,7 +166,11 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
           return;
         }
         if (err.status === 401) {
-          setError("Incorrect email/phone or password. Please try again.");
+          if (requires2fa) {
+            setError("Invalid or expired OTP code. Please try again.");
+          } else {
+            setError("Incorrect email/phone or password. Please try again.");
+          }
           return;
         }
       }
@@ -256,7 +273,38 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
                   </p>
                 </div>
 
+                {requires2fa ? (
+                  <div className="mb-6 p-4 rounded-2xl border border-primary/20 bg-primary/5 flex items-start gap-3">
+                    <KeyRound size={16} className="text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p style={{ fontWeight: 600, fontSize: "0.875rem", color: "var(--foreground)" }}>Two-factor authentication required</p>
+                      <p className="text-muted-foreground mt-0.5" style={{ fontSize: "0.8125rem" }}>A 6-digit code has been sent to your registered email.</p>
+                    </div>
+                  </div>
+                ) : null}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {requires2fa ? (
+                    <div>
+                      <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>OTP Code</label>
+                      <input
+                        type="text"
+                        value={otpCode}
+                        onChange={e => { setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setError(""); }}
+                        placeholder="123456"
+                        required
+                        autoComplete="one-time-code"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className="w-full px-4 py-3.5 rounded-xl border border-border bg-input-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/35 transition-all text-center tracking-widest"
+                        style={{ fontSize: "1.25rem", letterSpacing: "0.2em" }}
+                      />
+                      <button type="button" onClick={() => { setRequires2fa(false); setOtpCode(""); setError(""); }}
+                        className="mt-2 text-muted-foreground hover:text-foreground transition-colors" style={{ fontSize: "0.8125rem" }}>
+                        ← Back to sign in
+                      </button>
+                    </div>
+                  ) : (<>
                   <div>
                     <label className="block mb-1.5" style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Email or phone number</label>
                     <div className="relative">
@@ -307,6 +355,7 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
                       </button>
                     </div>
                   </div>
+                  </>)}
 
                   {error && (
                     <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl" style={{ background: "rgba(196,30,55,0.06)", border: "1px solid rgba(196,30,55,0.14)" }}>
@@ -339,7 +388,7 @@ export function LoginPage({ onSuccess, onSuspended, onRegister, onBack }: LoginP
                         )}
                       </div>
                     ) : (
-                      <>Sign In <ArrowRight size={16} /></>
+                      <>{requires2fa ? "Verify Code" : "Sign In"} <ArrowRight size={16} /></>
                     )}
                   </button>
                 </form>

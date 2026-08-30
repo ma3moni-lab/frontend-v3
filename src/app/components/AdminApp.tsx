@@ -26,7 +26,7 @@ import {
   CheckCircle, XCircle, Clock, Send, User, MessageSquare,
   Lock, Unlock, Menu, ChevronDown, Star, ArrowUpRight,
   BookOpen, ThumbsUp, UserPlus, Pencil,
-  Tag, Trash, Activity, Info, Save, Loader2
+  Tag, Trash, Activity, Info, Save, Loader2, BadgeCheck, FileCheck, ExternalLink
 } from "lucide-react";
 import { BlogSection, TopArticlesPanel } from "./admin/AdminBlogSection";
 import {
@@ -52,8 +52,8 @@ interface AdminAppProps {
 // Base access per role. Payments are super-admin only unless the super-admin
 // explicitly grants revenue visibility to admins via Settings.
 const ROLE_ACCESS: Record<AdminRole, AdminSection[]> = {
-  "super-admin":   ["overview","users","blacklist","support","roles","blog","payments","analytics","reports","settings","audit"],
-  "admin":         ["overview","users","blacklist","support","blog","analytics","reports"],
+  "super-admin":   ["overview","users","blacklist","support","roles","blog","payments","analytics","reports","settings","audit","id-verif","stories"],
+  "admin":         ["overview","users","blacklist","support","blog","analytics","reports","id-verif","stories"],
   "blog-admin":    ["blog","overview"],
   "customer-care": ["support","overview"],
 };
@@ -85,7 +85,8 @@ const ROLE_LABEL: Record<AdminRole, string> = {
 type AdminSection =
   | "overview" | "users" | "blacklist"
   | "support" | "roles" | "blog" | "payments" | "analytics"
-  | "reports" | "settings" | "audit";
+  | "reports" | "settings" | "audit"
+  | "id-verif" | "stories";
 
 // ─── MOCK DATA ────────────────────────────────────────────
 // USERS_DATA imported from src/data/users (shared with UsersSectionV2).
@@ -3660,6 +3661,141 @@ function SettingsSection({ role, onSettingsSaved }: { role: AdminRole; onSetting
   );
 }
 
+// ─── ID Verification Section ──────────────────────────────
+function IDVerificationSection() {
+  const [items, setItems] = useState<Array<{ id: string; email: string; name: string; id_document_url: string; id_review_status: string; id_verified: boolean }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<string | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    adminApi.idVerifications().then(r => setItems(r.results)).catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const review = async (id: string, action: "approve" | "reject") => {
+    setActing(id + action);
+    try {
+      await adminApi.reviewIdVerification(id, action);
+      toast.success(`ID ${action}d`);
+      load();
+    } catch { toast.error("Action failed"); }
+    finally { setActing(null); }
+  };
+
+  return (
+    <div>
+      <SectionHeader title="ID Verification" sub="Review and approve user identity documents" />
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin" /></div>
+      ) : items.length === 0 ? (
+        <div className="text-center py-12">
+          <BadgeCheck size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+          <p className="text-muted-foreground">No pending ID verifications.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {items.map(item => (
+            <div key={item.id} className="bg-card rounded-2xl border border-border p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>{item.name || item.email}</p>
+                  <p className="text-muted-foreground" style={{ fontSize: "0.8125rem" }}>{item.email}</p>
+                  <p className="mt-1" style={{ fontSize: "0.8125rem" }}>
+                    Status: <span style={{ fontWeight: 600, color: item.id_verified ? "#16a34a" : "#d97706" }}>{item.id_review_status}</span>
+                  </p>
+                </div>
+                {item.id_document_url && (
+                  <a href={item.id_document_url} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline" style={{ fontSize: "0.8125rem" }}>
+                    <ExternalLink size={13} /> View Document
+                  </a>
+                )}
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button onClick={() => review(item.id, "approve")} disabled={!!acting}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50"
+                  style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                  {acting === item.id + "approve" ? <Loader2 size={13} className="animate-spin" /> : <FileCheck size={13} />} Approve
+                </button>
+                <button onClick={() => review(item.id, "reject")} disabled={!!acting}
+                  className="flex items-center gap-1.5 px-4 py-2 border border-destructive text-destructive rounded-xl hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                  style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                  {acting === item.id + "reject" ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />} Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Partner Stories Section ──────────────────────────────
+function PartnerStoriesSection() {
+  const [stories, setStories] = useState<Array<{ id: number; partner_name: string; story: string; share_publicly: boolean; created_at: string; user: { id: string; email: string; name: string } }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [acting, setActing] = useState<number | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    adminApi.partnerStories().then(r => setStories(r.results)).catch(() => {}).finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const toggle = async (id: number, share: boolean) => {
+    setActing(id);
+    try {
+      await adminApi.reviewStory(id, share);
+      setStories(prev => prev.map(s => s.id === id ? { ...s, share_publicly: share } : s));
+      toast.success(share ? "Story published" : "Story hidden");
+    } catch { toast.error("Action failed"); }
+    finally { setActing(null); }
+  };
+
+  return (
+    <div>
+      <SectionHeader title="Partner Stories" sub="Curate success stories visible on the public site" />
+      {loading ? (
+        <div className="flex justify-center py-12"><div className="w-7 h-7 rounded-full border-2 border-primary/30 border-t-primary animate-spin" /></div>
+      ) : stories.length === 0 ? (
+        <div className="text-center py-12">
+          <Heart size={40} className="text-muted-foreground mx-auto mb-3 opacity-40" />
+          <p className="text-muted-foreground">No partner stories submitted yet.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {stories.map(s => (
+            <div key={s.id} className="bg-card rounded-2xl border border-border p-5">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <p style={{ fontWeight: 700, fontSize: "0.9375rem" }}>
+                    {s.partner_name ? `With ${s.partner_name}` : "Anonymous"} — {s.user?.name || s.user?.email}
+                  </p>
+                  <p className="text-muted-foreground" style={{ fontSize: "0.75rem" }}>{new Date(s.created_at).toLocaleDateString()}</p>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${s.share_publicly ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
+                  {s.share_publicly ? "Published" : "Hidden"}
+                </span>
+              </div>
+              <p className="text-muted-foreground mb-4" style={{ fontSize: "0.875rem", lineHeight: 1.65 }}>{s.story}</p>
+              <button
+                onClick={() => toggle(s.id, !s.share_publicly)}
+                disabled={acting === s.id}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl transition-colors disabled:opacity-50 ${s.share_publicly ? "border border-destructive text-destructive hover:bg-destructive/10" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}
+                style={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                {acting === s.id ? <Loader2 size={13} className="animate-spin" /> : s.share_publicly ? <XCircle size={13} /> : <CheckCircle size={13} />}
+                {s.share_publicly ? "Hide Story" : "Publish Story"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ADMIN SHELL ──────────────────────────────────────────
 export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, onSectionChange, onNameChange }: AdminAppProps) {
   // v2 — sections rendered on-demand via renderSection() to avoid recharts key collisions.
@@ -3793,6 +3929,8 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
     { key: "reports",    icon: <Flag size={17} />,            label: "Reports",   badge: ov?.pending_reports_count ?? navCounts.reports },
     { key: "settings",   icon: <Settings size={17} />,        label: "Settings" },
     { key: "audit",      icon: <Shield size={17} />,          label: "Audit Log" },
+    { key: "id-verif",   icon: <BadgeCheck size={17} />,      label: "ID Verify" },
+    { key: "stories",    icon: <Heart size={17} />,           label: "Stories" },
   ];
 
   const navItems = ALL_NAV_ITEMS.filter(item => allowedSections.includes(item.key));
@@ -3813,6 +3951,8 @@ export function AdminApp({ onBack, role, adminName, adminEmail, initialSection, 
       case "reports":    return <ReportsSection />;
       case "settings":   return <SettingsSection role={role} />;
       case "audit":      return <AdminAuditSection />;
+      case "id-verif":   return <IDVerificationSection />;
+      case "stories":    return <PartnerStoriesSection />;
     }
   };
 
